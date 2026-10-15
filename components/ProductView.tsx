@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import PlatformIcon from '@/components/PlatformIcon';
 import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
+import FounderLinks, { FounderLinksCard, type FounderSocials } from '@/components/FounderLinks';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { ArrowUpRight, Share2, Copy, Check } from 'lucide-react';
 import StatusCardModal from '@/components/StatusCardModal';
@@ -11,6 +12,7 @@ import RankingRow from '@/components/RankingRow';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
 import { supportUrl } from '@/lib/site';
+import { claimClick } from '@/lib/clickCount';
 
 interface Listing {
   id: string;
@@ -28,10 +30,12 @@ interface Listing {
 
 // The server renders this with the listing already loaded (so crawlers see the content);
 // it only fetches on the client when the server didn't find it yet (a just-submitted product).
-export default function ProductView({ id, initialProduct, initialAllListings }: {
+export default function ProductView({ id, initialProduct, initialAllListings, founder = null }: {
   id: string;
   initialProduct: Listing | null;
   initialAllListings: Listing[];
+  /** Founder links from the paid spot this product holds, if any. */
+  founder?: FounderSocials | null;
 }) {
   const [product, setProduct] = useState<Listing | null>(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
@@ -42,6 +46,16 @@ export default function ProductView({ id, initialProduct, initialAllListings }: 
 
   useEffect(() => {
     if (!initialProduct) fetchProduct();
+  }, [id]);
+
+  // Opening a product page counts as a click (once per visitor every 30 minutes, see /api/click).
+  const [ownClick, setOwnClick] = useState(0);
+  useEffect(() => {
+    claimClick(id);
+    fetch('/api/click', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (data?.counted) setOwnClick(1); })
+      .catch(() => {});
   }, [id]);
 
   const fetchProduct = async () => {
@@ -241,7 +255,7 @@ export default function ProductView({ id, initialProduct, initialAllListings }: 
                     {voted ? 'Voted' : 'Vote'} · {votes}
                   </button>
                   <a
-                    href={getVisitUrl()}
+                    href={product.url.startsWith('http') ? `/api/click?id=${encodeURIComponent(product.id)}` : getVisitUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 bg-white text-[#0F3460] font-black rounded-xl hover:-translate-y-0.5 active:scale-95 transition-all text-sm shadow-lg shadow-black/10"
@@ -249,6 +263,10 @@ export default function ProductView({ id, initialProduct, initialAllListings }: 
                     Visit {product.platform === 'website' ? 'Website' : 'Profile'}
                     <ArrowUpRight className="w-4 h-4" />
                   </a>
+                  <span className="text-xs sm:text-sm font-semibold text-white/70 tabular-nums">
+                    {((product.clickCount || 0) + ownClick).toLocaleString()} {(product.clickCount || 0) + ownClick === 1 ? 'click' : 'clicks'}
+                  </span>
+                  {founder && <FounderLinks listing={founder} title={product.title} size="md" />}
                   {voteMessage && <span className="text-xs sm:text-sm font-semibold text-emerald-300">{voteMessage}</span>}
                 </div>
               </div>
@@ -317,6 +335,7 @@ export default function ProductView({ id, initialProduct, initialAllListings }: 
 
           {/* SIDEBAR */}
           <aside className="space-y-4 sm:space-y-6 order-1 lg:order-2">
+            {founder && <FounderLinksCard listing={founder} title={product.title} />}
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-4 sm:p-6 lg:sticky lg:top-36">
               <div className="flex items-center gap-3 mb-3">
                 <IconTile tone="green"><PremiumIcons.Share /></IconTile>

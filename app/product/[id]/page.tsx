@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import ProductView from '@/components/ProductView';
 import JsonLd from '@/components/JsonLd';
 import { getListingById, getRankedListings } from '@/lib/server/listings';
+import { getActiveHolders } from '@/lib/server/premium';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { absoluteUrl, breadcrumbSchema, pageMetadata } from '@/lib/seo';
 
@@ -15,7 +16,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const category = getCategoryLabel(product.category);
-  const summary = product.description ? `${product.description.slice(0, 110).trim()}. ` : '';
+  // Cut at a word boundary and drop trailing punctuation so the sentence never ends in ".." or half a word.
+  const short = product.description.length > 110 ? product.description.slice(0, 110).replace(/\s+\S*$/, '') : product.description;
+  const summary = short ? `${short.trim().replace(/[\s.,;:!?-]+$/, '')}. ` : '';
   return pageMetadata({
     title: `${product.title}: ${category} ranking & votes`,
     description: `${summary}${product.title} has ${product.totalVotes} community votes on RankBid. See its live rank in ${category} and vote for free.`,
@@ -25,7 +28,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
-  const [product, allListings] = await Promise.all([getListingById(id), getRankedListings()]);
+  const [product, allListings, holders] = await Promise.all([getListingById(id), getRankedListings(), getActiveHolders()]);
+  // A sponsored product shows the founder links saved with its payment.
+  const spot = holders.find(h => h.listingId === id);
+  // Only the public fields: the founder's email and phone must never reach the page.
+  const founder = spot
+    ? {
+        premiumPosition: spot.position,
+        founderName: spot.founderName,
+        founderWebsite: spot.founderWebsite,
+        founderTwitter: spot.founderTwitter,
+        founderLinkedin: spot.founderLinkedin,
+        founderInstagram: spot.founderInstagram,
+        founderFacebook: spot.founderFacebook,
+        founderTiktok: spot.founderTiktok,
+        founderYoutube: spot.founderYoutube,
+        founderGithub: spot.founderGithub,
+      }
+    : null;
 
   return (
     <>
@@ -48,13 +68,22 @@ export default async function ProductPage({ params }: Props) {
               about: {
                 '@type': 'Thing',
                 name: product.title,
-                ...(product.platform === 'website' && /^https?:\/\//.test(product.url) && { url: product.url }),
+                ...(product.description && { description: product.description }),
+                ...(product.imageUrl && /^https?:\/\//.test(product.imageUrl) && { image: product.imageUrl }),
+                // A website is the thing's own URL; a social profile identifies the creator behind it.
+                ...(/^https?:\/\//.test(product.url) && (product.platform === 'website' ? { url: product.url } : { sameAs: product.url })),
+              },
+              // Community votes, so answer engines can quote the live count.
+              interactionStatistic: {
+                '@type': 'InteractionCounter',
+                interactionType: 'https://schema.org/VoteAction',
+                userInteractionCount: product.totalVotes,
               },
             },
           ]}
         />
       )}
-      <ProductView key={id} id={id} initialProduct={product} initialAllListings={allListings} />
+      <ProductView key={id} id={id} initialProduct={product} initialAllListings={allListings} founder={founder} />
     </>
   );
 }

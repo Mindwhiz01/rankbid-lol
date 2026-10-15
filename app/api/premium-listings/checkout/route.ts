@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
-import { getLadder, usdToPkr } from '@/lib/server/premium';
+import { getActiveHolders, updatePremiumListing, usdToPkr } from '@/lib/server/premium';
+import { MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
+import { getStripe, usdToCents } from '@/lib/server/stripe';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { httpUrlOrNull, staticUrlProblem } from '@/lib/server/url-safety';
+import { getSessionUser } from '@/lib/server/session';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[0-9][0-9 ()-]{6,19}$/;
 const HANDLE_RE = /^@?[A-Za-z0-9_.-]{1,50}$/;
 const URL_FIELDS = ['founderWebsite', 'founderLinkedin', 'founderFacebook', 'founderYoutube'] as const;
 const HANDLE_FIELDS = ['founderTwitter', 'founderInstagram', 'founderTiktok', 'founderGithub'] as const;
+/** Profile URL prefixes each handle field accepts and strips ("x.com/handle" → "handle"). */
+const HANDLE_HOSTS: Record<(typeof HANDLE_FIELDS)[number], RegExp> = {
+  founderTwitter: /^(www\.|mobile\.)?(x|twitter)\.com\//i,
+  founderInstagram: /^(www\.)?instagram\.com\//i,
+  founderTiktok: /^(www\.)?tiktok\.com\//i,
+  founderGithub: /^(www\.)?github\.com\//i,
+};
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
@@ -30,9 +40,11 @@ function validateFounder(item: CartItem): { error: string } | { links: Record<st
   }
   for (const field of HANDLE_FIELDS) {
     // Accept a pasted profile URL ("x.com/handle") and keep just the handle.
-    const raw = str(item[field]).replace(/^https?:\/\//i, '').replace(/^(www\.)?[a-z]+\.com\/@?/i, '').replace(/\/+$/, '');
+    const raw = str(item[field]).replace(/^https?:\/\//i, '').replace(/[?#].*$/, '').replace(/\/+$/, '')
+      .replace(HANDLE_HOSTS[field], '').replace(/^@/, '');
     if (!raw) { links[field] = null; continue; }
-    if (!HANDLE_RE.test(raw)) return { error: `Enter just the ${field.replace('founder', '')} username, e.g. @handle` };
+    // A bare domain or another site's link ("linkedin.com/feed") is not a username.
+    if (!HANDLE_RE.test(raw) || /\.(com|net|org|io|co)$/i.test(raw)) return { error: `Enter just the ${field.replace('founder', '')} username, e.g. @handle` };
     links[field] = raw;
   }
   return { links };
@@ -40,9 +52,8 @@ function validateFounder(item: CartItem): { error: string } | { links: Record<st
 
 interface CartItem {
   listingId: string;
-  position: number;
-  /** What the buyer offers (USD). Defaults to the spot's current minimum. */
-  bidUsd?: number;
+  /** What the buyer pays (whole USD). The rank follows from it. */
+  bidUsd: number;
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -58,7 +69,7 @@ interface CartItem {
 
 interface CheckoutRequest {
   items: CartItem[];
-  paymentMethod: 'rapid-gateway' | 'jazzcash' | 'easypaisa' | 'stripe' | 'manual';
+  paymentMethod: 'stripe';
 }
 
 export async function POST(req: NextRequest) {
@@ -67,34 +78,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
+    // Only the account that submitted a listing can make it premium.
+    const user = await getSessionUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Please sign in to make your listing premium' }, { status: 401 });
+    }
+
     if (!(await rateLimit(`checkout-ip:${ipHash(req)}`, 10, 60 * 60))) {
       return NextResponse.json({ error: 'Too many checkout attempts. Please try again later.' }, { status: 429 });
     }
 
-    const { items, paymentMethod = 'manual' } = await req.json() as CheckoutRequest;
-    if (!['rapid-gateway', 'jazzcash', 'easypaisa', 'stripe', 'manual'].includes(paymentMethod)) {
+    // Stripe is the only payment method.
+    const { items, paymentMethod = 'stripe' } = await req.json() as CheckoutRequest;
+    if (paymentMethod !== 'stripe') {
       return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
     }
 
     // One spot per checkout: the gateway charges a single amount for a single bid.
     if (!Array.isArray(items) || items.length !== 1) {
-      return NextResponse.json({ error: 'Choose one premium spot per checkout' }, { status: 400 });
+      return NextResponse.json({ error: 'Sponsor one product per checkout' }, { status: 400 });
     }
 
     const item = items[0];
-    const position = Number(item.position);
     if (typeof item?.listingId !== 'string' || !item.listingId || !item.founderName || !item.founderEmail || !item.founderPhone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    if (![1, 2, 3].includes(position)) {
-      return NextResponse.json({ error: 'Invalid position. Must be 1, 2, or 3' }, { status: 400 });
+    const bidUsd = Number(item.bidUsd);
+    if (!Number.isInteger(bidUsd) || bidUsd < MIN_BID_USD || bidUsd > 100_000) {
+      return NextResponse.json({ error: `Enter a whole-dollar amount of at least $${MIN_BID_USD}` }, { status: 400 });
     }
     const founder = validateFounder(item);
     if ('error' in founder) {
       return NextResponse.json({ error: founder.error }, { status: 400 });
     }
 
-    const listingRes = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(item.listingId)}&select=id`), {
+    const stripe = getStripe();
+    if (!stripe) {
+      console.error('STRIPE_SECRET_KEY not configured');
+      return NextResponse.json({ error: 'Card payments are not available right now' }, { status: 500 });
+    }
+
+    const listingRes = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(item.listingId)}&select=id,user_id`), {
       headers: sbHeaders(),
       cache: 'no-store',
     });
@@ -102,19 +126,13 @@ export async function POST(req: NextRequest) {
     if (!listing) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
-
-    const spot = (await getLadder()).find(s => s.position === position)!;
-    if (spot.holder?.listingId === item.listingId) {
-      return NextResponse.json({ error: `This product already holds #${position}` }, { status: 409 });
+    if (String(listing.user_id ?? '') !== user.id) {
+      return NextResponse.json({ error: 'Only the person who submitted this listing can make it premium' }, { status: 403 });
     }
 
-    const bidUsd = item.bidUsd == null ? spot.minBidUsd : Math.round(Number(item.bidUsd) * 100) / 100;
-    if (!Number.isFinite(bidUsd) || bidUsd < spot.minBidUsd) {
-      return NextResponse.json(
-        { error: `#${position} now needs at least $${spot.minBidUsd}`, minBidUsd: spot.minBidUsd },
-        { status: 409 }
-      );
-    }
+    // Expected rank right now (recorded for reference; the live rank is worked out from the bids).
+    const others = (await getActiveHolders()).filter(h => h.listingId !== item.listingId);
+    const position = rankForBid(bidUsd, others.map(h => h.bidUsd));
     const amountPkr = usdToPkr(bidUsd);
 
     const insertRes = await fetch(sbUrl('premium_listings'), {
@@ -148,35 +166,56 @@ export async function POST(req: NextRequest) {
     }
     const [premiumListing] = await insertRes.json();
 
-    if (paymentMethod === 'rapid-gateway') {
-      return NextResponse.json({
-        success: true,
-        paymentRequired: true,
-        paymentMethod: 'rapid-gateway',
-        initiatePaymentUrl: '/api/payment/rapid-gateway/initiate',
-        // The initiate route reads the amount from the database; only the id matters here.
-        paymentData: {
-          premiumListingId: premiumListing.id,
-          email: str(item.founderEmail).toLowerCase(),
-          phone: str(item.founderPhone),
-          name: str(item.founderName),
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    const success = new URL('/payment-success', appUrl);
+    // The page reads the real status from the server; it never trusts amounts in the URL.
+    success.searchParams.set('listing_id', premiumListing.id);
+    // Stripe swaps in the real id; keep the braces unencoded.
+    const successUrl = `${success.toString()}&txn_ref={CHECKOUT_SESSION_ID}`;
+
+    const metadata = { product: 'rankbid', premiumListingId: premiumListing.id, position: String(position) };
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      // No payment_method_types: Stripe picks the eligible methods.
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: usdToCents(bidUsd),
+          product_data: {
+            name: 'RankBid Sponsored listing',
+            description: `Sponsored for 30 days, ranked by price (currently #${position})`,
+          },
         },
-        premiumListings: [premiumListing],
-        totalPrice: bidUsd,
-        amountPkr,
-        itemCount: 1,
-      });
-    }
+      }],
+      customer_email: str(item.founderEmail).toLowerCase(),
+      client_reference_id: premiumListing.id,
+      metadata,
+      payment_intent_data: {
+        metadata,
+        // Shows as "RANKBID* PREMIUM" on the card statement; the prefix is set in the Stripe Dashboard.
+        statement_descriptor_suffix: 'PREMIUM',
+      },
+      custom_text: {
+        submit: { message: 'Sponsored listings are ranked by price: a higher bid later can move you down. Your listing stays live for 30 days and is non-refundable once active.' },
+      },
+      success_url: successUrl,
+      cancel_url: `${appUrl}/?premium=cancelled`,
+      // Short-lived so an abandoned checkout doesn't promise a stale rank.
+      // Stripe's minimum is 30 minutes; a little extra absorbs clock skew.
+      expires_at: Math.floor(Date.now() / 1000) + 35 * 60,
+    });
+
+    await updatePremiumListing(premiumListing.id, { payment_txn_ref: session.id });
 
     return NextResponse.json({
       success: true,
-      paymentRequired: false,
-      message: 'Premium listing submitted for review',
+      paymentRequired: true,
+      paymentMethod: 'stripe',
+      redirectUrl: session.url,
       premiumListings: [premiumListing],
       totalPrice: bidUsd,
-      amountPkr,
       itemCount: 1,
-      nextSteps: `An admin will verify your payment of PKR ${amountPkr.toLocaleString()} and activate #${position}. If someone outbids you first, you'll be contacted about a refund.`,
     });
   } catch (error: any) {
     console.error('Checkout error:', error);

@@ -6,7 +6,7 @@ import { SITE_URL, SUPPORT_EMAIL, X_HANDLE, X_URL } from '@/lib/site';
 export const SITE_NAME = 'RankBid';
 export const SITE_TAGLINE = 'Free community-voted product rankings';
 export const SITE_DESCRIPTION =
-  'RankBid is a free product launch platform where real people vote and the most-voted products, websites and creator profiles rise to the top of a live leaderboard. Rankings come from public vote counts, not algorithms.';
+  'RankBid is a free product launch platform where real people vote and the most-voted products, websites and creator profiles rise to the top of a live leaderboard. Rankings come from public vote counts, not algorithms. Makers can also bid for one of ten clearly labeled sponsored spots, starting at $1.';
 
 export const absoluteUrl = (path = '/') => new URL(path, SITE_URL).toString();
 
@@ -32,7 +32,7 @@ export const organizationSchema = {
   '@id': `${SITE_URL}/#organization`,
   name: SITE_NAME,
   url: SITE_URL,
-  logo: absoluteUrl('/icon'),
+  logo: absoluteUrl('/brand/logo.png'),
   description: SITE_DESCRIPTION,
   email: SUPPORT_EMAIL,
   sameAs: [X_URL],

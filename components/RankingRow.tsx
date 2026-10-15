@@ -9,6 +9,7 @@ import { getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
 import { supportUrl } from '@/lib/site';
 import { safeExternalUrl } from '@/lib/utils';
+import { claimClick } from '@/lib/clickCount';
 
 export interface RankingListing {
   id: string;
@@ -17,6 +18,8 @@ export interface RankingListing {
   description?: string;
   category: string;
   platform?: string;
+  /** Product-page opens plus site visits (see /api/click). Hidden when the source doesn't send it. */
+  clickCount?: number;
 }
 
 const FALLBACK_ICON =
@@ -56,6 +59,10 @@ export default function RankingRow({
 }) {
   const { voted, busy, extraVotes, message, vote: handleVote } = useVote(listing.id);
   const [shareOpen, setShareOpen] = useState(false);
+  const [clicks, setClicks] = useState(listing.clickCount);
+  const bumpClicks = () => {
+    if (claimClick(listing.id)) setClicks(c => (c === undefined ? c : c + 1));
+  };
 
   const platform = listing.platform || 'website';
   const badge = rankBadge[rank] ?? 'bg-[#0F3460] text-white shadow-[#0F3460]/20';
@@ -81,6 +88,7 @@ export default function RankingRow({
           <div className="flex items-center gap-1.5">
             <Link
               href={`/product/${listing.id}`}
+              onClick={bumpClicks}
               className="text-xs sm:text-sm font-bold text-[#1F2937] truncate hover:text-[#0F3460] transition-colors after:absolute after:inset-0 after:content-['']"
             >
               {listing.title}
@@ -93,6 +101,11 @@ export default function RankingRow({
             <span className="text-[11px] sm:text-xs font-semibold text-[#0F3460] bg-[#0F3460]/5 px-1.5 py-0.5 rounded whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">
               {getCategoryLabel(listing.category)}
             </span>
+            {clicks !== undefined && (
+              <span className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/50 whitespace-nowrap">
+                {clicks.toLocaleString()} {clicks === 1 ? 'click' : 'clicks'}
+              </span>
+            )}
             {message && <span className="text-[11px] sm:text-xs font-semibold text-[#059669]">{message}</span>}
           </div>
         </div>
@@ -132,8 +145,8 @@ export default function RankingRow({
           {onPremium && (
             <button
               onClick={onPremium}
-              title="Feature this product"
-              aria-label={`Make ${listing.title} premium`}
+              title="Get a sponsored spot"
+              aria-label={`Get a sponsored spot for ${listing.title}`}
               className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all active:scale-95"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -142,9 +155,10 @@ export default function RankingRow({
             </button>
           )}
           <a
-            href={safeExternalUrl(listing.url) ?? '#'}
+            href={safeExternalUrl(listing.url) ? `/api/click?id=${encodeURIComponent(listing.id)}` : '#'}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={bumpClicks}
             aria-label={`Visit ${listing.title}`}
             className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-[#1F2937]/70 hover:text-[#0F3460] hover:border-[#0F3460]/30 transition-all"
           >

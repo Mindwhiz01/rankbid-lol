@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { categoryPath } from '@/lib/categories';
+import SearchDialog from '@/components/SearchDialog';
 import { Search, Menu, X, Grid3x3, Trophy, Sparkles, LineChart, Users, Zap, Palette, Bitcoin, Code2, Compass, Activity, Eye, TrendingUp, LogOut } from 'lucide-react';
 
 // `category` must match the stored listing category values (see CATEGORIES in app/page.tsx).
@@ -56,7 +57,23 @@ export default function Header() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
-  const [stats, setStats] = useState({ live: 0, today: 0, views: 0 });
+  // Stays false until localStorage is read, so signed-in users never see the auth buttons flash.
+  const [authChecked, setAuthChecked] = useState(false);
+  // null until loaded: the server HTML shows dashes, not "0 visitors" (crawlers and AI engines read it on every page).
+  const [stats, setStats] = useState<{ live: number; today: number; views: number } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ⌘K / Ctrl+K opens search from anywhere
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // The site is light-only; clear any dark class left from earlier visits.
   useEffect(() => {
@@ -72,6 +89,7 @@ export default function Header() {
         localStorage.removeItem('user');
       }
     }
+    setAuthChecked(true);
   }, []);
 
   // Fetch stats for header display
@@ -132,8 +150,7 @@ export default function Header() {
                 {mobileOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
               </button>
               <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-[#0F3460] to-[#1a5490] text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-sm">R</span>
-                <span className="text-base sm:text-lg md:text-xl font-black text-[#0F3460] tracking-tight">RankBid</span>
+                <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-7 sm:h-8 md:h-9 w-auto" />
               </Link>
             </div>
 
@@ -141,19 +158,19 @@ export default function Header() {
             <div className="hidden md:flex items-center gap-3 ml-4 lg:ml-6 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                <span className="text-xs font-semibold text-gray-900">{stats.live}</span>
+                <span className="text-xs font-semibold text-gray-900">{stats?.live ?? '–'}</span>
                 <span className="text-xs text-gray-500">LIVE</span>
               </div>
               <span className="text-gray-300 text-xs">•</span>
               <div className="flex items-center gap-1">
                 <Users className="w-4 h-4 text-blue-500" />
-                <span className="text-xs font-semibold text-gray-900">{stats.today}</span>
+                <span className="text-xs font-semibold text-gray-900">{stats?.today ?? '–'}</span>
                 <span className="text-xs text-gray-500">VISITORS</span>
               </div>
               <span className="text-gray-300 text-xs">•</span>
               <div className="flex items-center gap-1">
                 <Eye className="w-4 h-4 text-gray-600" />
-                <span className="text-xs font-semibold text-gray-900">{stats.views}</span>
+                <span className="text-xs font-semibold text-gray-900">{stats?.views ?? '–'}</span>
                 <span className="text-xs text-gray-500">VIEWS</span>
               </div>
             </div>
@@ -193,17 +210,23 @@ export default function Header() {
                 >
                   {(user.name || user.email).charAt(0).toUpperCase()}
                 </Link>
+              ) : authChecked ? (
+                <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2 flex-shrink-0">
+                  <Link href="/login" className="hidden sm:inline-flex text-xs md:text-sm font-semibold text-[#0F3460] px-2 md:px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                    Log in
+                  </Link>
+                  <Link href="/signup" className="inline-flex items-center text-xs md:text-sm font-bold text-white bg-gradient-to-r from-[#0F3460] to-[#1a5490] px-2.5 sm:px-3 md:px-4 py-1.5 md:py-2 rounded-lg shadow-sm hover:shadow-md transition-shadow whitespace-nowrap">
+                    Sign up
+                  </Link>
+                </div>
               ) : null}
 
               {/* Search */}
               <button
-                onClick={() => {
-                  const query = prompt('Search products...');
-                  if (query?.trim()) {
-                    window.location.href = `/search?q=${encodeURIComponent(query)}`;
-                  }
-                }}
-                className="p-1 sm:p-1.5 md:p-2 text-[#1F2937] rounded-lg flex-shrink-0"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search products"
+                title="Search (⌘K)"
+                className="p-1 sm:p-1.5 md:p-2 text-[#1F2937] rounded-lg flex-shrink-0 hover:bg-gray-100 transition-colors"
               >
                 <Search className="w-4 h-4 md:w-5 md:h-5" />
               </button>
@@ -221,7 +244,16 @@ export default function Header() {
                 >
                   My Profile
                 </Link>
-              ) : null}
+              ) : (
+                <div className="grid grid-cols-2 gap-2 px-3 pb-2">
+                  <Link href="/login" onClick={() => setMobileOpen(false)} className="text-center text-sm font-semibold text-[#0F3460] border border-[#0F3460]/20 py-2.5 rounded-lg hover:bg-gray-50">
+                    Log in
+                  </Link>
+                  <Link href="/signup" onClick={() => setMobileOpen(false)} className="text-center text-sm font-bold text-white bg-gradient-to-r from-[#0F3460] to-[#1a5490] py-2.5 rounded-lg">
+                    Create account
+                  </Link>
+                </div>
+              )}
 
               <Link href="/platforms" className="flex items-center gap-2 text-sm font-semibold text-[#1F2937] px-3 py-2.5 rounded-lg hover:bg-gray-50">
                 <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -249,6 +281,8 @@ export default function Header() {
           )}
         </div>
       </header>
+
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* Category Filter - Professional (hidden on mobile) */}
       <div className="hidden md:block bg-gray-50 text-[#1F2937] border-b border-gray-200 sticky top-12 sm:top-14 md:top-16 z-30 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

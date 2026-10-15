@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getListingById, getRankedListings } from '@/lib/server/listings';
 import { getCategoryLabel } from '@/lib/categories';
+import { LOGO_WHITE_RATIO, logoWhiteDataUrl } from '@/lib/server/brand-logo';
 
 export const alt = 'Product ranking on RankBid';
 export const size = { width: 1200, height: 630 };
@@ -9,7 +10,7 @@ export const contentType = 'image/png';
 // Share card for a product: title, category, live rank and votes.
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, all] = await Promise.all([getListingById(id), getRankedListings()]);
+  const [product, all, logo] = await Promise.all([getListingById(id), getRankedListings(), logoWhiteDataUrl()]);
   const rank = product && product.totalVotes > 0 ? all.findIndex(l => l.id === product.id) + 1 : 0;
   const title = product?.title ?? 'RankBid';
 
@@ -22,8 +23,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <div style={{ width: 60, height: 60, borderRadius: 16, background: 'white', color: '#0F3460', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 900 }}>R</div>
-          <div style={{ fontSize: 36, fontWeight: 900 }}>RankBid</div>
+          <img src={logo} alt="RankBid" width={Math.round(60 * LOGO_WHITE_RATIO)} height={60} />
           {product && (
             <div style={{ marginLeft: 'auto', fontSize: 26, padding: '8px 22px', borderRadius: 999, background: 'rgba(255,255,255,0.15)' }}>
               {getCategoryLabel(product.category)}

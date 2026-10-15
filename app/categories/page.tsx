@@ -2,6 +2,7 @@ import CategoryBrowser from '@/components/CategoryBrowser';
 import JsonLd from '@/components/JsonLd';
 import { CATEGORIES, categoryPath, getCategoryLabel } from '@/lib/categories';
 import { getRankedListings } from '@/lib/server/listings';
+import { getCustomCategories } from '@/lib/server/custom-categories';
 import { absoluteUrl, breadcrumbSchema, itemListSchema, pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
@@ -11,7 +12,7 @@ export const metadata = pageMetadata({
 });
 
 export default async function CategoriesPage() {
-  const listings = await getRankedListings();
+  const [listings, custom] = await Promise.all([getRankedListings(), getCustomCategories()]);
   const counts: Record<string, number> = {};
   for (const l of listings) counts[l.category] = (counts[l.category] || 0) + 1;
   const top = listings.slice(0, 50);
@@ -25,7 +26,7 @@ export default async function CategoriesPage() {
             '@type': 'CollectionPage',
             name: 'RankBid product categories',
             url: absoluteUrl('/categories'),
-            hasPart: CATEGORIES.map(c => ({ '@type': 'CollectionPage', name: `${getCategoryLabel(c)} products`, url: absoluteUrl(categoryPath(c)) })),
+            hasPart: [...CATEGORIES, ...custom].map(c => ({ '@type': 'CollectionPage', name: `${getCategoryLabel(c)} products`, url: absoluteUrl(categoryPath(c)) })),
           },
           itemListSchema('Top products on RankBid', top),
         ]}
@@ -34,6 +35,7 @@ export default async function CategoriesPage() {
         selected={null}
         listings={top}
         counts={counts}
+        custom={custom}
         intro={`RankBid groups every launched product into ${CATEGORIES.length} categories. Each category has its own live leaderboard, ranked only by community votes, so you can find the most-loved tools in your niche.`}
       />
     </>

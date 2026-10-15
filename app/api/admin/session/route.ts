@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminKey } from '@/lib/server/admin';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
 // GET: is this browser an admin (admin key cookie, or signed in with an admin email)?
 export async function GET(req: NextRequest) {
@@ -27,9 +28,15 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-// DELETE: sign the admin key out.
-export async function DELETE() {
+// DELETE: sign out of the dashboard: drops the admin key cookie and ends an email sign-in too,
+// since admins who signed in with their account would otherwise still be admins.
+export async function DELETE(req: NextRequest) {
+  const token = req.cookies.get('auth_token')?.value;
+  if (token) {
+    await fetch(sbUrl(`sessions?token=eq.${encodeURIComponent(token)}`), { method: 'DELETE', headers: sbHeaders() }).catch(() => null);
+  }
   const res = NextResponse.json({ admin: false });
   res.cookies.delete(ADMIN_COOKIE);
+  res.cookies.delete('auth_token');
   return res;
 }

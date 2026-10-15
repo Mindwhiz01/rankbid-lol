@@ -13,21 +13,19 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The site also loads on *.vercel.app (no coming soon page there); keep those copies out of search
+      // so only rankbid.click gets indexed.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: ".*\\.vercel\\.app" }],
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
   },
   async redirects() {
     return [
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "rankbid-lol.vercel.app",
-          },
-        ],
-        destination: "https://www.rankbid.click/:path*",
-        permanent: true,
-      },
       // Legacy paid-bidding pages: listings now live at /product/:id and
       // submissions go through the free form on the homepage.
       {

@@ -10,7 +10,8 @@
     "db:push": "prisma db push && node prisma/seed.js",
     "db:migrate": "prisma migrate dev && node prisma/seed.js",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

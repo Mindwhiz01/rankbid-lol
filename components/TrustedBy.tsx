@@ -203,8 +203,8 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
           <Ring which="outer" turn={turn} active={activeAvatar} />
           <Ring which="inner" turn={turn} active={activeAvatar} />
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[17%] h-[17%] rounded-full bg-[#059669]/15 flex items-center justify-center">
-            <span className="w-[62%] h-[62%] rounded-[30%] bg-gradient-to-br from-[#0F3460] to-[#1a5490] text-white font-black flex items-center justify-center text-[clamp(1rem,3.2vw,1.75rem)] shadow-lg shadow-[#0F3460]/30">
-              R
+            <span className="w-[62%] h-[62%] rounded-[30%] bg-white flex items-center justify-center shadow-lg shadow-[#0F3460]/30">
+              <img src="/brand/logo-mark.png" alt="" width={223} height={194} className="w-[70%] h-auto" />
             </span>
           </div>
         </div>

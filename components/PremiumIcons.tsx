@@ -132,6 +132,12 @@ export const PremiumIcons = {
       <path d="M7 3.5h10v5a5 5 0 01-10 0v-5zM7 5.5H4.5v1.5A3 3 0 007.3 10M17 5.5h2.5v1.5a3 3 0 01-2.8 3M12 13.5v3.5M8.5 20.5h7l-.8-3.5H9.3l-.8 3.5z" />
     </Svg>
   ),
+  Inbox: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M3.5 13.5l2.6-7.3A2 2 0 018 4.8h8a2 2 0 011.9 1.4l2.6 7.3v4.2a2 2 0 01-2 2h-13a2 2 0 01-2-2v-4.2z" fill="currentColor" fillOpacity={0.25} />
+      <path d="M3.5 13.5l2.6-7.3A2 2 0 018 4.8h8a2 2 0 011.9 1.4l2.6 7.3v4.2a2 2 0 01-2 2h-13a2 2 0 01-2-2v-4.2zM3.5 13.5h4.3l1.4 2.5h5.6l1.4-2.5h4.3" />
+    </Svg>
+  ),
   Shield: (p: IconProps) => (
     <Svg {...p}>
       <path d="M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6l8-3z" fill="currentColor" fillOpacity={0.25} />
@@ -162,6 +168,23 @@ export function IconTile({
   return (
     <div className={`${tileSizes[size]} ${tileTones[tone]} text-white flex items-center justify-center flex-shrink-0 shadow-md ring-1 ring-white/20`}>
       {children}
+    </div>
+  );
+}
+
+// Empty-state badge: gradient inbox tile on a soft halo, with a green "+" inviting the first submission.
+export function EmptyStateIcon({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const box = size === 'sm' ? 'w-12 h-12 sm:w-14 sm:h-14 rounded-2xl' : 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl';
+  const icon = size === 'sm' ? 'w-6 h-6 sm:w-7 sm:h-7' : 'w-7 h-7 sm:w-8 sm:h-8';
+  return (
+    <div className="relative inline-flex">
+      <div className="absolute -inset-3 rounded-[1.75rem] bg-gradient-to-br from-[#0F3460]/10 to-[#059669]/10 blur-md" aria-hidden="true" />
+      <div className={`relative ${box} bg-gradient-to-br from-[#0F3460] to-[#1a5490] text-white flex items-center justify-center shadow-lg shadow-[#0F3460]/25 ring-1 ring-white/20`}>
+        <PremiumIcons.Inbox className={icon} />
+      </div>
+      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gradient-to-br from-[#059669] to-[#10B981] text-white ring-2 ring-white flex items-center justify-center shadow-md" aria-hidden="true">
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
+      </span>
     </div>
   );
 }

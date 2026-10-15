@@ -3,9 +3,11 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, ChevronRight } from 'lucide-react';
+import { LogOut, ChevronRight, Star, Pencil, Trash2 } from 'lucide-react';
 import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
+import SubmissionEditModal from '@/components/SubmissionEditModal';
+import { HOME_SPONSORED } from '@/lib/premiumSpots';
 
 interface User {
   id: string;
@@ -24,6 +26,13 @@ interface Listing {
   dayVotes: number;
   category: string;
   createdAt: string;
+}
+
+/** A live sponsored listing of this user's (from /api/premium-listings/ladder): its rank by price. */
+interface HeldSpot {
+  position: number;
+  bidUsd: number;
+  expiresAt: string | null;
 }
 
 interface Vote {
@@ -48,6 +57,12 @@ export default function ProfilePage() {
   const [allListings, setAllListings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'submissions' | 'votes' | 'settings'>('submissions');
   const [loading, setLoading] = useState(true);
+  const [premiumSpots, setPremiumSpots] = useState<Record<string, HeldSpot>>({});
+  const [notice, setNotice] = useState('');
+  const [editing, setEditing] = useState<Listing | null>(null);
+  const [deleting, setDeleting] = useState<Listing | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -72,12 +87,28 @@ export default function ProfilePage() {
       if (submissionsRes.ok) {
         const data = await submissionsRes.json();
         setSubmissions(data.listings || []);
+        // Older outbid emails link here with ?raise=<listingId>: send them to the sponsor checkout page.
+        const raiseId = new URLSearchParams(window.location.search).get('raise');
+        if (raiseId && (data.listings || []).some((l: Listing) => l.id === raiseId)) {
+          router.replace(`/sponsor?listing=${encodeURIComponent(raiseId)}`);
+        }
       }
 
       const votesRes = await fetch('/api/user/votes');
       if (votesRes.ok) {
         const data = await votesRes.json();
         setVotes(data.votes || []);
+      }
+
+      // Which of the user's submissions are sponsored right now, and their rank by price
+      const ladderRes = await fetch('/api/premium-listings/ladder');
+      if (ladderRes.ok) {
+        const data = await ladderRes.json();
+        const held: Record<string, HeldSpot> = {};
+        for (const r of data.ranked || []) {
+          held[r.listingId] = { position: r.position, bidUsd: r.bidUsd, expiresAt: r.expiresAt };
+        }
+        setPremiumSpots(held);
       }
 
       // Fetch all listings to calculate rankings
@@ -95,6 +126,35 @@ export default function ProfilePage() {
 
   const calculateRank = (totalVotes: number): number => {
     return allListings.filter(l => (l.totalVotes || 0) > totalVotes).length + 1;
+  };
+
+  const openDelete = (listing: Listing) => {
+    setNotice('');
+    setDeleteError('');
+    setDeleting(listing);
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      const res = await fetch('/api/user/submissions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: deleting.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not delete this submission');
+      setSubmissions(prev => prev.filter(l => l.id !== deleting.id));
+      setAllListings(prev => prev.filter(l => l.id !== deleting.id));
+      setNotice(`${deleting.title || 'Your submission'} was deleted.`);
+      setDeleting(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this submission');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const handleLogout = () => {
@@ -202,15 +262,79 @@ export default function ProfilePage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="curve-list space-y-3">
-                    {submissions.map((listing) => (
-                      <RankingRow
-                        key={listing.id}
-                        listing={{ ...listing, url: listing.url || '', title: listing.title || (listing.handle ? `@${listing.handle}` : listing.url || 'Untitled') }}
-                        rank={calculateRank(listing.totalVotes)}
-                        votes={listing.totalVotes || 0}
-                      />
-                    ))}
+                  <div className="space-y-3">
+                    {notice && (
+                      <p role="status" className="px-4 py-3 rounded-xl bg-[#059669]/10 border border-[#059669]/25 text-sm font-semibold text-[#065F46]">
+                        {notice}
+                      </p>
+                    )}
+                    {submissions.map((listing) => {
+                      const title = listing.title || (listing.handle ? `@${listing.handle}` : listing.url || 'Untitled');
+                      const spot = premiumSpots[listing.id];
+                      const manage = (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => { setNotice(''); setEditing({ ...listing, title }); }}
+                            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-[#0F3460] text-xs sm:text-sm font-bold hover:border-[#0F3460]/40 hover:bg-[#0F3460]/[0.04] transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDelete({ ...listing, title })}
+                            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-red-600 text-xs sm:text-sm font-bold hover:border-red-300 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
+                        </div>
+                      );
+                      return (
+                        <div key={listing.id}>
+                          <RankingRow
+                            listing={{ ...listing, url: listing.url || '', title }}
+                            rank={calculateRank(listing.totalVotes)}
+                            votes={listing.totalVotes || 0}
+                          />
+                          {/* Premium strip: held spot, or the option to buy one */}
+                          {spot ? (
+                            <div className="mx-2 sm:mx-3 -mt-1 pt-3 pb-2 px-3 sm:px-4 rounded-b-xl bg-amber-50 border border-t-0 border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-amber-700">
+                                <Star className="w-4 h-4 fill-amber-500 text-amber-500" /> Sponsored #{spot.position}
+                              </span>
+                              <span className="text-xs text-amber-700/70">
+                                ${spot.bidUsd} · {spot.position <= HOME_SPONSORED ? 'on the homepage' : 'on the sponsored page'}
+                                {spot.expiresAt && ` · until ${new Date(spot.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                              </span>
+                              <div className="ml-auto flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/sponsor?listing=${encodeURIComponent(listing.id)}`)}
+                                  className="text-xs font-black text-amber-700 hover:underline"
+                                >
+                                  Raise bid
+                                </button>
+                                {manage}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mx-2 sm:mx-3 -mt-1 pt-3 pb-2 px-3 sm:px-4 rounded-b-xl bg-gray-50 border border-t-0 border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <p className="text-xs text-[#1F2937]/60">Sponsor it for 30 days from $1: the higher you pay, the higher it ranks.</p>
+                              <div className="self-start sm:self-auto flex flex-wrap items-center gap-1.5">
+                                {manage}
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/sponsor?listing=${encodeURIComponent(listing.id)}`)}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 text-white text-xs sm:text-sm font-black shadow-sm shadow-amber-500/30 hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-white" /> Sponsor it
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -277,9 +401,14 @@ export default function ProfilePage() {
                           {/* Right Section: Vote Count and Actions */}
                           <div className="flex items-center gap-3 ml-2 flex-shrink-0">
                             {/* Vote Count */}
-                            <p className="text-lg font-black text-[#0F3460] min-w-[1.5rem] text-right">
-                              {vote.listing?.totalVotes || 0}
-                            </p>
+                            <div className="min-w-[2.5rem] text-right">
+                              <p className="text-lg font-black text-[#0F3460] leading-none">
+                                {vote.listing?.totalVotes || 0}
+                              </p>
+                              <p className="text-[10px] sm:text-[11px] text-[#1F2937]/50 font-semibold mt-0.5">
+                                {(vote.listing?.totalVotes || 0) === 1 ? 'vote' : 'votes'}
+                              </p>
+                            </div>
 
                             <ChevronRight className="w-4 h-4 text-[#1F2937]/30 group-hover:text-[#0F3460] transition-colors" />
                           </div>
@@ -347,6 +476,59 @@ export default function ProfilePage() {
         )}
       </div>
       </div>
+
+      {editing && (
+        <SubmissionEditModal
+          submission={editing}
+          onClose={() => setEditing(null)}
+          onSaved={updated => {
+            setSubmissions(prev => prev.map(l => (l.id === updated.id ? { ...l, ...updated } : l)));
+            setNotice('Your changes were saved.');
+            setEditing(null);
+          }}
+        />
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 bg-[#0B2545]/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => !deleteBusy && setDeleting(null)}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-submission-title"
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl slide-up p-5 sm:p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h2 id="delete-submission-title" className="text-base sm:text-lg font-black text-[#1F2937] mb-1.5">Delete this submission?</h2>
+            <p className="text-xs sm:text-sm text-[#1F2937]/65">
+              <span className="font-bold text-[#1F2937]">{deleting.title}</span> will be removed from the rankings along with
+              its {deleting.totalVotes || 0} {deleting.totalVotes === 1 ? 'vote' : 'votes'}. This can&apos;t be undone.
+            </p>
+            {deleteError && <p role="alert" className="mt-3 text-xs font-bold text-red-600">{deleteError}</p>}
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setDeleting(null)}
+                disabled={deleteBusy}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-xs sm:text-sm font-bold text-[#1F2937]/70 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteBusy}
+                className="px-5 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-black hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

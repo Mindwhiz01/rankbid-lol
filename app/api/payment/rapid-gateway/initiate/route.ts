@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       CUSTOMER_MOBILE_NO: phone,
       CUSTOMER_EMAIL_ADDRESS: email,
       BASKET_ID: basketId,
-      TXNDESC: `Premium listing boost - Position #${premium.position}`,
+      TXNDESC: 'RankBid sponsored listing',
       ORDER_DATE: new Date().toISOString().split('T')[0],
       SUCCESS_URL: `${appUrl}/payment-success?basket_id=${basketId}`,
       FAILURE_URL: `${appUrl}/payment-failure?basket_id=${basketId}`,

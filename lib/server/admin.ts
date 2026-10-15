@@ -41,16 +41,65 @@ export function isValidAdminCookie(value: string | null | undefined): boolean {
   return Boolean(expected && value && safeEqual(value, expected));
 }
 
+// ---- Team admins ----
+// Up to MAX_TEAM_ADMINS extra people the owner shares the dashboard with, stored as an email list
+// in site_settings (key 'admin_team'). Their accounts are created by the owner with a password,
+// so nobody can claim one of these addresses by signing up first.
+
+export const MAX_TEAM_ADMINS = 3;
+const TEAM_KEY = 'admin_team';
+const TEAM_CACHE_MS = 15_000;
+let teamCache: { emails: string[]; at: number } | null = null;
+
+export async function getTeamAdminEmails(): Promise<string[]> {
+  if (teamCache && Date.now() - teamCache.at < TEAM_CACHE_MS) return teamCache.emails;
+  let emails: string[] = [];
+  try {
+    const res = await fetch(sbUrl(`site_settings?key=eq.${TEAM_KEY}&select=value`), { headers: sbHeaders(), cache: 'no-store' });
+    if (res.ok) {
+      const [row] = await res.json();
+      if (Array.isArray(row?.value)) emails = row.value.filter((e: unknown): e is string => typeof e === 'string');
+    }
+  } catch (e) {
+    console.error('Failed to read admin team:', e);
+  }
+  teamCache = { emails, at: Date.now() };
+  return emails;
+}
+
+export async function setTeamAdminEmails(emails: string[]): Promise<void> {
+  const res = await fetch(sbUrl('site_settings?on_conflict=key'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify({ key: TEAM_KEY, value: emails, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Failed to save admin team: ${await res.text()}`);
+  teamCache = { emails, at: Date.now() };
+}
+
 /**
- * An admin request carries the admin key (x-admin-key header), the adminKey cookie set by
- * /api/admin/session, or comes from a signed-in user whose email is in ADMIN_EMAILS.
+ * The owner: holds the admin key (header or cookie) or is signed in with an ADMIN_EMAILS address.
+ * Only the owner can add or remove team admins.
+ */
+export async function isOwnerRequest(req: NextRequest): Promise<boolean> {
+  if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
+    return true;
+  }
+  const user = await getSessionUser(req);
+  return Boolean(user && ADMIN_EMAILS.includes(user.email));
+}
+
+/**
+ * An admin request comes from the owner (see isOwnerRequest) or from a signed-in user whose
+ * email is on the admin team.
  */
 export async function isAdminRequest(req: NextRequest): Promise<boolean> {
   if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
     return true;
   }
   const user = await getSessionUser(req);
-  return Boolean(user && ADMIN_EMAILS.includes(user.email));
+  if (!user) return false;
+  return ADMIN_EMAILS.includes(user.email) || (await getTeamAdminEmails()).includes(user.email);
 }
 
 // ---- Data ----

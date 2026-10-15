@@ -3,13 +3,17 @@ import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
 import SelectionHeading from '@/components/SelectionHeading';
 import CategoryDropdown from '@/components/CategoryDropdown';
+import SubmitProductModal from '@/components/SubmitProductModal';
 import { CATEGORIES, categoryPath, getCategoryLabel } from '@/lib/categories';
+import { MIN_BID_USD } from '@/lib/premiumSpots';
 import type { Listing } from '@/lib/server/listings';
 
 // Server-rendered category hub and category pages. Every category is a real link to its
 // own URL so crawlers can reach each one, and the rankings are in the initial HTML.
-export default function CategoryBrowser({ selected, listings, counts, intro }: {
+export default function CategoryBrowser({ selected, listings, counts, intro, custom = [] }: {
   selected: string | null;
+  /** Categories people added under "Other" (listed after the built-in ones, before Other). */
+  custom?: string[];
   listings: Listing[];
   counts: Record<string, number>;
   intro: string;
@@ -48,7 +52,7 @@ export default function CategoryBrowser({ selected, listings, counts, intro }: {
             <CategoryDropdown
               label={label}
               count={selected ? counts[selected] || 0 : totalCount}
-              options={[null, ...CATEGORIES].map(cat => ({
+              options={[null, ...CATEGORIES.filter(c => c !== 'Other'), ...custom, 'Other'].map(cat => ({
                 key: cat ?? 'all',
                 href: cat ? categoryPath(cat) : '/categories',
                 label: cat ? getCategoryLabel(cat) : 'All Categories',
@@ -73,12 +77,12 @@ export default function CategoryBrowser({ selected, listings, counts, intro }: {
             {listings.length === 0 ? (
               <div className="text-center py-8 sm:py-12 border border-gray-200 shadow-sm bg-white rounded-lg">
                 <p className="text-sm font-bold text-[#1F2937] mb-4">No products yet in {selected ? label : 'any category'}. Be the first to launch here.</p>
-                <Link
-                  href="/#submit"
+                <SubmitProductModal
+                  category={selected}
+                  label="Submit a product"
                   className="inline-block px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all"
-                >
-                  Submit a product for free
-                </Link>
+                />
+                <p className="mt-3 text-xs text-[#1F2937]/50">Free, or sponsored from ${MIN_BID_USD}.</p>
               </div>
             ) : (
               <ol className="curve-list space-y-3 sm:space-y-4">

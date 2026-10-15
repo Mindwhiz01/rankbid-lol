@@ -17,7 +17,8 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
         <li><strong>Votes:</strong> which products you voted for. Guest votes from a shared support link also store the name, email and support type you enter.</li>
         <li><strong>Waitlist:</strong> the email address you sign up with.</li>
         <li><strong>Usage data:</strong> pages visited, a visitor session ID, your IP address and browser user agent, used to count visitors and stop vote abuse.</li>
-        <li><strong>Payments:</strong> for premium listings, payment details are entered with our payment providers. We receive a confirmation and the amount, not your full card or wallet details.</li>
+        <li><strong>Clicks:</strong> when you open a product, we count one click. To avoid counting the same visitor twice, we keep a salted hash of your IP address (not the address itself) for up to a day.</li>
+        <li><strong>Payments:</strong> for sponsored spots, card details are entered with Stripe. We receive a confirmation and the amount, not your card details. We also store the founder name, email, phone and links you enter when buying a spot.</li>
       </ul>
     ),
   },
@@ -29,7 +30,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
         <li>To run RankBid: show listings, count votes and keep rankings accurate.</li>
         <li>To keep you signed in and secure your account.</li>
         <li>To detect fraud such as duplicate accounts, bots or paid votes.</li>
-        <li>To process premium listings and contact you about them.</li>
+        <li>To process sponsored spots and contact you about them.</li>
         <li>To send product or launch updates if you joined the waitlist. You can ask us to stop at any time.</li>
       </ul>
     ),
@@ -39,8 +40,8 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     title: 'What Is Public',
     body: (
       <p>
-        Listing content you submit (title, description, logo, link and founder info on premium listings) and vote counts
-        are shown publicly. We never publish voters&rsquo; email addresses.
+        Listing content you submit (title, description, logo and link), vote and click counts, and on sponsored spots the bid
+        amount and founder social links, are shown publicly. Founder email addresses and phone numbers are never shown. We never publish voters&rsquo; email addresses.
       </p>
     ),
   },
@@ -53,7 +54,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
         <ul>
           <li>Supabase (database and storage) and Vercel (hosting).</li>
           <li>Google, if you choose to sign in with Google.</li>
-          <li>Payment providers (card gateway, JazzCash, EasyPaisa) when you buy a premium listing.</li>
+          <li>Stripe, when you buy a sponsored spot.</li>
         </ul>
         <p>We may also disclose information if required by law.</p>
       </>

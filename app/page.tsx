@@ -1,5 +1,7 @@
 import HomePage from '@/components/HomePage';
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, pageMetadata } from '@/lib/seo';
+import JsonLd from '@/components/JsonLd';
+import { getRankedListings } from '@/lib/server/listings';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, itemListSchema, pageMetadata } from '@/lib/seo';
 
 export const metadata = {
   ...pageMetadata({ title: `${SITE_NAME}: ${SITE_TAGLINE}`, description: SITE_DESCRIPTION, path: '/' }),
@@ -7,6 +9,13 @@ export const metadata = {
   title: { absolute: `${SITE_NAME}: ${SITE_TAGLINE}` },
 };
 
-export default function Page() {
-  return <HomePage />;
+export default async function Page() {
+  // Rendered into the HTML so search engines and AI crawlers see the live rankings.
+  const listings = (await getRankedListings()).slice(0, 1000).map(l => ({ ...l, isPremium: false }));
+  return (
+    <>
+      <JsonLd data={itemListSchema('Top products on RankBid by community votes', listings.slice(0, 15))} />
+      <HomePage initialListings={listings} />
+    </>
+  );
 }

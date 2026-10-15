@@ -202,60 +202,6 @@ body {
   animation: floatSlow 6s ease-in-out infinite;
 }
 
-/* Footer wordmark: letters rise in when the footer scrolls into view (.is-visible),
-   then a soft light sweeps across the gradient text. */
-@keyframes letterRise {
-  from {
-    opacity: 0;
-    transform: translateY(40%);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-/* Outlined letters: a thin stroke, with the light band filling the inside as it sweeps past. */
-.wordmark-letter {
-  display: inline-block;
-  opacity: 0;
-  background-image: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0) 42%,
-    rgba(110, 231, 183, 0.45) 50%,
-    rgba(255, 255, 255, 0) 58%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.22);
-  transition: -webkit-text-stroke-color 400ms ease, background-color 400ms ease;
-}
-
-/* Hover: letters fill softly and the outline turns emerald */
-.wordmark:hover .wordmark-letter {
-  -webkit-text-stroke-color: rgba(110, 231, 183, 0.75);
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.is-visible .wordmark-letter {
-  animation:
-    letterRise 900ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both,
-    shimmer 6s linear calc(var(--d, 0ms) + 900ms) infinite;
-}
-
 /* ---- Interaction effects (driven by components/InteractionEffects.tsx) ---- */
 
 /* Cursor spotlight: a soft glow that follows the pointer (--mx/--my set from JS).
@@ -368,12 +314,6 @@ body {
   .spotlight::after,
   .spotlight-light::after {
     display: none;
-  }
-
-  .wordmark-letter,
-  .is-visible .wordmark-letter {
-    opacity: 1;
-    animation: none;
   }
 }
 

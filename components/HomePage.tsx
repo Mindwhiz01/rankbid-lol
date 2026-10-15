@@ -6,13 +6,16 @@ import Link from 'next/link';
 import { FAQS } from '@/lib/faqs';
 import Pagination from '@/components/Pagination';
 import PlatformIcon from '@/components/PlatformIcon';
-import PremiumListingCard from '@/components/PremiumListingCard';
+import SponsoredRow from '@/components/SponsoredRow';
 import VerifiedListingCard from '@/components/VerifiedListingCard';
-import PremiumListingModal from '@/components/PremiumListingModal';
+import { useRouter } from 'next/navigation';
 import LoginModal from '@/components/LoginModal';
 import StatusCardModal from '@/components/StatusCardModal';
-import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
+import { EmptyStateIcon, IconTile, PremiumIcons } from '@/components/PremiumIcons';
 import RankingRow from '@/components/RankingRow';
+import SubmitProductForm, { type SubmittedProduct } from '@/components/SubmitProductForm';
+import { openSubmitModal } from '@/components/SubmitProductModal';
+import type { SubmitPlatform } from '@/lib/platform-url';
 import LivePodium from '@/components/LivePodium';
 import SelectionHeading from '@/components/SelectionHeading';
 import RankingsSignpost from '@/components/RankingsSignpost';
@@ -26,6 +29,8 @@ const slideDelay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
 import { getPlatformIcon } from '@/lib/platformIcons';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { supportUrl } from '@/lib/site';
+import { HOME_SPONSORED } from '@/lib/premiumSpots';
+import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 
 interface Listing {
   id: string;
@@ -42,9 +47,8 @@ interface Listing {
   userVoted?: boolean;
   isPremium: boolean;
   premiumPosition?: number | null;
+  premiumBidUsd?: number | null;
   founderName?: string | null;
-  founderEmail?: string | null;
-  founderPhone?: string | null;
   founderWebsite?: string | null;
   founderTwitter?: string | null;
   founderLinkedin?: string | null;
@@ -69,52 +73,8 @@ interface Listing {
   userGithub?: string | null;
 }
 
-const CATEGORIES = [
-  { value: 'Marketing', label: 'Marketing' },
-  { value: 'SEO', label: 'SEO' },
-  { value: 'Productivity', label: 'Productivity' },
-  { value: 'Agents', label: 'Agents' },
-  { value: 'Crypto', label: 'Crypto' },
-  { value: 'Developer', label: 'Developer' },
-  { value: 'Health', label: 'Health' },
-  { value: 'Games', label: 'Games' },
-  { value: 'Business', label: 'Business' },
-  { value: 'Ecommerce', label: 'Ecommerce' },
-  { value: 'Travel', label: 'Travel' },
-  { value: 'Directories', label: 'Directories' },
-  { value: 'AIMedia', label: 'AI Media' },
-  { value: 'Agencies', label: 'Agencies' },
-  { value: 'Social', label: 'Social' },
-  { value: 'Education', label: 'Education' },
-  { value: 'People', label: 'People' },
-  { value: 'Design', label: 'Design' },
-  { value: 'Hiring', label: 'Hiring' },
-  { value: 'Domains', label: 'Domains' },
-  { value: 'Security', label: 'Security' },
-  { value: 'Sales', label: 'Sales' },
-  { value: 'News', label: 'News' },
-  { value: 'RealEstate', label: 'Real Estate' },
-  { value: 'Writing', label: 'Writing' },
-  { value: 'Audio', label: 'Audio' },
-  { value: 'Analytics', label: 'Analytics' },
-  { value: 'Unlimited', label: 'Unlimited' },
-  { value: 'Other', label: 'Other' }
-];
-
-const PLATFORMS = [
-  { id: 'website', label: 'Website', icon: '/web.png' },
-  { id: 'twitter', label: 'Twitter/X', icon: '/twitter.png' },
-  { id: 'linkedin', label: 'LinkedIn', icon: '/linkedin.png' },
-  { id: 'facebook', label: 'Facebook', icon: '/facebook.png' },
-  { id: 'instagram', label: 'Instagram', icon: '/instagram.png' },
-  { id: 'tiktok', label: 'TikTok', icon: '/tiktok.png' }
-];
-
-// Known labels first, then the shared CamelCase splitter ("DigitalMarketing" -> "Digital Marketing").
-const getCategoryLabel = (categoryValue: string): string => {
-  const category = CATEGORIES.find(cat => cat.value === categoryValue);
-  return category ? category.label : formatCategory(categoryValue);
-};
+// Shared CamelCase splitter with the known labels ("AIMedia" -> "AI").
+const getCategoryLabel = formatCategory;
 
 interface Toast {
   id: string;
@@ -189,35 +149,31 @@ const Icons = {
 // Soft left edge for the why-makers photo, so it melts into the navy beside the copy.
 const PHOTO_FADE = 'linear-gradient(to right, transparent, black 18%)';
 
-export default function Home() {
+// initialListings: the server-rendered first page (see app/page.tsx) so crawlers see the rankings
+// without running JavaScript; the client refetches on mount and keeps it live.
+export default function Home({ initialListings = [] }: { initialListings?: Listing[] }) {
+  const router = useRouter();
   const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [listings, setListings] = useState<Listing[]>(() => initialListings.slice(0, 15));
   const [premiumListings, setPremiumListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTimeFilter] = useState<'alltime' | 'today'>('alltime');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(() => Math.max(1, Math.ceil(initialListings.length / 15)));
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [premiumModalOpen, setPremiumModalOpen] = useState(false);
-  const [selectedListingForPremium, setSelectedListingForPremium] = useState<Listing | null>(null);
+  // Listings the signed-in user submitted: only these get the Premium button (the checkout API enforces it too).
+  const [ownListingIds, setOwnListingIds] = useState<Set<string>>(new Set());
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const [selectedListingForShare, setSelectedListingForShare] = useState<Listing | null>(null);
-  const [allListings, setAllListings] = useState<Listing[]>([]);
+  const [allListings, setAllListings] = useState<Listing[]>(initialListings);
 
-  const [formData, setFormData] = useState({
-    url: '',
-    handle: '',
-    description: '',
-    category: '',
-    platform: 'website',
-  });
-  const [formLoading, setFormLoading] = useState(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [metadataLoading, setMetadataLoading] = useState(false);
-  const [detectedPlatform, setDetectedPlatform] = useState('website');
-  const [detectedCategory, setDetectedCategory] = useState('');
+  const [submitPlatform, setSubmitPlatform] = useState<SubmitPlatform>('website');
+  // /?category=AIMedia#submit (from an empty category page) preselects that category.
+  const [initialSubmitCategory] = useState(() =>
+    typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('category') ?? ''
+  );
   const [votedListings, setVotedListings] = useState<Set<string>>(new Set());
   const [optimisticVotes, setOptimisticVotes] = useState<Record<string, number>>({});
   const [lastSubmittedProduct, setLastSubmittedProduct] = useState<{ id: string; title: string } | null>(null);
@@ -230,6 +186,18 @@ export default function Home() {
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);
+  };
+
+  const loadOwnListingIds = async () => {
+    try {
+      const res = await fetch('/api/user/submissions');
+      if (!res.ok) return; // signed out
+      const data = await res.json();
+      const own: { id: string; title: string }[] = (data.listings || []).map((l: { id: string; title: string }) => ({ id: l.id, title: l.title }));
+      setOwnListingIds(new Set(own.map(l => l.id)));
+    } catch {
+      // No Premium buttons is the safe fallback.
+    }
   };
 
   useEffect(() => {
@@ -245,6 +213,7 @@ export default function Home() {
 
     setCurrentPage(1);
     fetchListings(1);
+    loadOwnListingIds();
 
     // Fetch all listings for rank calculation
     const fetchAllListings = async () => {
@@ -344,7 +313,7 @@ export default function Home() {
       }
       const data = JSON.parse(text);
       setListings(data.listings || []);
-      setPremiumListings(data.premium || []);
+      setPremiumListings(isSponsoredPreview() ? SPONSORED_PREVIEW : data.premium || []);
       setTotalPages(data.pagination?.totalPages || 1);
       setCurrentPage(page);
     } catch (error) {
@@ -359,79 +328,14 @@ export default function Home() {
     return allListings.filter(l => (l.totalVotes || 0) > totalVotes).length + 1;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (formErrors[name]) {
-      setFormErrors(prev => {
-        const newErrors = {...prev};
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!formData.category) {
-      errors.category = 'Please select a category';
-    }
-    if (!formData.url && !formData.handle) {
-      errors.url = 'Please enter a URL or handle';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!user) {
-      setLoginModalOpen(true);
-      return;
-    }
-
-    if (!validateForm()) {
-      addToast('Please fill in all required fields', 'error');
-      return;
-    }
-
-    setFormLoading(true);
-
-    try {
-      const submitData = {
-        url: formData.platform === 'website' ? formData.url : undefined,
-        handle: formData.platform !== 'website' ? (formData.url || formData.handle) : undefined,
-        description: formData.description,
-        category: formData.category,
-        platform: formData.platform,
-      };
-
-      // The server reads who is submitting from the httpOnly session cookie.
-      const res = await fetch('/api/listings/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      const displayName = data.displayHandle ? `@${data.displayHandle}` : 'Your product';
-      addToast(`🎉 ${displayName} is live! Community voting starts now.`, 'success');
-      setLastSubmittedProduct({ id: data.id, title: displayName });
-      setFormData({ url: '', handle: '', description: '', category: '', platform: 'website' });
-      setDetectedPlatform('website');
-      setDetectedCategory('');
-      setCurrentPage(1);
-      fetchListings(1);
-    } catch (error: any) {
-      addToast(error.message || 'Submission failed', 'error');
-    } finally {
-      setFormLoading(false);
-    }
+  // A product went live through the submit form: celebrate it and refresh the rankings.
+  const handleSubmitted = ({ id, displayHandle }: SubmittedProduct) => {
+    const displayName = displayHandle ? `@${displayHandle}` : 'Your product';
+    addToast(`🎉 ${displayName} is live! Community voting starts now.`, 'success');
+    setLastSubmittedProduct({ id, title: displayName });
+    setCurrentPage(1);
+    fetchListings(1);
+    loadOwnListingIds();
   };
 
   const handleShareTwitter = () => {
@@ -461,86 +365,39 @@ export default function Home() {
     }
   };
 
-  const handlePremiumSubmit = async (data: any) => {
-    if (!selectedListingForPremium) {
-      throw new Error('No listing selected for premium upgrade');
+  // Sponsor checkout is its own page (/sponsor): from the Sponsored section the price aims for that rank.
+  const openClaim = (position: number) => {
+    if (!user) {
+      setLoginModalOpen(true);
+      return;
     }
-
-    try {
-      console.log('🎯 Submitting premium listing:', {
-        listingId: selectedListingForPremium.id,
-        ...data,
-      });
-
-      const cartItem = {
-        listingId: selectedListingForPremium.id,
-        position: data.position,
-        bidUsd: data.bidUsd,
-        founderName: data.founderName,
-        founderEmail: data.founderEmail,
-        founderPhone: data.founderPhone,
-        founderWebsite: data.founderWebsite,
-        founderTwitter: data.founderTwitter,
-        founderLinkedin: data.founderLinkedin,
-        founderInstagram: data.founderInstagram,
-        founderFacebook: data.founderFacebook,
-        founderTiktok: data.founderTiktok,
-        founderYoutube: data.founderYoutube,
-        founderGithub: data.founderGithub,
-      };
-
-      const res = await fetch('/api/premium-listings/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [cartItem],
-          paymentMethod: data.paymentMethod || 'manual',
-        }),
-      });
-
-      console.log('Checkout API response status:', res.status);
-
-      const result = await res.json();
-      console.log('Checkout API response:', result);
-
-      if (!res.ok) {
-        throw new Error(result.error || `API error: ${res.status}`);
-      }
-
-      // Handle payment flow
-      if (result.paymentRequired && result.paymentMethod === 'rapid-gateway' && result.paymentData) {
-        console.log('🚀 Initiating Rapid Gateway payment...');
-        addToast('💳 Redirecting to Rapid Gateway...', 'info');
-
-        const paymentRes = await fetch('/api/payment/rapid-gateway/initiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(result.paymentData),
-        });
-
-        if (!paymentRes.ok) {
-          const errorData = await paymentRes.json();
-          throw new Error(errorData.error || 'Failed to initiate payment');
-        }
-
-        const paymentData = await paymentRes.json();
-
-        // Redirect to Rapid Gateway
-        if (paymentData.redirectUrl) {
-          window.location.href = paymentData.redirectUrl;
-          return;
-        }
-      }
-
-      // For manual and other payment methods
-      addToast('✨ Premium listing request submitted! Admin approval pending.', 'success');
-      setPremiumModalOpen(false);
-      setSelectedListingForPremium(null);
-    } catch (error: any) {
-      console.error('Premium submission failed:', error);
-      throw new Error(error.message || 'Failed to submit premium listing');
-    }
+    router.push(`/sponsor?rank=${position}`);
   };
+
+  // Sponsored spots change whenever someone's payment lands: keep them fresh without a reload.
+  useEffect(() => {
+    if (isSponsoredPreview()) return;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const res = await fetch('/api/listings/submit?page=1&pageSize=1', { cache: 'no-store' });
+        if (res.ok) setPremiumListings((await res.json()).premium || []);
+      } catch {
+        // Keep showing the last known spots.
+      }
+    };
+    const timer = setInterval(refresh, 15_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+
+  // Sponsored listings are ranked by price (#1, #2, … with no gaps). The homepage shows the top 10;
+  // #1-#3 always show (on the podium), then one open rank after the last listing (up to #10).
+  const sponsoredCount = premiumListings.length;
+  const visibleSpots = Math.min(HOME_SPONSORED, Math.max(3, sponsoredCount + 1));
 
   const totalVotes = allListings.reduce((n, l) => n + (l.totalVotes || 0), 0);
 
@@ -572,18 +429,54 @@ export default function Home() {
             </a>
 
             <h1 style={slideDelay(80)} className="slide-up mt-6 text-[2.6rem] leading-[1.02] sm:text-6xl md:text-7xl font-black tracking-[-0.04em] text-[#0B2545]">
-              Ranked by people.
+              Ranked by people.{' '}
               <span className="block text-[#1F2937]/30">Not algorithms.</span>
             </h1>
             <p style={slideDelay(140)} className="slide-up mt-5 sm:mt-6 text-sm sm:text-base md:text-lg text-[#1F2937]/60 max-w-xl mx-auto">
-              RankBid is a free product launch platform. Submit your product, collect community votes, and climb a live leaderboard ranked only by real people.
+              RankBid is a free product launch platform. Submit your product, collect community votes, and climb a live leaderboard ranked only by real people. Want the top of the page? Sponsored spots start at $1.
             </p>
 
           </div>
 
           {/* Live top 3 podium: refreshes on its own every few seconds */}
           <div style={slideDelay(200)} className="slide-up relative max-w-5xl mx-auto px-4 sm:px-6 mt-10 sm:mt-12 pb-14 sm:pb-20">
-            <LivePodium />
+            <LivePodium onClaim={openClaim} />
+
+            {/* SPONSORED #4-#10: the podium shows #1-#3; the rest are on /sponsored */}
+            {visibleSpots > 3 && (
+              <div className="mt-8 sm:mt-10">
+                <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2 text-amber-500">
+                    <Icons.Star />
+                    <h3 className="text-base sm:text-lg font-black text-[#1F2937]">More sponsored</h3>
+                    <span className="text-xs font-bold text-[#1F2937]/40">ranked by price</span>
+                  </div>
+                  <a href="/sponsored" className="text-xs sm:text-sm font-black text-amber-700 hover:underline whitespace-nowrap">
+                    {sponsoredCount > HOME_SPONSORED ? `See all ${sponsoredCount} →` : 'See all →'}
+                  </a>
+                </div>
+                <div className="space-y-2 sm:space-y-2.5">
+                  {Array.from({ length: visibleSpots - 3 }, (_, i) => i + 4).map(pos => {
+                    const holder = premiumListings.find(l => l.premiumPosition === pos);
+                    if (holder) return <SponsoredRow key={holder.id} listing={holder} />;
+                    return (
+                      <button
+                        key={`open-${pos}`}
+                        type="button"
+                        onClick={() => openClaim(pos)}
+                        aria-label={`Sponsor your product at #${pos}`}
+                        className="group w-full text-left flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl border-2 border-dashed border-amber-200 bg-white/60 hover:border-amber-400 hover:bg-amber-50/60 transition-all"
+                      >
+                        <span className="w-7 sm:w-9 flex-shrink-0 text-sm sm:text-lg font-black text-amber-600/70 tabular-nums">#{pos}</span>
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 rounded-md px-2 py-0.5">Open</span>
+                        <span className="flex-1 min-w-0 text-xs sm:text-sm font-semibold text-[#1F2937]/50 truncate">Feature your product here for 30 days</span>
+                        <span className="flex-shrink-0 text-xs sm:text-sm font-black text-amber-700 group-hover:underline">Claim</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -639,93 +532,13 @@ export default function Home() {
                   </div>
                 </div>
 
-            {/* Platform Selection */}
-            <div className="flex flex-wrap gap-2 mb-4 md:mb-6">
-              {PLATFORMS.map(platform => (
-                <button
-                  key={platform.id}
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, platform: platform.id }))}
-                  className={`px-2 sm:px-4 py-1.5 sm:py-2 font-bold text-xs rounded-lg transition-all duration-200 hover:scale-105 flex items-center gap-1 sm:gap-2 ${
-                    formData.platform === platform.id
-                      ? 'bg-[#0F3460] text-white border border-[#0F3460] shadow-sm'
-                      : 'bg-white text-[#1F2937] border border-gray-300 hover:border-[#0F3460]/40 hover:bg-[#0F3460]/5'
-                  }`}
-                >
-                  <img src={platform.icon} alt={platform.label} className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
-                  <span className="hidden sm:inline">{platform.label}</span>
-                  <span className="sm:hidden">{platform.label.split('/')[0]}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Form Fields */}
-            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <input
-                    type="text"
-                    name="url"
-                    placeholder={formData.platform === 'website' ? 'Product URL' : 'Full profile URL'}
-                    value={formData.url}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 sm:px-4 py-2 sm:py-3 bg-white text-[#1F2937] border border-gray-300 font-semibold text-xs sm:text-sm rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F3460]/30 focus:border-[#0F3460] transition-all duration-200 ${
-                      formErrors.url ? 'border-red-500 shake' : ''
-                    }`}
-                    required
-                  />
-                  {formErrors.url && (
-                    <p className="text-xs text-red-600 font-bold mt-1 slide-in">{formErrors.url}</p>
-                  )}
-                  {formData.platform !== 'website' && (
-                    <p className="text-xs text-[#1F2937]/60 font-semibold mt-1">
-                      {formData.platform === 'facebook' && 'e.g., https://facebook.com/yourpage'}
-                      {formData.platform === 'instagram' && 'e.g., https://instagram.com/username'}
-                      {formData.platform === 'tiktok' && 'e.g., https://tiktok.com/@username'}
-                      {formData.platform === 'linkedin' && 'e.g., https://linkedin.com/in/yourprofile'}
-                      {['twitter', 'x'].includes(formData.platform) && 'e.g., https://twitter.com/username'}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 sm:px-4 py-2 sm:py-3 bg-white text-[#1F2937] border border-gray-300 font-semibold text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F3460]/30 focus:border-[#0F3460] transition-all duration-200 ${
-                      formErrors.category ? 'border-red-500 shake' : ''
-                    }`}
-                    required
-                  >
-                    <option value="">Select category</option>
-                    {CATEGORIES.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
-                  </select>
-                  {formErrors.category && (
-                    <p className="text-xs text-red-600 font-bold mt-1 slide-in">{formErrors.category}</p>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={formLoading || metadataLoading}
-                className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-[#0F3460] to-[#1a5490] text-white font-black text-sm rounded-xl shadow-lg shadow-[#0F3460]/20 hover:shadow-xl active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
-              >
-                {formLoading ? (
-                  <>
-                    <span className="inline-block animate-spin">⏳</span> Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Icons.Upload />
-                    Submit Product
-                  </>
-                )}
-              </button>
-            </form>
+            <SubmitProductForm
+              platform={submitPlatform}
+              onPlatformChange={setSubmitPlatform}
+              initialCategory={initialSubmitCategory}
+              onError={message => addToast(message, 'error')}
+              onSubmitted={handleSubmitted}
+            />
 
             {/* Share Buttons - Show after successful submission */}
             {lastSubmittedProduct && (
@@ -803,26 +616,7 @@ export default function Home() {
 
             {/* Category filter moved to header navigation */}
 
-            {/* PREMIUM LISTINGS SECTION */}
-            {!loading && premiumListings.length > 0 && (
-              <div className="mb-6 sm:mb-8 space-y-3 sm:space-y-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Icons.Star />
-                  <h3 className="text-base sm:text-lg font-black text-[#1F2937]">Premium Featured</h3>
-                </div>
-                {premiumListings.map(listing => (
-                  <PremiumListingCard
-                    key={listing.id}
-                    listing={listing}
-                    position={listing.premiumPosition || 1}
-                    onVote={handleVote}
-                    hasVoted={votedListings.has(listing.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {loading ? (
+            {loading && listings.length === 0 ? (
               <div className="text-center py-8 sm:py-10 md:py-12">
                 <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
                 <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mt-2 sm:mt-3">Loading rankings...</p>
@@ -834,7 +628,7 @@ export default function Home() {
                 </div>
                 <p className="text-xs sm:text-sm font-bold text-[#1F2937] mb-3 sm:mb-4 mt-3 sm:mt-4">No rankings yet</p>
                 <button
-                  onClick={() => document.getElementById('submit')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => openSubmitModal({ category: selectedCategory === 'All' ? null : selectedCategory })}
                   className="px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm hover:bg-[#0D2A50] active:scale-95 transition-all duration-200 rounded-lg"
                 >
                   Be First to Submit
@@ -886,10 +680,7 @@ export default function Home() {
                       listing={listing}
                       rank={(currentPage - 1) * 15 + idx + 1}
                       votes={(activeTimeFilter === 'today' ? listing.dayVotes : listing.totalVotes) || 0}
-                      onPremium={listing.isPremium ? undefined : () => {
-                        setSelectedListingForPremium(listing);
-                        setPremiumModalOpen(true);
-                      }}
+                      onPremium={listing.isPremium || !ownListingIds.has(listing.id) ? undefined : () => router.push(`/sponsor?listing=${encodeURIComponent(listing.id)}`)}
                     />
                   );
                 })}
@@ -954,7 +745,7 @@ export default function Home() {
                     {/* Brand-colored top accent */}
                     <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: platformColor }} aria-hidden="true" />
                     {/* Header */}
-                    <div className="flex items-center gap-3 mb-4 sm:mb-5">
+                    <div className="flex items-center justify-center gap-3 mb-4 sm:mb-5">
                       <div className="w-10 h-10 md:w-11 md:h-11 flex-shrink-0 rounded-xl flex items-center justify-center" style={{ backgroundColor: platformColor + '14' }}>
                         <PlatformIcon platform={platform} size={22} />
                       </div>
@@ -1014,7 +805,7 @@ export default function Home() {
                     ) : (
                       <div className="text-center py-4 sm:py-6 md:py-8 flex-1 flex items-center justify-center">
                         <div>
-                          <p className="text-2xl sm:text-3xl mb-2">📭</p>
+                          <div className="mb-3 sm:mb-4"><EmptyStateIcon size="sm" /></div>
                           <p className="text-xs sm:text-xs md:text-sm text-[#1F2937]/60 font-semibold mb-2 sm:mb-3">No submissions yet</p>
                           <p className="text-xs text-[#1F2937]/50">Be the first to submit!</p>
                         </div>
@@ -1022,10 +813,7 @@ export default function Home() {
                     )}
 
                     <button
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, platform }));
-                        document.getElementById('submit')?.scrollIntoView({ behavior: 'smooth' });
-                      }}
+                      onClick={() => openSubmitModal({ platform: platform as SubmitPlatform })}
                       className={`w-full mt-3 sm:mt-4 md:mt-6 px-2 sm:px-3 py-2 sm:py-2.5 md:py-3 font-bold text-xs md:text-sm rounded-xl transition-all duration-200 active:scale-95 border-2 border-[#0F3460] text-[#0F3460] hover:bg-[#0F3460] hover:text-white shadow-sm hover:shadow-md`}
                     >
                       Submit for {platformLabel} →
@@ -1040,54 +828,55 @@ export default function Home() {
 
         {/* WHY MAKERS SECTION: navy gradient with a photo blended in on the right */}
         <section className="relative overflow-hidden bg-gradient-to-br from-[#0B2545] via-[#0F3460] to-[#1a5490] text-white">
-          {/* Desktop: photo covers the full height of the section, starting 40% across so the
-              phone and hand show beside the copy; whatever is wider than the screen runs off
-              the right edge. Keeping the aspect ratio keeps the notification on her sweater. */}
-          <div
-            className="absolute inset-y-0 left-[40%] hidden lg:block h-full aspect-[2198/1396]"
-            aria-hidden="true"
-          >
-            <img
-              src="/why-makers-person.jpg"
-              alt=""
-              className="h-full w-full"
-              style={{ maskImage: PHOTO_FADE, WebkitMaskImage: PHOTO_FADE }}
-            />
-            {/* Frosted RankBid notification over her sweater: label + close button, then a card
-                with two fainter cards stacked beneath it */}
-            <div className="absolute left-[34%] top-[51%] w-[31%]">
-              <div className="flex items-center justify-between pl-3 pr-1">
-                <span className="text-sm font-medium text-white drop-shadow">Notification Center</span>
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs text-gray-500 shadow">✕</span>
-              </div>
-              <div className="relative mt-2.5">
-                <div className="absolute inset-x-[9%] -bottom-[22px] top-4 rounded-2xl bg-white/30 backdrop-blur-sm" />
-                <div className="absolute inset-x-[4%] -bottom-[11px] top-2 rounded-2xl bg-white/50 backdrop-blur-sm" />
-                <div className="relative flex items-center gap-3 rounded-2xl bg-white/85 p-3 shadow-xl backdrop-blur-md">
-                  <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0B2545] to-[#1a5490] text-lg font-black text-white">R</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-bold text-[#0B2545]">RankBid</p>
-                      <p className="text-[11px] text-gray-400">2 min ago</p>
+          {/* Desktop only; phones and tablets get no photo. The photo fills from 40% across to the
+              right edge, full height, so the phone and hand show beside the copy. The inner box
+              covers that area at the photo's own aspect ratio (scaling up on wide screens instead
+              of leaving a gap on the right), which keeps the notification on her sweater. */}
+          <div className="absolute inset-y-0 left-[40%] right-0 hidden lg:block [container-type:size]" aria-hidden="true">
+            <div
+              className="absolute left-0 aspect-[2198/1396]"
+              style={{
+                width: 'max(100cqw, calc(100cqh * 2198 / 1396))',
+                // Overflow is trimmed a quarter from the top, the rest from the bottom, so her face stays in view
+                top: 'calc((100cqh - max(100cqh, 100cqw * 1396 / 2198)) * 0.25)',
+              }}
+            >
+              <img
+                src="/why-makers-person.jpg"
+                alt=""
+                className="h-full w-full"
+                style={{ maskImage: PHOTO_FADE, WebkitMaskImage: PHOTO_FADE }}
+              />
+              {/* Frosted RankBid notification over her sweater: label + close button, then a card
+                  with two fainter cards stacked beneath it */}
+              <div className="absolute left-[34%] top-[51%] w-[31%]">
+                <div className="flex items-center justify-between pl-3 pr-1">
+                  <span className="text-sm font-medium text-white drop-shadow">Notification Center</span>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs text-gray-500 shadow">✕</span>
+                </div>
+                <div className="relative mt-2.5">
+                  <div className="absolute inset-x-[9%] -bottom-[22px] top-4 rounded-2xl bg-white/30 backdrop-blur-sm" />
+                  <div className="absolute inset-x-[4%] -bottom-[11px] top-2 rounded-2xl bg-white/50 backdrop-blur-sm" />
+                  <div className="relative flex items-center gap-3 rounded-2xl bg-white/85 p-3 shadow-xl backdrop-blur-md">
+                    <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#0F3460]/10">
+                      <img src="/brand/logo-mark.png" alt="" width={223} height={194} className="w-8 h-auto" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-bold text-[#0B2545]">RankBid</p>
+                        <p className="text-[11px] text-gray-400">2 min ago</p>
+                      </div>
+                      <p className="mt-0.5 text-xs leading-snug text-gray-500">Your product just hit <span className="font-semibold text-[#059669]">#1 today</span> 🏆</p>
                     </div>
-                    <p className="mt-0.5 text-xs leading-snug text-gray-500">Your product just hit <span className="font-semibold text-[#059669]">#1 today</span> 🏆</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          {/* Mobile/tablet: top half of the photo as a banner above the copy */}
-          <img
-            src="/why-makers-person.jpg"
-            alt=""
-            aria-hidden="true"
-            className="lg:hidden w-full aspect-[2198/720] object-cover object-top"
-            style={{ maskImage: 'linear-gradient(to bottom, black 55%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 55%, transparent)' }}
-          />
-
-          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-14 sm:pb-20 lg:py-28 -mt-8 lg:mt-0">
+          {/* Desktop: copy sits near the left edge rather than in a centred column */}
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-14 sm:pt-20 pb-14 sm:pb-20 lg:py-28 lg:max-w-none lg:mx-0 lg:pl-[clamp(2.5rem,6vw,8rem)] lg:pr-0">
             {/* Copy + four reasons, no cards */}
-            <div className="lg:max-w-[50%]">
+            <div className="lg:max-w-[560px]">
               <SelectionHeading
                 lead="why makers"
                 highlight="launch here"
@@ -1098,7 +887,7 @@ export default function Home() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-8">
                 {[
                   { icon: <PremiumIcons.Gift />, title: 'Free to launch', text: 'Submit unlimited products with no listing fees.' },
-                  { icon: <PremiumIcons.Scale />, title: 'Fair for everyone', text: 'Indie makers compete on votes, not ad budgets.' },
+                  { icon: <PremiumIcons.Scale />, title: 'Fair for everyone', text: 'Votes alone decide the leaderboard. Paid spots are always labeled Sponsored.' },
                   { icon: <PremiumIcons.Pulse />, title: 'Live feedback', text: 'Watch real votes and rankings update in real time.' },
                   { icon: <PremiumIcons.Share />, title: 'Built to share', text: 'Share your rank card on X and LinkedIn to rally votes.' },
                 ].map(item => (
@@ -1160,20 +949,6 @@ export default function Home() {
         {/* CLOSING CTA */}
         <HomeCta />
       </div>
-
-      {/* PREMIUM LISTING MODAL */}
-      {selectedListingForPremium && (
-        <PremiumListingModal
-          listingId={selectedListingForPremium.id}
-          listingTitle={selectedListingForPremium.title}
-          isOpen={premiumModalOpen}
-          onClose={() => {
-            setPremiumModalOpen(false);
-            setSelectedListingForPremium(null);
-          }}
-          onSubmit={handlePremiumSubmit}
-        />
-      )}
 
       {/* LOGIN MODAL */}
       <LoginModal

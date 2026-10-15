@@ -1,13 +1,5 @@
-// Server-only helpers for the premium #1-#3 bidding ladder (see supabase/migrations/premium_bidding.sql).
+// Server-only helpers for sponsored listings, ranked by price (see supabase/migrations/premium_rank_by_price.sql).
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-
-export const PREMIUM_POSITIONS = [1, 2, 3] as const;
-
-/** Starting price (USD) of an empty spot. Must match `base` in activate_premium_bid. */
-export const BASE_PRICES_USD: Record<number, number> = { 1: 5, 2: 3, 3: 1 };
-
-/** A held spot can be taken by paying the holder's bid plus this much. */
-export const OUTBID_STEP_USD = 1;
 
 /** Rapid Gateway charges PKR; prices are set in USD and converted at this rate. */
 export function usdToPkr(usd: number): number {
@@ -18,8 +10,10 @@ export function usdToPkr(usd: number): number {
 export interface PremiumHolder {
   id: string;
   listingId: string;
+  /** Live rank: highest bid first, earlier activation wins a tie. */
   position: number;
   bidUsd: number;
+  activatedAt: string | null;
   expiresAt: string;
   founderName: string | null;
   founderEmail: string | null;
@@ -34,17 +28,10 @@ export interface PremiumHolder {
   founderGithub: string | null;
 }
 
-export interface LadderSpot {
-  position: number;
-  holder: PremiumHolder | null;
-  /** Lowest bid (USD) that takes this spot right now. */
-  minBidUsd: number;
-}
-
-/** Current holders of #1-#3 (expired holders are ignored). */
+/** Every live sponsored listing, ranked (expired ones are ignored). */
 export async function getActiveHolders(): Promise<PremiumHolder[]> {
   const res = await fetch(
-    sbUrl(`premium_listings?payment_status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=position.asc&select=*`),
+    sbUrl(`premium_listings?payment_status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=bid_usd.desc,activated_at.asc&select=*`),
     { headers: sbHeaders(), cache: 'no-store' }
   );
   if (!res.ok) {
@@ -52,11 +39,12 @@ export async function getActiveHolders(): Promise<PremiumHolder[]> {
     return [];
   }
   const rows: any[] = await res.json();
-  return rows.map(r => ({
+  const holders = rows.map(r => ({
     id: r.id,
     listingId: r.listing_id,
-    position: r.position,
+    position: 0,
     bidUsd: Number(r.bid_usd ?? r.payment_amount ?? r.amount_paid ?? 0),
+    activatedAt: r.activated_at ?? null,
     expiresAt: r.expires_at,
     founderName: r.founder_name,
     founderEmail: r.founder_email,
@@ -70,21 +58,9 @@ export async function getActiveHolders(): Promise<PremiumHolder[]> {
     founderYoutube: r.founder_youtube,
     founderGithub: r.founder_github,
   }));
-}
-
-export function buildLadder(holders: PremiumHolder[]): LadderSpot[] {
-  return PREMIUM_POSITIONS.map(position => {
-    const holder = holders.find(h => h.position === position) || null;
-    return {
-      position,
-      holder,
-      minBidUsd: holder ? holder.bidUsd + OUTBID_STEP_USD : BASE_PRICES_USD[position],
-    };
-  });
-}
-
-export async function getLadder(): Promise<LadderSpot[]> {
-  return buildLadder(await getActiveHolders());
+  // Sorted again here because older rows may lack bid_usd (the amount is in payment_amount).
+  holders.sort((a, b) => b.bidUsd - a.bidUsd || String(a.activatedAt ?? '').localeCompare(String(b.activatedAt ?? '')));
+  return holders.map((h, i) => ({ ...h, position: i + 1 }));
 }
 
 export interface ActivationResult {
@@ -93,7 +69,7 @@ export interface ActivationResult {
   required?: number;
 }
 
-/** Places a paid bid on the ladder, pushing lower holders down. Safe to call more than once. */
+/** Activates a paid bid for 30 days and returns its rank. Safe to call more than once. */
 export async function activatePremiumBid(premiumListingId: string): Promise<ActivationResult> {
   const res = await fetch(sbUrl('rpc/activate_premium_bid'), {
     method: 'POST',

@@ -1,6 +1,9 @@
 // Server-only checks on URLs people submit, so the site doesn't rank or link to malware,
 // phishing, adult or gambling pages.
 
+import { isSocialMediaUrl } from '@/lib/social-utils';
+import { safeFetch, UnsafeUrlError } from '@/lib/server/safe-fetch';
+
 const BLOCKED_HOSTS = [
   // adult
   'pornhub.com', 'xvideos.com', 'xnxx.com', 'xhamster.com', 'onlyfans.com', 'redtube.com', 'youporn.com', 'chaturbate.com',
@@ -93,4 +96,26 @@ export function httpUrlOrNull(raw: unknown, maxLength = 500): string | null {
   } catch {
     return null;
   }
+}
+
+const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
+
+/** null if the URL can be listed, otherwise the reason it can't. */
+export async function accessibilityProblem(url: string): Promise<string | null> {
+  const social = isSocialMediaUrl(url);
+  let res: Response;
+  try {
+    res = await safeFetch(url, { method: 'HEAD', headers: UA });
+    if (res.status === 405 || res.status === 501) res = await safeFetch(url, { method: 'GET', headers: UA });
+  } catch (error) {
+    if (error instanceof UnsafeUrlError) return 'This URL is not allowed.';
+    // Network hiccups and timeouts: allow, as before, rather than reject real sites.
+    console.warn(`URL accessibility check failed for ${url}:`, error);
+    return null;
+  }
+  if (isDownloadResponse(res)) return 'Direct download links are not allowed. Link to a web page instead.';
+  if (res.status >= 200 && res.status < 400) return null;
+  // Social networks often answer bots with 403/429 for profiles that do exist.
+  if (social && res.status !== 404 && res.status !== 410) return null;
+  return 'URL is not accessible or does not exist. Please verify the URL is correct and accessible.';
 }

@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { SITE_URL } from '@/lib/site';
+import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site';
 
 export type SubmissionEmailListing = {
   id: string;
@@ -75,17 +75,16 @@ function submissionHtml(listing: SubmissionEmailListing): string {
       `;
 }
 
-/** Emails the admin about a new submission. Never throws: a failed email must not block the submission. */
-export async function sendNewSubmissionEmail(listing: SubmissionEmailListing): Promise<EmailResult> {
+/** Sends one email through Resend, falling back to the shared sender. Never throws. */
+async function send(to: string, subject: string, html: string, label: string): Promise<EmailResult> {
   try {
     if (!process.env.RESEND_API_KEY) {
-      console.warn('RESEND_API_KEY not configured, skipping email notification');
+      console.warn(`RESEND_API_KEY not configured, skipping ${label} email`);
       return { sent: false, error: 'RESEND_API_KEY not configured' };
     }
 
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const to = process.env.NOTIFICATION_EMAIL || 'nouman@mindwhiz.com';
-    const message = { to, subject: `🎉 New Submission: ${listing.title}`, html: submissionHtml(listing) };
+    const message = { to, subject, html };
 
     // Resend reports failures in `error` instead of throwing.
     let from = FROM;
@@ -96,14 +95,106 @@ export async function sendNewSubmissionEmail(listing: SubmissionEmailListing): P
       ({ data, error } = await resend.emails.send({ from, ...message }));
     }
     if (error || !data) {
-      console.error('Failed to send new submission email:', error);
+      console.error(`Failed to send ${label} email:`, error);
       return { sent: false, error: error?.message || 'Unknown Resend error' };
     }
 
-    console.log(`New submission email sent to ${to} from ${from} (resend id ${data.id}) for listing ${listing.id}`);
+    console.log(`${label} email sent to ${to} from ${from} (resend id ${data.id})`);
     return { sent: true, id: data.id, from, to };
   } catch (error) {
-    console.error('Failed to send email notification:', error);
+    console.error(`Failed to send ${label} email:`, error);
     return { sent: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** Emails the admin about a new submission. Never throws: a failed email must not block the submission. */
+export async function sendNewSubmissionEmail(listing: SubmissionEmailListing): Promise<EmailResult> {
+  const to = process.env.NOTIFICATION_EMAIL || 'nouman@mindwhiz.com';
+  return send(to, `🎉 New Submission: ${listing.title}`, submissionHtml(listing), `New submission (listing ${listing.id})`);
+}
+
+/**
+ * Tells someone they've been given access to the admin dashboard. `password` is included only when
+ * the owner just created their account with it; existing accounts keep their own password.
+ */
+export async function sendAdminInviteEmail(e: { to: string; name?: string | null; password?: string | null; invitedBy?: string | null }): Promise<EmailResult> {
+  const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';
+  const by = e.invitedBy ? ` by ${escapeHtml(e.invitedBy)}` : '';
+  const credentials = e.password
+    ? `<div style="margin: 16px 0; padding: 14px 16px; background-color: #f3f4f6; border-radius: 6px; font-size: 14px;">
+         <div><span style="color: #6b7280;">Email:</span> <strong>${escapeHtml(e.to)}</strong></div>
+         <div style="margin-top: 6px;"><span style="color: #6b7280;">Password:</span> <strong style="font-family: monospace;">${escapeHtml(e.password)}</strong></div>
+       </div>`
+    : `<p>Sign in with <strong>${escapeHtml(e.to)}</strong> and ${e.password === null ? 'the password you were given' : 'your RankBid password'}.</p>`;
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">You're now a RankBid admin</h2>
+            <p>${hello}</p>
+            <p>You've been given access to the RankBid admin dashboard${by}.</p>
+            ${credentials}
+            <a href="${SITE_URL}/admin" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Open the dashboard</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              Keep these details private. If you weren't expecting this, you can ignore this email or contact ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+  return send(e.to, `You've been given access to the RankBid admin dashboard`, html, 'Admin invite');
+}
+
+/** Card layout shared by the sponsored-spot emails. `body` is trusted HTML built from escaped values. */
+function premiumHtml(heading: string, body: string, button?: { href: string; label: string }): string {
+  const cta = button
+    ? `<a href="${button.href}" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">${escapeHtml(button.label)}</a>`
+    : '';
+  return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">${escapeHtml(heading)}</h2>
+            ${body}
+            ${cta}
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              Sponsored listings follow the <a href="${SITE_URL}/tos" style="color: #9ca3af;">RankBid Terms</a>. Questions? Email ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+}
+
+export type PremiumEmail = { to: string; productTitle: string; listingId: string; position: number; bidUsd: number };
+
+const usd = (n: number) => `$${n.toFixed(2).replace(/\.00$/, '')}`;
+
+/** Receipt once the webhook has activated a paid bid; `position` is its rank at that moment. */
+export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string | null }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const until = e.expiresAt ? ` until ${new Date(e.expiresAt).toUTCString().slice(5, 16)}` : ' for 30 days';
+  const body = `
+    <p>Payment received: <strong>${usd(e.bidUsd)}</strong>. <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong>.</p>
+    <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you if you drop off the homepage top 10. Payments for active listings are not refundable.</p>`;
+  return send(e.to, `You're #${e.position} on RankBid`, premiumHtml('Your sponsored listing is live', body, { href: SITE_URL, label: 'See it on RankBid' }), `Premium receipt (#${e.position})`);
+}
+
+/** The bid was paid but couldn't be activated (below the minimum). Admin refunds it. */
+export async function sendPremiumRefundNotice(e: PremiumEmail & { requiredUsd?: number }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const needed = e.requiredUsd ? ` Sponsored listings need at least ${usd(e.requiredUsd)}.` : '';
+  const body = `
+    <p>Your payment of <strong>${usd(e.bidUsd)}</strong> for <strong>${title}</strong> couldn't be used for a sponsored listing.${needed}</p>
+    <p>Your payment will be refunded in full to your card. You can bid again any time.</p>`;
+  const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
+  return send(e.to, `Your RankBid payment will be refunded`, premiumHtml('Your sponsored listing could not start', body, { href: raise, label: 'Bid again' }), 'Premium refund notice');
+}
+
+/** A higher bid pushed a holder out of the homepage top 10 (newPosition is its new rank). */
+export async function sendPremiumOutbidAlert(e: PremiumEmail & { newPosition: number | null }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const where = e.newPosition ? `moved from #${e.position} to <strong>#${e.newPosition}</strong>` : `moved down from #${e.position}`;
+  const body = `
+    <p>Someone outbid you. <strong>${title}</strong> ${where} and is no longer on the RankBid homepage.</p>
+    <p>It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> until it expires. Raise your bid to get back into the top 10.</p>`;
+  const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
+  const subject = e.newPosition ? `You've been outbid: now #${e.newPosition} on RankBid` : `You've been outbid on RankBid`;
+  return send(e.to, subject, premiumHtml('You dropped off the homepage', body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
 }

@@ -85,9 +85,8 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 md:p-10 border border-white/20">
           {/* Logo */}
           <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-11 h-11 bg-gradient-to-br from-[#0F3460] to-[#1a5490] rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md">R</div>
-              <span className="text-3xl font-black text-[#0F3460]">RankBid</span>
+            <Link href="/" className="inline-flex mb-4">
+              <img src="/brand/logo.png" alt="RankBid" width={491} height={295} className="h-24 w-auto" />
             </Link>
             <p className="text-gray-600 text-sm mt-4">Sign in to your account</p>
           </div>

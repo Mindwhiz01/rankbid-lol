@@ -10,6 +10,7 @@ import InteractionEffects from '@/components/InteractionEffects';
 import JsonLd from '@/components/JsonLd';
 import ScrollToTop from '@/components/ScrollToTop';
 import ScrollButtons from '@/components/ScrollButtons';
+import { SubmitModalHost } from '@/components/SubmitProductModal';
 import { SITE_URL, X_HANDLE } from '@/lib/site';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, organizationSchema, websiteSchema } from '@/lib/seo';
 
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <Footer />
           <ScrollButtons />
+          <SubmitModalHost />
         </Providers>
       </body>
     </html>

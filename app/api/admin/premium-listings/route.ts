@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/server/admin';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-import { activatePremiumBid, getPremiumListing, updatePremiumListing } from '@/lib/server/premium';
+import { activatePremiumBid, getActiveHolders, getPremiumListing, updatePremiumListing } from '@/lib/server/premium';
+import { getStripe } from '@/lib/server/stripe';
+
+async function stripePaid(ref: unknown): Promise<boolean> {
+  const stripe = getStripe();
+  if (!stripe || typeof ref !== 'string') return false;
+  if (ref.startsWith('pi_')) return (await stripe.paymentIntents.retrieve(ref)).status === 'succeeded';
+  if (ref.startsWith('cs_')) return (await stripe.checkout.sessions.retrieve(ref)).payment_status === 'paid';
+  return false;
+}
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
@@ -22,10 +31,20 @@ export async function GET(req: NextRequest) {
       throw new Error(`${res.status} ${await res.text()}`);
     }
     const rows: any[] = await res.json();
+    // Active listings show their live rank by price; others keep the rank recorded at checkout/activation.
+    const liveRank = new Map((await getActiveHolders()).map(h => [h.id, h.position]));
+    const dashboard = `https://dashboard.stripe.com${process.env.STRIPE_SECRET_KEY?.startsWith('sk_test') ? '/test' : ''}`;
 
     return NextResponse.json({
       premiumListings: rows.map(({ listing, ...row }) => ({
         ...row,
+        position: liveRank.get(row.id) ?? row.position ?? null,
+        // After the webhook the ref is the PaymentIntent (pi_…); before it, the Checkout Session (cs_…).
+        stripe_url: row.payment_method === 'stripe' && typeof row.payment_txn_ref === 'string'
+          ? row.payment_txn_ref.startsWith('pi_')
+            ? `${dashboard}/payments/${row.payment_txn_ref}`
+            : `${dashboard}/checkout/sessions/${row.payment_txn_ref}`
+          : null,
         listing_title: listing?.title ?? null,
         listing_description: listing?.description ?? null,
         category: listing?.category ?? null,
@@ -78,13 +97,21 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // A Stripe order is only approved once Stripe confirms the money arrived (covers a missed webhook).
+    if (status === 'approved' && premium.payment_method === 'stripe' && !(await stripePaid(premium.payment_txn_ref))) {
+      return NextResponse.json(
+        { error: 'Stripe shows this order as unpaid' },
+        { status: 409 }
+      );
+    }
+
     await updatePremiumListing(premiumListingId, {
       approved_at: new Date().toISOString(),
       approved_by: approvedBy || 'admin',
       ...(status === 'rejected' ? { payment_status: 'rejected' } : {}),
     });
 
-    // Approval puts the bid on the ladder, pushing lower holders down a spot.
+    // Approval activates the bid for 30 days; it takes its rank among the others by price.
     const result = status === 'approved' ? await activatePremiumBid(premiumListingId) : { status: 'rejected' };
 
     return NextResponse.json({

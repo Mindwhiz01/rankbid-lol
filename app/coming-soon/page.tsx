@@ -1,135 +1,70 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
+import Link from 'next/link';
+import { SUPPORT_EMAIL } from '@/lib/site';
+import { SITE_DESCRIPTION } from '@/lib/seo';
+
+const POLICY_LINKS = [
+  { href: '/rules', label: 'Pricing & rules' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/tos', label: 'Terms' },
+  { href: '/privacy', label: 'Privacy' },
+  { href: `mailto:${SUPPORT_EMAIL}`, label: 'Contact' },
+];
 
 const styles = `
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  @keyframes csRise {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
   }
-
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
+  @keyframes csFloat {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-10px) rotate(-1deg); }
   }
-
-  @keyframes pulse-gentle {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.7;
-    }
+  @keyframes csDrift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(40px, -30px) scale(1.08); }
   }
-
-  @keyframes floatBlob1 {
-    0%, 100% {
-      transform: translate(0px, 0px) scale(1);
-      opacity: 0.4;
-    }
-    25% {
-      transform: translate(30px, -50px) scale(1.1);
-      opacity: 0.5;
-    }
-    50% {
-      transform: translate(60px, 0px) scale(0.9);
-      opacity: 0.3;
-    }
-    75% {
-      transform: translate(30px, 50px) scale(1.05);
-      opacity: 0.45;
-    }
+  @keyframes csSweep {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
   }
-
-  @keyframes floatBlob2 {
-    0%, 100% {
-      transform: translate(0px, 0px) scale(1);
-      opacity: 0.3;
-    }
-    25% {
-      transform: translate(-40px, 60px) scale(0.95);
-      opacity: 0.4;
-    }
-    50% {
-      transform: translate(-80px, 30px) scale(1.1);
-      opacity: 0.35;
-    }
-    75% {
-      transform: translate(-40px, -50px) scale(1.02);
-      opacity: 0.38;
-    }
+  .cs-rise { opacity: 0; animation: csRise 800ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both; }
+  .cs-float { animation: csFloat 6s ease-in-out infinite; }
+  .cs-drift { animation: csDrift 14s ease-in-out infinite; }
+  .cs-sweep {
+    background-image: linear-gradient(100deg, #ffffff 0%, #ffffff 40%, #6EE7B7 50%, #ffffff 60%, #ffffff 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: csSweep 7s linear infinite;
   }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.8s ease-out forwards;
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  .animate-pulse-gentle {
-    animation: pulse-gentle 2s ease-in-out infinite;
-  }
-
-  .animate-blob-1 {
-    animation: floatBlob1 8s ease-in-out infinite;
-  }
-
-  .animate-blob-2 {
-    animation: floatBlob2 10s ease-in-out infinite;
-  }
-
-  .delay-1 {
-    animation-delay: 0.1s;
-  }
-
-  .delay-2 {
-    animation-delay: 0.3s;
-  }
-
-  .delay-3 {
-    animation-delay: 0.5s;
-  }
-
-  .delay-4 {
-    animation-delay: 0.7s;
-  }
-
-  .input-focus-glow:focus {
-    box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.1);
+  @media (prefers-reduced-motion: reduce) {
+    .cs-rise, .cs-float, .cs-drift, .cs-sweep { animation: none; opacity: 1; }
   }
 `;
+
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
 
 export default function ComingSoon() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
   const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
 
+  const loadCount = () =>
+    fetch('/api/waitlist/count')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (typeof d?.count === 'number') setWaitlistCount(d.count);
+      })
+      .catch(() => {});
+
   useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const res = await fetch('/api/waitlist/count');
-        if (res.ok) {
-          const data = await res.json();
-          if (typeof data.count === 'number') setWaitlistCount(data.count);
-        }
-      } catch (error) {
-        console.error('Failed to fetch waitlist count:', error);
-      }
-    };
-    fetchCount();
+    loadCount();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,35 +72,24 @@ export default function ComingSoon() {
     if (!email.trim()) return;
 
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
       });
-
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setSubmitted(true);
         setEmail('');
-
-        // Fetch updated count from database
-        fetch('/api/waitlist/count')
-          .then(r => r.json())
-          .then(d => {
-            if (typeof d.count === 'number') setWaitlistCount(d.count);
-          })
-          .catch(() => {});
-
-        setTimeout(() => setSubmitted(false), 5000);
+        loadCount();
       } else {
-        alert(data.error || 'Failed to join waitlist');
-        setEmail('');
+        setError(data.error || 'Could not join the waitlist. Please try again.');
       }
-    } catch (error) {
-      console.error('Waitlist submission error:', error);
-      alert('Something went wrong. Please try again.');
+    } catch {
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -174,72 +98,101 @@ export default function ComingSoon() {
   return (
     <>
       <style>{styles}</style>
-      <div className="min-h-screen bg-gradient-to-br from-white via-white to-gray-50 flex flex-col items-center justify-center px-4 py-20 overflow-hidden relative" suppressHydrationWarning>
-        {/* Animated Background Blobs */}
-        <div className="absolute top-10 right-10 w-80 h-80 bg-gradient-to-br from-blue-200 to-blue-300 rounded-full blur-3xl opacity-20 -z-10 animate-blob-1"></div>
-        <div className="absolute bottom-10 left-10 w-80 h-80 bg-gradient-to-br from-indigo-200 to-purple-300 rounded-full blur-3xl opacity-15 -z-10 animate-blob-2"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full blur-3xl opacity-10 -z-10 animate-blob-1" style={{animationDelay: '-4s'}}></div>
+      <div className="spotlight relative isolate min-h-screen overflow-hidden bg-[#071a33] text-white flex flex-col" suppressHydrationWarning>
+        {/* Background: brand glows + dotted grid fading out from the centre */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+          <div className="cs-drift absolute -top-48 left-[10%] w-[40rem] h-[40rem] rounded-full bg-[#1a5490]/40 blur-3xl" />
+          <div className="cs-drift absolute -bottom-48 -right-24 w-[34rem] h-[34rem] rounded-full bg-[#059669]/20 blur-3xl" style={{ animationDelay: '-7s' }} />
+          <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(rgba(255,255,255,0.35)_0.6px,transparent_0.6px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,#000_15%,transparent_70%)]" />
+        </div>
 
-        <div className="w-full max-w-2xl text-center relative z-10">
-          {/* Logo */}
-          <div className="animate-fade-in-up delay-1">
-            <h1 className="text-6xl md:text-7xl font-black text-[#1F2937] mb-12 tracking-tight animate-float">
-              rankbid
+        <main className="relative z-10 flex-1 flex items-center">
+          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16 text-center">
+            {/* Eyebrow */}
+            <span
+              style={delay(0)}
+              className="cs-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] text-emerald-300/90"
+            >
+              <span className="relative flex w-2 h-2">
+                <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
+                <span className="relative w-2 h-2 rounded-full bg-emerald-400" />
+              </span>
+              Launching soon
+            </span>
+
+            {/* Wordmark with an oversized R */}
+            <h1 style={delay(100)} className="cs-rise mt-8 sm:mt-10 flex items-end justify-center select-none" aria-label="RankBid">
+              <span
+                aria-hidden="true"
+                className="cs-float relative mr-1 sm:mr-2 inline-flex items-center justify-center w-[6.5rem] h-[6.5rem] sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-[1.75rem] sm:rounded-[2.5rem] bg-gradient-to-br from-white to-[#DCE7F5] text-[#0F3460] text-[5rem] sm:text-[8rem] md:text-[9.5rem] font-black leading-none tracking-[-0.06em] shadow-2xl shadow-black/40 ring-1 ring-white/40"
+              >
+                <img src="/brand/logo-mark.png" alt="" width={223} height={194} className="w-[72%] h-auto" />
+                <span className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 w-6 h-6 sm:w-9 sm:h-9 rounded-full bg-emerald-400 text-[#071a33] text-[10px] sm:text-sm font-black flex items-center justify-center shadow-lg tracking-normal">#1</span>
+              </span>
+              <span aria-hidden="true" className="cs-sweep pb-1 sm:pb-2 text-5xl sm:text-7xl md:text-8xl font-black leading-none tracking-[-0.05em]">
+                ankBid
+              </span>
             </h1>
-          </div>
 
-          {/* Teaser Message */}
-          <div className="animate-fade-in-up delay-2">
-            <p className="text-base md:text-lg text-[#1F2937]/60 mb-12 font-medium leading-relaxed">
-              We're cooking something awesome here...
+            <p style={delay(180)} className="cs-rise mt-8 sm:mt-12 text-3xl sm:text-5xl md:text-6xl font-black tracking-[-0.04em] leading-tight">
+              Something big is{' '}
+              <span className="bg-gradient-to-r from-emerald-300 to-emerald-500 bg-clip-text text-transparent">coming soon.</span>
             </p>
-          </div>
 
-          {/* Form Section */}
-          <div className="animate-fade-in-up delay-3">
-            {!submitted ? (
-              <form onSubmit={handleSubmit} className="mb-8">
-                <div className="flex flex-col sm:flex-row gap-3 items-center justify-center mb-6">
+            {/* Plain-language summary: the only copy crawlers and AI answer engines see before launch */}
+            <p style={delay(220)} className="cs-rise mt-5 sm:mt-6 max-w-xl mx-auto text-sm sm:text-base text-white/60 leading-relaxed">
+              {SITE_DESCRIPTION}
+            </p>
+
+            {/* Waitlist */}
+            <div style={delay(260)} className="cs-rise mt-8 sm:mt-12 max-w-lg mx-auto">
+              {!submitted ? (
+                <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5 p-1.5 sm:rounded-2xl rounded-2xl bg-white/[0.06] border border-white/15 backdrop-blur-sm focus-within:border-emerald-300/60 transition-colors">
+                  <label htmlFor="waitlist-email" className="sr-only">Email address</label>
                   <input
+                    id="waitlist-email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={e => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full sm:w-96 px-6 py-4 bg-white border-2 border-gray-300 rounded-full text-[#1F2937] placeholder-[#1F2937]/40 text-sm md:text-base focus:outline-none focus:border-[#0F3460] transition-all duration-300 input-focus-glow"
+                    autoComplete="email"
                     required
+                    className="flex-1 min-w-0 px-4 py-3 bg-transparent text-white placeholder-white/40 text-sm sm:text-base focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full sm:w-auto px-8 py-4 bg-[#1F2937] text-white font-black text-sm md:text-base rounded-full hover:bg-[#0F3460] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                    className="px-6 py-3 rounded-xl bg-white text-[#0F3460] text-sm sm:text-base font-black shadow-lg shadow-black/30 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed transition-all whitespace-nowrap"
                   >
-                    {loading ? 'Joining...' : 'Join waitlist'} {!loading && '→'}
+                    {loading ? 'Joining…' : 'Join the waitlist →'}
                   </button>
+                </form>
+              ) : (
+                <div className="p-5 rounded-2xl bg-emerald-400/10 border border-emerald-300/40">
+                  <p className="text-lg font-black text-emerald-300">You&apos;re on the list ✓</p>
+                  <p className="text-sm text-white/70 mt-1">We&apos;ll email you the moment RankBid goes live.</p>
                 </div>
-              </form>
-            ) : (
-              <div className="mb-8 animate-fade-in-up">
-                <div className="p-6 bg-green-50 border-2 border-green-200 rounded-2xl inline-block shadow-md">
-                  <p className="text-lg font-black text-green-700">✓ Got it!</p>
-                  <p className="text-sm text-green-600 mt-2">We'll notify you when we launch.</p>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+              {error && <p role="alert" className="mt-3 text-sm font-semibold text-red-300">{error}</p>}
 
-          {/* Social Proof: the real count, shown only once it's loaded */}
-          {waitlistCount !== null && waitlistCount > 0 && (
-          <div className="animate-fade-in-up delay-4">
-            <p className="text-sm md:text-base text-[#1F2937]/60 font-medium">
-              First come, first serve. There are{' '}
-              <span className="font-black text-[#1F2937] inline-block animate-pulse-gentle">
-                {waitlistCount}
-              </span>{' '}
-              {waitlistCount === 1 ? 'person' : 'people'} on the waitlist already.
-            </p>
+              {waitlistCount !== null && waitlistCount > 0 && (
+                <p className="mt-4 text-sm text-white/55">
+                  <span className="font-black text-white tabular-nums">{waitlistCount.toLocaleString()}</span>{' '}
+                  {waitlistCount === 1 ? 'person has' : 'people have'} already joined. First come, first served.
+                </p>
+              )}
+            </div>
           </div>
-          )}
-        </div>
+        </main>
+
+        {/* Pricing, policies and contact stay reachable before launch (Stripe reviews these). */}
+        <footer className="relative z-10 px-4 pb-6">
+          <nav aria-label="Policies" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-white/50">
+            {POLICY_LINKS.map(link => (
+              <Link key={link.label} href={link.href} className="hover:text-white transition-colors">{link.label}</Link>
+            ))}
+          </nav>
+        </footer>
       </div>
     </>
   );

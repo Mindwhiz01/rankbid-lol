@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { CATEGORIES } from '@/lib/categories';
+import SelectionHeading from '@/components/SelectionHeading';
 
 // /why banner: a photo across the top, cut by a white wave, with the headline,
 // buttons and live numbers below. Every number and card shows real site data.
@@ -43,8 +44,10 @@ export default function WhyHero() {
   return (
     <section className="relative overflow-hidden bg-white border-b border-gray-200">
       {/* PHOTO + WAVE */}
-      {/* Hidden on phones: the banner starts with the copy there */}
-      <div className="relative hidden sm:block sm:h-[26rem] lg:h-auto lg:aspect-[1560/612]">
+      {/* Hidden on phones: the banner starts with the copy there. On large screens it keeps the photo's
+          1560x612 shape (39.23vw tall) but never takes more than 56% of the window, so the headline
+          below stays in view without scrolling. */}
+      <div className="relative hidden sm:block sm:h-[26rem] lg:h-[min(39.23vw,56vh)]">
         <Image
           src={PHOTO_SRC}
           alt="Two friends laughing at a phone"
@@ -83,18 +86,22 @@ export default function WhyHero() {
       </div>
 
       {/* COPY + NUMBERS: a 2x2 grid so the card lines up with the paragraph and the stats with the
-          buttons. On larger screens the copy is pulled up into the white space under the wave; the
-          offset is in vw because the photo and wave scale with the screen width. */}
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-12 sm:pt-0 sm:pb-16 lg:pb-20 sm:-mt-16 lg:-mt-[9.5vw]">
+          buttons. On larger screens the copy is pulled up into the white space under the wave by about a
+          quarter of the photo's height (the same min() as the photo, so they stay in step). */}
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-12 sm:pt-0 sm:pb-16 lg:pb-20 sm:-mt-16 lg:mt-[calc(min(39.23vw,56vh)*-0.2422)]">
         <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[1.45fr_1fr]">
           <div>
             <p style={slideDelay(0)} className="slide-up text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] text-[#0F3460]/60 mb-3 sm:mb-4">Why RankBid</p>
-            <h1 style={slideDelay(60)} className="slide-up text-[2.5rem] leading-[1.02] sm:text-6xl lg:text-[4rem] font-black tracking-[-0.04em] text-[#0B2545]">
-              <span className="lg:whitespace-nowrap">Votes, not budgets,</span>
-              <span className="block text-[#059669]">decide who rises.</span>
-            </h1>
+            <SelectionHeading
+              as="h1"
+              lead="Votes, not budgets,"
+              highlight="decide who rises."
+              size="text-[2.4rem] sm:text-6xl lg:text-[4rem]"
+              style={slideDelay(60)}
+              className="slide-up"
+            />
             <p style={slideDelay(120)} className="slide-up mt-5 sm:mt-6 max-w-lg text-sm sm:text-base md:text-lg text-[#1F2937]/60">
-              RankBid is a free, community-driven launchpad. Real people vote, and the best products climb. No algorithms, no gatekeepers, no paid shortcuts to the top.
+              RankBid is a free, community-driven launchpad. Real people vote, and the best products climb. No algorithms, no gatekeepers. Want extra visibility? Sponsored spots start at $1 and are always clearly labeled.
             </p>
           </div>
 

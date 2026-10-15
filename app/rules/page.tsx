@@ -63,6 +63,7 @@ export default function RulesPage() {
             <List bad items={[
               'Fake accounts, bots or vote buying/trading',
               'Any attempt to manipulate rankings',
+              'Bots or scripts that inflate click counts',
               'Fake products or misleading claims',
               'Harassment, hate speech or abuse',
             ]} />
@@ -77,12 +78,14 @@ export default function RulesPage() {
             ]} />
           </RuleCard>
 
-          <RuleCard icon={<PremiumIcons.Trophy />} title="Premium Listings (Optional)">
+          <RuleCard icon={<PremiumIcons.Trophy />} title="Sponsored Spots (Optional)">
             <List items={[
-              'Premium is optional: free listings rank on votes alone',
-              'Premium features your product at #1, #2 or #3 for 30 days',
-              'Pay $1 more than the current holder to take a spot; they move down one',
-              'Premium listings follow the same content rules as everyone else',
+              'Optional: the vote leaderboard ranks on votes alone',
+              'You choose the price (from $1); sponsored products are ranked by price',
+              'Pay more than a listing to rank above it; on equal prices whoever paid first stays ahead',
+              'The top 10 show on the homepage; every sponsored product is on the Sponsored page',
+              'Each sponsorship lasts 30 days',
+              'Sponsored products follow the same content rules as everyone else',
             ]} />
           </RuleCard>
 

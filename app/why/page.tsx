@@ -15,14 +15,14 @@ const STEPS = [
 ];
 
 const MAKER_POINTS: { icon: ReactNode; title: string; text: string }[] = [
-  { icon: <PremiumIcons.Gift />, title: 'Free, forever', text: 'No listing fees. Submit as many products as you like.' },
+  { icon: <PremiumIcons.Gift />, title: 'Free, forever', text: 'No listing fees. Submit as many products as you like. Sponsored spots are optional.' },
   { icon: <PremiumIcons.Rocket />, title: 'No gatekeepers', text: 'Your product goes live instantly. No editors, no waiting.' },
   { icon: <PremiumIcons.Scale />, title: 'A fair playing field', text: 'Indie makers compete with big teams on votes, not ad budgets.' },
   { icon: <PremiumIcons.Feedback />, title: 'Honest feedback', text: 'See exactly how real people respond to what you built.' },
 ];
 
 const VOTER_POINTS: { icon: ReactNode; title: string; text: string }[] = [
-  { icon: <PremiumIcons.Compass />, title: 'Discover what’s good', text: 'Browse products ranked by real people, not paid placements.' },
+  { icon: <PremiumIcons.Compass />, title: 'Discover what’s good', text: 'The leaderboard is ranked by votes. Paid spots are always labeled Sponsored.' },
   { icon: <PremiumIcons.Ballot />, title: 'Your vote matters', text: 'Every vote moves the rankings everyone else sees.' },
   { icon: <PremiumIcons.Pulse />, title: 'Live rankings', text: 'Watch today’s trending products change in real time.' },
   { icon: <PremiumIcons.Heart />, title: 'Back real makers', text: 'Help indie founders and small teams get discovered.' },
@@ -117,8 +117,7 @@ export default function WhyRankBid() {
                   <div className="absolute -top-16 -right-12 w-44 h-44 bg-emerald-400/30 rounded-full blur-3xl" aria-hidden="true" />
                   <div className="relative">
                     <div className="flex items-center gap-2 mb-7">
-                      <span className="w-7 h-7 rounded-lg bg-white text-[#0F3460] flex items-center justify-center font-black text-sm">R</span>
-                      <span className="font-black text-sm">RankBid</span>
+                      <img src="/brand/logo-horizontal-white.png" alt="RankBid" width={823} height={194} className="h-6 w-auto" />
                       <span className="ml-auto text-[10px] font-black tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-[#0B2545]">TOP 3</span>
                     </div>
                     <p className="text-[10px] font-bold tracking-[0.15em] text-white/55 mb-1">PRODUCT</p>

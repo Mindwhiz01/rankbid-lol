@@ -1,139 +1,14 @@
-'use client';
+import JsonLd from '@/components/JsonLd';
+import { getLaunchedToday } from '@/lib/server/listings';
+import { breadcrumbSchema, itemListSchema } from '@/lib/seo';
+import DailyView from './DailyView';
 
-import Link from 'next/link';
-import Header from '@/components/Header';
-import PageHero from '@/components/PageHero';
-import RankingRow from '@/components/RankingRow';
-import { useState, useEffect, type CSSProperties } from 'react';
-
-interface Listing {
-  id: string;
-  url: string;
-  title: string;
-  description: string;
-  category: string;
-  platform: string;
-  totalVotes: number;
-  dayVotes: number;
-  clickCount: number;
-}
-
-interface CountdownTime {
-  hours: number;
-  minutes: number;
-  seconds: number;
-}
-
-
-export default function DailyPage() {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState<CountdownTime>({ hours: 0, minutes: 0, seconds: 0 });
-
-  useEffect(() => {
-    fetchListings();
-
-    const calculateCountdown = () => {
-      // Time until the next UTC midnight (timestamps are already UTC; no timezone shifting needed).
-      const now = new Date();
-      const nextUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-      const diff = nextUtcMidnight - now.getTime();
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown({ hours, minutes, seconds });
-
-      // Refresh listings when countdown reaches 0 (day changed)
-      if (diff <= 0) {
-        fetchListings();
-      }
-    };
-
-    calculateCountdown();
-    const timer = setInterval(calculateCountdown, 1000);
-
-    // Refresh listings every 30 seconds for real-time updates
-    const refreshTimer = setInterval(fetchListings, 30000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(refreshTimer);
-    };
-  }, []);
-
-  const fetchListings = async () => {
-    try {
-      const res = await fetch('/api/listings/submit?sort=dayVotes&limit=100&timeFilter=today');
-      if (!res.ok) {
-        setListings([]);
-        return;
-      }
-      const data = await res.json();
-      setListings((data.listings || []).sort((a: Listing, b: Listing) => b.dayVotes - a.dayVotes).slice(0, 50));
-    } catch (error) {
-      setListings([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default async function DailyPage() {
+  const listings = await getLaunchedToday(50);
   return (
     <>
-      <Header />
-      <div className="bg-white text-[#1F2937]">
-        {/* Header Section */}
-        <PageHero title="Today&apos;s Top Rankings" subtitle="Community-voted products ranking for today.">
-          <div className="slide-up mt-5 sm:mt-7 inline-flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white/10 border border-white/15 rounded-xl backdrop-blur-sm" style={{ '--d': '240ms' } as CSSProperties}>
-            <span className="text-xs sm:text-sm font-bold text-white/80">Resets in</span>
-            <div className="flex gap-1.5 sm:gap-2 items-center">
-              <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
-                <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.hours).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Hours</span>
-              </div>
-              <span className="text-lg sm:text-2xl font-black text-white/60">:</span>
-              <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
-                <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.minutes).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Mins</span>
-              </div>
-              <span className="text-lg sm:text-2xl font-black text-white/60">:</span>
-              <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
-                <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.seconds).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Secs</span>
-              </div>
-            </div>
-          </div>
-        </PageHero>
-
-        {/* Listings Section */}
-        <section className="bg-gray-50 py-6 sm:py-10 md:py-12 min-h-[40vh]">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin text-4xl">⏳</div>
-                <p className="text-[#1F2937]/60 font-semibold mt-2">Loading rankings...</p>
-              </div>
-            ) : listings.length === 0 ? (
-              <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
-                <p className="text-sm sm:text-base font-bold text-[#1F2937] mb-1">No votes yet today</p>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4">Be the first: submit a product or vote for one you love.</p>
-                <Link
-                  href="/#submit"
-                  className="inline-flex px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all"
-                >
-                  Submit a Listing
-                </Link>
-              </div>
-            ) : (
-              <div className="curve-list space-y-3">
-                {listings.map((listing, idx) => (
-                  <RankingRow key={listing.id} listing={listing} rank={idx + 1} votes={listing.dayVotes || 0} votesLabel="today" />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+      <JsonLd data={[itemListSchema('Products launched on RankBid today', listings), breadcrumbSchema([{ name: 'Daily launches', path: '/daily' }])]} />
+      <DailyView initialListings={listings} />
     </>
   );
 }

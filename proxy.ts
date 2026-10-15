@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryFromSlug, categoryPath } from '@/lib/categories';
-import { ADMIN_COOKIE, adminCookieValue, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
+import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
+import { isComingSoonEnabled } from '@/lib/server/site-settings';
 
 // Indexable content pages, open to everyone (and search/AI crawlers) before launch.
 // Matched exactly or as a path prefix ('/product' covers '/product/:id').
@@ -13,6 +14,7 @@ const PUBLIC_PAGES = [
   '/platforms',
   '/product',
   '/leaderboard',
+  '/sponsored',
   '/today',
   '/daily',
   '/archive',
@@ -32,6 +34,25 @@ const PUBLIC_ROUTES = [
   '/api/waitlist/count',
 ];
 
+// Pages still reachable while coming soon mode is on. /login lets admins who sign in by email get through.
+// Pricing (/rules, /faq), contact (/about) and policies stay public: Stripe reviews them before live payments.
+const COMING_SOON_OPEN = [
+  '/coming-soon',
+  '/admin',
+  '/login',
+  '/tos',
+  '/privacy',
+  '/cookies',
+  '/rules',
+  '/faq',
+  '/about',
+];
+
+function isMainDomain(request: NextRequest): boolean {
+  const host = (request.headers.get('host') || '').split(':')[0].toLowerCase();
+  return host === 'rankbid.click' || host.endsWith('.rankbid.click');
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
@@ -40,7 +61,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Old category links used ?category=AIMedia; the canonical page is /categories/ai-media.
+  // Old category links used ?category=AIMedia; the canonical page is /categories/ai.
   if (pathname === '/categories' && searchParams.get('category')) {
     const raw = searchParams.get('category')!;
     const category = categoryFromSlug(raw);
@@ -48,21 +69,6 @@ export async function proxy(request: NextRequest) {
     url.pathname = category ? categoryPath(category) : '/categories';
     url.search = '';
     return NextResponse.redirect(url, 308);
-  }
-
-  // (An ?adminKey= visit falls through so the admin cookie still gets set below.)
-  if (!searchParams.has('adminKey') && (pathname === '/' || PUBLIC_PAGES.some(route => pathname === route || pathname.startsWith(`${route}/`)))) {
-    return NextResponse.next();
-  }
-
-  // Allow public routes
-  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  // Allow API routes (they handle their own auth)
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
   }
 
   // ?adminKey=<ADMIN_KEY> signs this browser in as admin, then the key is dropped from the URL.
@@ -81,6 +87,40 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // Coming soon mode (switched from the admin dashboard): every visitor except admins sees /coming-soon.
+  // It only applies on rankbid.click; the vercel.app domain always shows the full site.
+  if (isMainDomain(request) && await isComingSoonEnabled()) {
+    if (COMING_SOON_OPEN.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
+      return NextResponse.next();
+    }
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.next(); // API routes handle their own auth
+    }
+    if (await isAdminRequest(request)) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL('/coming-soon', request.url));
+  }
+
+  // The site is open: nothing to wait for on /coming-soon.
+  if (pathname === '/coming-soon') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (pathname === '/' || PUBLIC_PAGES.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
+    return NextResponse.next();
+  }
+
+  // Allow public routes
+  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // Allow API routes (they handle their own auth)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   if (isValidAdminCookie(request.cookies.get(ADMIN_COOKIE)?.value)) {
     return NextResponse.next();
   }
@@ -93,8 +133,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect non-authenticated users to coming-soon
-  return NextResponse.redirect(new URL('/coming-soon', request.url));
+  // Signed-out visitors sign in for members-only pages, then come back with the same query
+  // (e.g. /sponsor?listing=… keeps the product they chose).
+  const login = new URL('/login', request.url);
+  login.searchParams.set('next', pathname + request.nextUrl.search);
+  return NextResponse.redirect(login);
 }
 
 export const config = {

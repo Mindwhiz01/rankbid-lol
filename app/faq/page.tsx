@@ -11,7 +11,7 @@ const LAST_UPDATED = '2026-10-08';
 
 export const metadata = pageMetadata({
   title: 'FAQ: How RankBid Voting & Rankings Work',
-  description: 'Answers to common questions about RankBid: is it free, how voting and rankings work, what you can submit, premium listings and how to get more votes.',
+  description: 'Answers to common questions about RankBid: is it free, how voting and rankings work, what you can submit, sponsored spots, clicks and how to get more votes.',
   path: '/faq',
 });
 

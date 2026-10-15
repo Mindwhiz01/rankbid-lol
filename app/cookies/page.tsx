@@ -17,6 +17,7 @@ const ESSENTIAL: StorageItem[] = [
 
 const PREFERENCES: StorageItem[] = [
   { name: 'rankbid_voted_listings', type: 'Local storage', purpose: 'Remembers which products you voted for, so their buttons show “Voted”.', duration: 'Until cleared' },
+  { name: 'rankbid_clicked', type: 'Local storage', purpose: 'Remembers which products you opened in the last 30 minutes, so click counts on screen match what is counted.', duration: '30 minutes' },
   { name: 'sessionId', type: 'Local storage', purpose: 'Anonymous visit ID used to count live visitors and page views.', duration: 'Until cleared' },
 ];
 

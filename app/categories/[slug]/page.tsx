@@ -4,6 +4,7 @@ import CategoryBrowser from '@/components/CategoryBrowser';
 import JsonLd from '@/components/JsonLd';
 import { categoryFromSlug, categoryPath, categorySlug, getCategoryLabel } from '@/lib/categories';
 import { getCategoryListings, getRankedListings } from '@/lib/server/listings';
+import { getCustomCategories } from '@/lib/server/custom-categories';
 import { breadcrumbSchema, itemListSchema, pageMetadata } from '@/lib/seo';
 
 type Props = { params: Promise<{ slug: string }> };
@@ -13,7 +14,7 @@ const intro = (label: string) =>
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const category = categoryFromSlug(slug);
+  const category = categoryFromSlug(slug, await getCustomCategories());
   if (!category) return {};
   const label = getCategoryLabel(category);
   return pageMetadata({
@@ -25,7 +26,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params;
-  const category = categoryFromSlug(slug);
+  const custom = await getCustomCategories();
+  const category = categoryFromSlug(slug, custom);
   if (!category) notFound();
   // Old links used the stored value ("AIMedia"); send them to the canonical slug.
   if (slug !== categorySlug(category)) permanentRedirect(categoryPath(category));
@@ -46,7 +48,7 @@ export default async function CategoryPage({ params }: Props) {
           itemListSchema(`Top ${label} products on RankBid`, listings),
         ]}
       />
-      <CategoryBrowser selected={category} listings={listings} counts={counts} intro={intro(label)} />
+      <CategoryBrowser selected={category} listings={listings} counts={counts} intro={intro(label)} custom={custom} />
     </>
   );
 }

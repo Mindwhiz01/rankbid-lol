@@ -184,9 +184,8 @@ export default function StatusCardModal({ isOpen, onClose, product, productUrl }
 
                 <div style={{ position: 'relative' }}>
                   {/* Brand */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '34px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: C.white, color: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', lineHeight: '28px' }}>R</div>
-                    <span style={{ fontWeight: 900, fontSize: '15px', lineHeight: '28px', letterSpacing: '0.3px' }}>RankBid</span>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '34px' }}>
+                    <img src="/brand/logo-horizontal-white.png" alt="RankBid" width={119} height={28} style={{ display: 'block', width: '119px', height: '28px' }} />
                   </div>
 
                   {/* Product name */}

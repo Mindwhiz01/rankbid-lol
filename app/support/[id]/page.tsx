@@ -37,8 +37,7 @@ export default async function SupportPage({ params }: Props) {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0F3460] to-[#1a5490] text-white flex items-center justify-center font-black text-sm shadow-sm">R</span>
-            <span className="text-lg font-black text-[#0F3460] tracking-tight">RankBid</span>
+            <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-8 w-auto" />
           </Link>
           <span className="text-xs font-semibold text-[#1F2937]/50">Community-voted rankings</span>
         </div>

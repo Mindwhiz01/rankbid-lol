@@ -5,32 +5,11 @@ import { extractSocialHandle, formatSocialMediaUrl, isSocialMediaUrl } from '@/l
 import { sendNewSubmissionEmail } from '@/lib/email';
 import { getActiveHolders, type PremiumHolder } from '@/lib/server/premium';
 import { CATEGORIES, LEGACY_CATEGORIES } from '@/lib/categories';
+import { addCustomCategory, getCustomCategories } from '@/lib/server/custom-categories';
+import { detectPlatform, looksLikeUrl, normalizePlatform, platformUrlProblem } from '@/lib/platform-url';
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
-import { safeFetch, UnsafeUrlError } from '@/lib/server/safe-fetch';
-import { isDownloadResponse, isFlaggedBySafeBrowsing, staticUrlProblem } from '@/lib/server/url-safety';
-
-const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
-
-/** null if the URL can be listed, otherwise the reason it can't. */
-async function accessibilityProblem(url: string): Promise<string | null> {
-  const social = isSocialMediaUrl(url);
-  let res: Response;
-  try {
-    res = await safeFetch(url, { method: 'HEAD', headers: UA });
-    if (res.status === 405 || res.status === 501) res = await safeFetch(url, { method: 'GET', headers: UA });
-  } catch (error) {
-    if (error instanceof UnsafeUrlError) return 'This URL is not allowed.';
-    // Network hiccups and timeouts: allow, as before, rather than reject real sites.
-    console.warn(`URL accessibility check failed for ${url}:`, error);
-    return null;
-  }
-  if (isDownloadResponse(res)) return 'Direct download links are not allowed. Link to a web page instead.';
-  if (res.status >= 200 && res.status < 400) return null;
-  // Social networks often answer bots with 403/429 for profiles that do exist.
-  if (social && res.status !== 404 && res.status !== 410) return null;
-  return 'URL is not accessible or does not exist. Please verify the URL is correct and accessible.';
-}
+import { accessibilityProblem, isFlaggedBySafeBrowsing, staticUrlProblem } from '@/lib/server/url-safety';
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,13 +30,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { url, handle, description, category, platform } = await req.json();
+    const body = await req.json();
+    const { url, handle, description, customCategory } = body;
+    let { category, platform } = body;
 
     if (
       (url !== undefined && typeof url !== 'string') ||
       (handle !== undefined && typeof handle !== 'string') ||
       (description !== undefined && typeof description !== 'string') ||
-      (platform !== undefined && typeof platform !== 'string')
+      (platform !== undefined && typeof platform !== 'string') ||
+      (customCategory !== undefined && typeof customCategory !== 'string')
     ) {
       return NextResponse.json({ error: 'Invalid submission', listings: [] }, { status: 400 });
     }
@@ -69,14 +51,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'linkedin'].includes(platform) && url && !url.startsWith('http')) {
-      return NextResponse.json(
-        { error: `Please enter the full profile URL for ${platform}. Example: https://${platform}.com/username`, listings: [] },
-        { status: 400 }
-      );
+    // The link must belong to the platform tab picked on the form. Without a platform (the
+    // sponsor checkout's "add a product" box) it's taken from the link itself.
+    const linkText = (url || handle || '').trim();
+    if (platform) {
+      const problem = platformUrlProblem(platform, linkText);
+      if (problem) return NextResponse.json({ error: problem, listings: [] }, { status: 400 });
+      platform = normalizePlatform(platform);
+    } else {
+      platform = detectPlatform(linkText);
+      if (!platform) return NextResponse.json({ error: 'Enter a valid link', listings: [] }, { status: 400 });
     }
 
-    if (!category || ![...CATEGORIES, ...LEGACY_CATEGORIES].includes(category)) {
+    // "Other" plus a typed name adds that name as a category everyone can pick from then on.
+    if (customCategory?.trim()) {
+      try {
+        category = await addCustomCategory(customCategory);
+      } catch (e) {
+        console.error('Saving custom category failed:', e);
+        category = null;
+      }
+      if (!category) {
+        return NextResponse.json(
+          { error: "That category name can't be used. Use 2-30 letters or numbers.", listings: [] },
+          { status: 400 }
+        );
+      }
+    } else if (!category || ![...CATEGORIES, ...LEGACY_CATEGORIES, ...(await getCustomCategories())].includes(category)) {
       return NextResponse.json(
         { error: 'Category required', listings: [] },
         { status: 400 }
@@ -97,7 +98,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let normalizedUrl = url || getPlatformUrl(platform, handle);
+    // A social link typed without https:// ("instagram.com/name") is a URL, not a handle.
+    const typedLink = handle && looksLikeUrl(handle) && !/^https?:\/\//i.test(handle) ? `https://${handle.trim()}` : handle;
+    let normalizedUrl = url || getPlatformUrl(platform, typedLink);
     let displayHandle = handle;
 
     if (normalizedUrl && !normalizedUrl.startsWith('http')) {
@@ -426,7 +429,7 @@ export async function GET(req: NextRequest) {
       platform: item.platform || 'website',
       totalVotes: item.total_votes || 0,
       dayVotes: item.day_votes || 0,
-      clickCount: item.views || 0,
+      clickCount: item.click_count || 0,
       createdAt: item.created_at,
       updatedAt: item.updated_at || item.created_at,
       imageUrl: item.image_url || null,
@@ -435,16 +438,16 @@ export async function GET(req: NextRequest) {
     });
     const mappedListings = listings.map(mapListing);
 
-    // Paid #1-#3 holders. Votes still order the main list; these also come back as `premium`
-    // so the featured strip shows every holder, whichever page they fall on.
+    // Live sponsored listings, ranked by price. Votes still order the main list; these also come back as `premium`
+    // so the sponsored strip shows every holder, whichever page they fall on.
+    // Founder email/phone stay server-side: they are for the admin, not the public page.
     const holders = await getActiveHolders();
     const withPremium = (listing: ReturnType<typeof mapListing>, holder: PremiumHolder) => ({
       ...listing,
       isPremium: true,
       premiumPosition: holder.position,
+      premiumBidUsd: holder.bidUsd,
       founderName: holder.founderName,
-      founderEmail: holder.founderEmail,
-      founderPhone: holder.founderPhone,
       founderWebsite: holder.founderWebsite,
       founderTwitter: holder.founderTwitter,
       founderLinkedin: holder.founderLinkedin,

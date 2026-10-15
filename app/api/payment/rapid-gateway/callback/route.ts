@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Puts the bid on the ladder; if someone outbid it meanwhile it becomes 'needs_refund'.
+        // Activates the bid for 30 days; it takes its rank among the others by price.
         const result = await activatePremiumBid(premiumListingId);
         console.log('✅ Premium payment processed:', premiumListingId, result);
 

@@ -11,6 +11,8 @@ interface SelectionHeadingProps {
   /** 'light' for white/grey sections, 'dark' for the navy gradient headers */
   tone?: 'light' | 'dark';
   as?: 'h1' | 'h2';
+  /** Text size classes for both lines; page heroes pass a larger scale */
+  size?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -43,17 +45,18 @@ export default function SelectionHeading({
   align = 'left',
   tone = 'light',
   as: Tag = 'h2',
+  size = 'text-3xl sm:text-4xl md:text-5xl',
   className = '',
   style,
 }: SelectionHeadingProps) {
   const t = TONES[tone];
   const centered = align === 'center';
-  const size = 'text-3xl sm:text-4xl md:text-5xl';
 
   return (
     <div style={style} className={`${centered ? 'text-center' : ''} ${className}`}>
       <Tag className={`${t.heading} leading-[0.95] tracking-[-0.03em]`}>
-        {lead && <span className={`block ${size} ${t.lead}`}>{lead}</span>}
+        {/* The space keeps "lead highlight" readable as text (crawlers, screen readers); the block span hides it visually. */}
+        {lead && <><span className={`block ${size} ${t.lead}`}>{lead}</span>{' '}</>}
         <span className={`relative inline-block ${lead ? 'mt-2' : ''} px-2 sm:px-2.5 py-0.5 ${t.box} ${size} font-bold`}>
           {highlight}
           <span aria-hidden="true" className={`absolute left-0 top-0 bottom-0 w-[3px] ${t.handle}`}>

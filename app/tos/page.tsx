@@ -24,6 +24,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
       <ul>
         <li>You need an account to submit products and to vote.</li>
         <li>Each person may vote once per product. Using multiple accounts, bots or paid votes is not allowed.</li>
+        <li>Inflating click counts with bots, scripts or click farms is not allowed.</li>
         <li>You are responsible for activity on your account and for keeping your login secure.</li>
       </ul>
     ),
@@ -51,12 +52,15 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
   },
   {
     id: 'premium',
-    title: 'Premium Listings & Payments',
+    title: 'Sponsored Spots & Payments',
     body: (
       <ul>
-        <li>Premium listings are optional. They feature your product in a chosen position (#1, #2 or #3) for 30 days; votes still apply on top. A held spot can be taken by someone who pays at least $1 more; the holder then moves down one spot, and a holder pushed below #3 loses the placement without a refund.</li>
-        <li>Payments are processed by our payment providers (card gateway, JazzCash, EasyPaisa). Prices are shown before you pay.</li>
-        <li>Once a premium listing is active, payment is final and non-refundable, except where required by law.</li>
+        <li>Sponsored listings are optional and shown in a labeled Sponsored section separate from the vote leaderboard. Buying one does not add votes or change your leaderboard rank.</li>
+        <li>You choose the amount you pay, from $1 in whole US dollars. Sponsored listings are ranked by amount paid, highest first; on equal amounts the one paid first ranks higher. The top 10 are shown on the homepage and all are shown on the Sponsored page.</li>
+        <li>Your rank can go down when someone pays more, and up when listings above you expire. A change in rank, including leaving the homepage top 10, is not grounds for a refund.</li>
+        <li>A sponsored listing lasts 30 days from when payment is confirmed. Changes in rank do not change that period. Paying again for the same product replaces its current sponsored listing.</li>
+        <li>Payments are processed by Stripe in US dollars. The price is shown before you pay.</li>
+        <li>Once a sponsored listing is active, payment is final and non-refundable, except where required by law.</li>
         <li>You are responsible for any taxes or fees in your jurisdiction.</li>
       </ul>
     ),
@@ -67,7 +71,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     body: (
       <p>
         We may remove any listing or suspend any account that breaks these terms or our rules, manipulates rankings,
-        uses misleading information or is involved in illegal activity. Premium fees are not refunded for listings
+        uses misleading information or is involved in illegal activity. Sponsored spot fees are not refunded for listings
         removed for violations.
       </p>
     ),
@@ -77,7 +81,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     title: 'No Guarantees & Liability',
     body: (
       <p>
-        RankBid is provided &ldquo;as is&rdquo;. A ranking or premium placement does not guarantee traffic, users or sales. We are
+        RankBid is provided &ldquo;as is&rdquo;. A ranking or sponsored spot does not guarantee traffic, users or sales. We are
         not liable for indirect or consequential damages, and our total liability is limited to the amount you paid us
         in the last 30 days.
       </p>

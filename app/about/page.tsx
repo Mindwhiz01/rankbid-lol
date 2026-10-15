@@ -13,8 +13,8 @@ const STEPS = [
 
 const VALUES = [
   { icon: <PremiumIcons.Gift />, title: '100% free', text: 'No submission fees and no hidden costs.' },
-  { icon: <PremiumIcons.Eye />, title: 'Fully transparent', text: 'Every vote count is public and live.' },
-  { icon: <PremiumIcons.Scale />, title: 'Fair competition', text: 'Rankings come from votes, not ad budgets.' },
+  { icon: <PremiumIcons.Eye />, title: 'Fully transparent', text: 'Votes, clicks and sponsored bids are public and live.' },
+  { icon: <PremiumIcons.Scale />, title: 'Fair competition', text: 'The leaderboard comes from votes. Sponsored spots are labeled.' },
   { icon: <PremiumIcons.Globe />, title: 'Real audience', text: 'Product fans and makers from around the world.' },
   { icon: <PremiumIcons.Pulse />, title: 'Real-time results', text: 'Watch your ranking change as votes come in.' },
   { icon: <PremiumIcons.Heart />, title: 'Community first', text: 'Built to help makers support each other.' },

@@ -13,6 +13,7 @@ export interface Listing {
   totalVotes: number;
   dayVotes: number;
   clickCount: number;
+  imageUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,7 +21,7 @@ export interface Listing {
 type Row = {
   id: string; title: string; description?: string | null; url?: string | null; location?: string | null;
   category?: string | null; platform?: string | null; total_votes?: number | null; day_votes?: number | null;
-  click_count?: number | null; created_at: string; updated_at?: string | null;
+  click_count?: number | null; image_url?: string | null; created_at: string; updated_at?: string | null;
 };
 
 function toListing(row: Row): Listing {
@@ -34,6 +35,7 @@ function toListing(row: Row): Listing {
     totalVotes: row.total_votes || 0,
     dayVotes: row.day_votes || 0,
     clickCount: row.click_count || 0,
+    ...(row.image_url && { imageUrl: row.image_url }),
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
   };
@@ -67,4 +69,18 @@ export function getRankedListings(): Promise<Listing[]> {
 
 export function getCategoryListings(category: string, limit = 50): Promise<Listing[]> {
   return query(`listings?select=*&category=eq.${encodeURIComponent(category)}&${RANK_ORDER}&limit=${limit}`);
+}
+
+/** Listings with votes in the last 24 hours, most of today's votes first (the /today board). */
+export function getTrendingToday(limit = 100): Promise<Listing[]> {
+  return query(`listings?select=*&day_votes=gt.0&order=day_votes.desc,updated_at.desc.nullslast&limit=${limit}`);
+}
+
+/** Listings submitted today (UTC), most of today's votes first (the /daily board). */
+export function getLaunchedToday(limit = 100): Promise<Listing[]> {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const range = `created_at=gte.${encodeURIComponent(start.toISOString())}&created_at=lt.${encodeURIComponent(end.toISOString())}`;
+  return query(`listings?select=*&${range}&order=day_votes.desc,updated_at.desc.nullslast&limit=${limit}`);
 }

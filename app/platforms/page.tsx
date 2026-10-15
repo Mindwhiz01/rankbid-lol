@@ -6,6 +6,9 @@ import RankingRow from '@/components/RankingRow';
 import Pagination from '@/components/Pagination';
 import PlatformsCta from '@/components/PlatformsCta';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { EmptyStateIcon } from '@/components/PremiumIcons';
+import { openSubmitModal } from '@/components/SubmitProductModal';
+import { normalizePlatform } from '@/lib/platform-url';
 
 interface Listing {
   id: string;
@@ -164,11 +167,11 @@ export default function PlatformsPage() {
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
-                <div className="text-3xl sm:text-4xl mb-3">📭</div>
+                <div className="mb-4"><EmptyStateIcon /></div>
                 <p className="text-base sm:text-lg font-black text-[#1F2937] mb-1">No listings yet</p>
                 <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4 sm:mb-6">Be the first to submit a {selectedPlatformInfo?.label.toLowerCase()}!</p>
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => openSubmitModal({ platform: normalizePlatform(selectedPlatform) })}
                   className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all shadow-lg"
                 >
                   Start Submitting

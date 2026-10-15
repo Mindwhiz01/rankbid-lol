@@ -144,10 +144,7 @@ export default function PlatformsCta() {
                           <svg viewBox="0 0 16 12" className="h-2.5 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                             <path d="M1 1h14M1 6h14M1 11h14" />
                           </svg>
-                          <span className="flex items-center gap-1.5">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-[#0F3460] to-[#1a5490] text-[9px] font-black text-white">R</span>
-                            <span className="text-xs font-black tracking-tight text-[#0F3460]">RankBid</span>
-                          </span>
+                          <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-4 w-auto" />
                           <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                             <circle cx="7" cy="7" r="5" />
                             <path d="M11 11l4 4" />
