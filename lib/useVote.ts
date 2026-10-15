@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 
 const VOTED_KEY = 'rankbid_voted_listings';
 
@@ -33,20 +33,24 @@ function getUser(): { id: string } | null {
 
 /**
  * Vote state for one listing, shared by ranking rows and the product page.
+ * Clicks flip the button and count at once; the server is brought in line in the background,
+ * and the button only flips back if the server refuses. Clicking "Voted" again takes the vote back.
  * Logged-out visitors are sent to /login and brought back afterwards.
  */
 export function useVote(listingId: string) {
   const voted = useSyncExternalStore(subscribe, () => readVoted().has(listingId), () => false);
-  const [busy, setBusy] = useState(false);
   const [extraVotes, setExtraVotes] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  // What the server has for this user (null until the first click), and whether a request is running.
+  const serverVoted = useRef<boolean | null>(null);
+  const syncing = useRef(false);
 
   const flash = (text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(null), 2500);
   };
 
-  const rememberVoted = (on = true) => {
+  const rememberVoted = (on: boolean) => {
     const set = readVoted();
     if (on) set.add(listingId);
     else set.delete(listingId);
@@ -54,74 +58,69 @@ export function useVote(listingId: string) {
     listeners.forEach(l => l());
   };
 
-  // Clicking "Voted" again takes the vote back.
-  const unvote = async () => {
-    setBusy(true);
-    setExtraVotes(n => n - 1);
+  const toLogin = () => {
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  };
+
+  // Sends votes / unvotes until the server matches what's on screen. Fast double clicks
+  // just change the target, so they never wait on each other.
+  const sync = async () => {
+    if (syncing.current) return;
+    syncing.current = true;
     try {
-      const res = await fetch('/api/votes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        rememberVoted(false);
-        flash('Vote removed');
-      } else if (res.status === 401) {
-        setExtraVotes(n => n + 1);
-        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-      } else {
-        setExtraVotes(n => n + 1);
-        flash(data.error || 'Could not remove vote, try again');
+      while (readVoted().has(listingId) !== serverVoted.current) {
+        const want = readVoted().has(listingId);
+        let res: Response | null = null;
+        let data: { success?: boolean; error?: string } = {};
+        try {
+          res = await fetch('/api/votes', {
+            method: want ? 'POST' : 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ listingId }),
+          });
+          data = await res.json().catch(() => ({}));
+        } catch {
+          res = null;
+        }
+
+        if (res?.ok && data.success) {
+          serverVoted.current = want;
+          continue;
+        }
+        if (want && data.error === 'Already voted') {
+          // It was already counted, so the extra +1 on screen goes.
+          serverVoted.current = true;
+          setExtraVotes(n => n - 1);
+          continue;
+        }
+
+        // Refused: put the button and count back to what the server has.
+        rememberVoted(!want);
+        setExtraVotes(n => n + (want ? -1 : 1));
+        if (res?.status === 401) {
+          toLogin();
+        } else {
+          flash(data.error || (want ? 'Vote failed, try again' : 'Could not remove vote, try again'));
+        }
+        break;
       }
-    } catch {
-      setExtraVotes(n => n + 1);
-      flash('Could not remove vote, try again');
     } finally {
-      setBusy(false);
+      syncing.current = false;
     }
   };
 
-  const vote = async () => {
-    const user = getUser();
-    if (!user) {
-      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  const vote = () => {
+    if (!getUser()) {
+      toLogin();
       return;
     }
-    if (busy) return;
-    if (voted) return unvote();
-
-    setBusy(true);
-    setExtraVotes(n => n + 1);
-    try {
-      const res = await fetch('/api/votes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        rememberVoted();
-        flash('Vote recorded!');
-      } else if (res.status === 401) {
-        setExtraVotes(n => n - 1);
-        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-      } else if (data.error === 'Already voted') {
-        setExtraVotes(n => n - 1);
-        rememberVoted();
-        flash('You already voted');
-      } else {
-        setExtraVotes(n => n - 1);
-        flash('Vote failed, try again');
-      }
-    } catch {
-      setExtraVotes(n => n - 1);
-      flash('Vote failed, try again');
-    } finally {
-      setBusy(false);
-    }
+    if (serverVoted.current === null) serverVoted.current = voted;
+    const next = !voted;
+    rememberVoted(next);
+    setExtraVotes(n => n + (next ? 1 : -1));
+    flash(next ? 'Vote recorded!' : 'Vote removed');
+    void sync();
   };
 
-  return { voted, busy, extraVotes, message, vote };
+  return { voted, extraVotes, message, vote };
 }

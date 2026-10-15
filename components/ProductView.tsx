@@ -42,7 +42,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const [allListings, setAllListings] = useState<Listing[]>(initialAllListings);
   const [copied, setCopied] = useState(false);
   const [showStatusCard, setShowStatusCard] = useState(false);
-  const { voted, busy: voting, extraVotes, message: voteMessage, vote } = useVote(id);
+  const { voted, extraVotes, message: voteMessage, vote } = useVote(id);
 
   useEffect(() => {
     if (!initialProduct) fetchProduct();
@@ -243,7 +243,6 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                 <div className="slide-up flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3" style={{ '--d': '320ms' } as CSSProperties}>
                   <button
                     onClick={vote}
-                    disabled={voting}
                     title={voted ? 'Click to remove your vote' : undefined}
                     className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 font-black rounded-xl text-sm transition-all active:scale-95 disabled:opacity-60 ${
                       voted
