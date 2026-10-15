@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, rankForBid } from '@/lib/premiumSpots';
-import { detectPlatform, normalizePlatform, type SubmitPlatform } from '@/lib/platform-url';
+import { PLATFORM_LABELS, normalizePlatform, platformExample, platformUrlProblem, type SubmitPlatform } from '@/lib/platform-url';
 import CategoryField, { categoryChoice, categoryChoiceError, categoryPayload, type CategoryChoice } from '@/components/CategoryField';
 
 interface PremiumListingModalProps {
@@ -26,7 +26,7 @@ export interface PremiumData {
   /** Existing product to boost; absent when newProduct is set. */
   listingId?: string;
   /** A product that is not listed yet: it is submitted first, then the bid goes to checkout. */
-  newProduct?: { url: string; category: string; customCategory?: string };
+  newProduct?: { link: string; platform: SubmitPlatform; category: string; customCategory?: string };
   /** Whole USD; the rank follows from it. */
   bidUsd: number;
   founderName: string;
@@ -119,6 +119,8 @@ export default function PremiumListingModal({
   // Product picker (only without a fixed listingId): an own listing's id, or NEW_PRODUCT.
   const [productChoice, setProductChoice] = useState(NEW_PRODUCT);
   const [productUrl, setProductUrl] = useState('');
+  // Platform tab for a new product, as on the homepage submit form (a profile can be just a handle).
+  const [newPlatform, setNewPlatform] = useState<SubmitPlatform>('website');
   const [productCategory, setProductCategory] = useState<CategoryChoice>(() => categoryChoice(initialCategory));
   const [ranked, setRanked] = useState<RankedListing[]>([]);
   // The rank the buyer picked; null means the suggested one. The price follows from it.
@@ -132,7 +134,7 @@ export default function PremiumListingModal({
   const listingId = fixedListingId ?? (isNewProduct ? undefined : productChoice);
   const title = listingTitle ?? (isNewProduct ? 'New product' : ownListings.find(l => l.id === productChoice)?.title);
   const productPlatform = isNewProduct
-    ? detectPlatform(productUrl)
+    ? newPlatform
     : normalizePlatform(ownListings.find(l => l.id === listingId)?.platform);
   const ownField = productPlatform ? PLATFORM_FIELD[productPlatform] : null;
 
@@ -174,8 +176,9 @@ export default function PremiumListingModal({
     setLoading(true);
 
     if (isNewProduct) {
-      if (!productUrl.trim()) {
-        setError('❌ Please enter your product URL');
+      const linkProblem = platformUrlProblem(newPlatform, productUrl);
+      if (linkProblem) {
+        setError(`❌ ${linkProblem}`);
         setLoading(false);
         return;
       }
@@ -221,7 +224,7 @@ export default function PremiumListingModal({
 
       await onSubmit({
         ...(isNewProduct
-          ? { newProduct: { url: productUrl.trim(), ...categoryPayload(productCategory) } }
+          ? { newProduct: { link: productUrl.trim(), platform: newPlatform, ...categoryPayload(productCategory) } }
           : { listingId }),
         bidUsd: price,
         ...payload,
@@ -251,6 +254,7 @@ export default function PremiumListingModal({
         setRankInput(null);
         setProductChoice(NEW_PRODUCT);
         setProductUrl('');
+        setNewPlatform('website');
         setProductCategory(categoryChoice(initialCategory));
         setLinkRows(defaultRows(null));
         onClose();
@@ -368,9 +372,37 @@ export default function PremiumListingModal({
                   )}
                   {isNewProduct && (
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_13rem] gap-4">
+                      {/* Platform tabs, same as the homepage submit form */}
+                      <div className="sm:col-span-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Platform">
+                        {(Object.keys(PLATFORM_FIELD) as SubmitPlatform[]).map(p => (
+                          <button
+                            key={p}
+                            type="button"
+                            role="radio"
+                            aria-checked={newPlatform === p}
+                            onClick={() => setNewPlatform(p)}
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
+                              newPlatform === p ? 'bg-[#0F3460] border-[#0F3460] text-white' : 'bg-white border-gray-200 text-[#1F2937] hover:border-[#0F3460]/40'
+                            }`}
+                          >
+                            <SocialMark field={PLATFORM_FIELD[p]} />
+                            {PLATFORM_LABELS[p]}
+                          </button>
+                        ))}
+                      </div>
                       <label className="block">
-                        <span className={fieldLabel}>Product URL or profile link {req}</span>
-                        <input type="text" inputMode="url" value={productUrl} onChange={e => setProductUrl(e.target.value)} placeholder="yourproduct.com" className={input} />
+                        <span className={fieldLabel}>{newPlatform === 'website' ? 'Product URL' : `${PLATFORM_LABELS[newPlatform]} profile link or username`} {req}</span>
+                        <input
+                          type="text"
+                          inputMode="url"
+                          value={productUrl}
+                          onChange={e => setProductUrl(e.target.value)}
+                          placeholder={platformExample(newPlatform)}
+                          className={input}
+                        />
+                        {productUrl.trim() && platformUrlProblem(newPlatform, productUrl) && (
+                          <span className="block mt-1 text-xs font-bold text-red-600">{platformUrlProblem(newPlatform, productUrl)}</span>
+                        )}
                       </label>
                       <div className="block">
                         <span className={fieldLabel}>Category {req}</span>
@@ -387,30 +419,18 @@ export default function PremiumListingModal({
               {/* Rank: pick a place, the price follows */}
               <section>
                 <h3 className={sectionTitle}>Sponsored rank {req}</h3>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
-                  {rankChoices.map(r => {
-                    const amount = priceFor(r);
-                    const active = r === rank;
-                    return (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRankInput(r)}
-                        aria-pressed={active}
-                        aria-label={`Rank ${r} for $${amount}`}
-                        className={`rounded-2xl border-2 px-2 py-3 text-center transition-all active:scale-[0.98] ${
-                          active ? 'border-[#0F3460] bg-[#0F3460] text-white shadow-lg shadow-[#0F3460]/25' : 'border-gray-200 bg-white text-[#0B2545] hover:border-[#0F3460]/40'
-                        }`}
-                      >
-                        <span className="block text-3xl font-black tracking-[-0.04em] leading-none tabular-nums">#{r}</span>
-                        <span className={`block mt-1.5 text-base font-black tabular-nums ${active ? 'text-amber-300' : 'text-amber-600'}`}>${amount}</span>
-                        <span className={`block mt-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? 'text-white/60' : 'text-[#1F2937]/40'}`}>
-                          {r <= HOME_SPONSORED ? 'Homepage' : 'Sponsored'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <select
+                  aria-label="Sponsored rank"
+                  value={rank}
+                  onChange={e => setRankInput(Number(e.target.value))}
+                  className={input + ' font-bold'}
+                >
+                  {rankChoices.map(r => (
+                    <option key={r} value={r}>
+                      #{r} · ${priceFor(r)} · {r <= HOME_SPONSORED ? 'Homepage' : 'Sponsored page'}
+                    </option>
+                  ))}
+                </select>
 
                 <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
                   <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>

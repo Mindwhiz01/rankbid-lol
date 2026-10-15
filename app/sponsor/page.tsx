@@ -72,7 +72,14 @@ function SponsorCheckout() {
       const res = await fetch('/api/listings/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newProduct.url, category: newProduct.category, customCategory: newProduct.customCategory }),
+        // Same shape as the homepage submit form: a site is a URL, a social profile a handle or link.
+        body: JSON.stringify({
+          url: newProduct.platform === 'website' ? newProduct.link : undefined,
+          handle: newProduct.platform !== 'website' ? newProduct.link : undefined,
+          platform: newProduct.platform,
+          category: newProduct.category,
+          customCategory: newProduct.customCategory,
+        }),
       });
       const created = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(created.error || 'Could not list your product');
