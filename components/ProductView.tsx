@@ -58,6 +58,19 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
       .catch(() => {});
   }, [id]);
 
+  // The person who submitted this product gets a Sponsor button (the checkout checks ownership too).
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch('/api/user/submissions', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (live && Array.isArray(data?.listings)) setIsOwner(data.listings.some((l: { id: string }) => l.id === id));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [id]);
+
   const fetchProduct = async () => {
     try {
       // A just-submitted product can take a moment to appear (replication lag), so retry once on 404.
@@ -264,6 +277,15 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                     Visit {product.platform === 'website' ? 'Website' : 'Profile'}
                     <ArrowUpRight className="w-4 h-4" />
                   </a>
+                  {isOwner && (
+                    <Link
+                      href={`/sponsor?listing=${encodeURIComponent(product.id)}`}
+                      className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 text-[#0B2545] font-black rounded-xl hover:-translate-y-0.5 active:scale-95 transition-all text-sm shadow-lg shadow-black/20"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9L12 2.5z" /></svg>
+                      {founder ? 'Raise sponsored rank' : 'Sponsor this product'}
+                    </Link>
+                  )}
                   <span className="text-xs sm:text-sm font-semibold text-white/70 tabular-nums">
                     {((product.clickCount || 0) + ownClick).toLocaleString()} {(product.clickCount || 0) + ownClick === 1 ? 'click' : 'clicks'}
                   </span>
