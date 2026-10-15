@@ -243,10 +243,11 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                 <div className="slide-up flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3" style={{ '--d': '320ms' } as CSSProperties}>
                   <button
                     onClick={vote}
-                    disabled={voted || voting}
-                    className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 font-black rounded-xl text-sm transition-all active:scale-95 ${
+                    disabled={voting}
+                    title={voted ? 'Click to remove your vote' : undefined}
+                    className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 font-black rounded-xl text-sm transition-all active:scale-95 disabled:opacity-60 ${
                       voted
-                        ? 'bg-white/15 text-white border border-white/25 cursor-default'
+                        ? 'bg-white/15 text-white border border-white/25 hover:bg-red-500/80 hover:border-red-400'
                         : 'bg-gradient-to-r from-[#059669] to-[#10B981] text-white shadow-lg shadow-black/20 hover:-translate-y-0.5 hover:shadow-xl'
                     }`}
                   >

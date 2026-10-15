@@ -46,11 +46,41 @@ export function useVote(listingId: string) {
     setTimeout(() => setMessage(null), 2500);
   };
 
-  const rememberVoted = () => {
+  const rememberVoted = (on = true) => {
     const set = readVoted();
-    set.add(listingId);
+    if (on) set.add(listingId);
+    else set.delete(listingId);
     localStorage.setItem(VOTED_KEY, JSON.stringify([...set]));
     listeners.forEach(l => l());
+  };
+
+  // Clicking "Voted" again takes the vote back.
+  const unvote = async () => {
+    setBusy(true);
+    setExtraVotes(n => n - 1);
+    try {
+      const res = await fetch('/api/votes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        rememberVoted(false);
+        flash('Vote removed');
+      } else if (res.status === 401) {
+        setExtraVotes(n => n + 1);
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+      } else {
+        setExtraVotes(n => n + 1);
+        flash(data.error || 'Could not remove vote, try again');
+      }
+    } catch {
+      setExtraVotes(n => n + 1);
+      flash('Could not remove vote, try again');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const vote = async () => {
@@ -59,10 +89,11 @@ export function useVote(listingId: string) {
       window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
       return;
     }
-    if (voted || busy) return;
+    if (busy) return;
+    if (voted) return unvote();
 
     setBusy(true);
-    setExtraVotes(1);
+    setExtraVotes(n => n + 1);
     try {
       const res = await fetch('/api/votes', {
         method: 'POST',
@@ -74,18 +105,18 @@ export function useVote(listingId: string) {
         rememberVoted();
         flash('Vote recorded!');
       } else if (res.status === 401) {
-        setExtraVotes(0);
+        setExtraVotes(n => n - 1);
         window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
       } else if (data.error === 'Already voted') {
-        setExtraVotes(0);
+        setExtraVotes(n => n - 1);
         rememberVoted();
         flash('You already voted');
       } else {
-        setExtraVotes(0);
+        setExtraVotes(n => n - 1);
         flash('Vote failed, try again');
       }
     } catch {
-      setExtraVotes(0);
+      setExtraVotes(n => n - 1);
       flash('Vote failed, try again');
     } finally {
       setBusy(false);

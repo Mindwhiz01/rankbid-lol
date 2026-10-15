@@ -58,6 +58,15 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
     throw new Error(`Failed to insert vote: ${await insertRes.text()}`);
   }
 
+  // updated_at doubles as "last voted at": among listings with equal votes, the one that
+  // reached that count most recently ranks first.
+  const { totalVotes, dayVotes } = await refreshCounts(listingId, { updated_at: new Date().toISOString() });
+  return { status: 'ok', totalVotes, dayVotes };
+}
+
+/** Recounts a listing's votes from the `votes` table and saves the totals on the listing. */
+async function refreshCounts(listingId: string, extra: Record<string, string> = {}) {
+  const id = encodeURIComponent(listingId);
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const [totalVotes, dayVotes] = await Promise.all([
@@ -68,15 +77,25 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
   const updateRes = await fetch(sbUrl(`listings?id=eq.${id}`), {
     method: 'PATCH',
     headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-    // updated_at doubles as "last voted at": among listings with equal votes, the one that
-    // reached that count most recently ranks first.
-    body: JSON.stringify({ total_votes: totalVotes, day_votes: dayVotes, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ total_votes: totalVotes, day_votes: dayVotes, ...extra }),
   });
   if (!updateRes.ok) {
     console.error('Failed to update listing vote counts:', await updateRes.text());
   }
+  return { totalVotes, dayVotes };
+}
 
-  return { status: 'ok', totalVotes, dayVotes };
+/**
+ * Takes back `voterId`'s vote on a listing and refreshes its counts. The listing's
+ * "last voted at" is left alone, so an unvote doesn't move it ahead of equal listings.
+ */
+export async function removeVote(listingId: string, voterId: string): Promise<{ totalVotes: number; dayVotes: number }> {
+  const res = await fetch(
+    sbUrl(`votes?listing_id=eq.${encodeURIComponent(listingId)}&voter_id=eq.${encodeURIComponent(voterId)}`),
+    { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
+  );
+  if (!res.ok) throw new Error(`Failed to delete vote: ${await res.text()}`);
+  return refreshCounts(listingId);
 }
 
 export interface PublicListing {

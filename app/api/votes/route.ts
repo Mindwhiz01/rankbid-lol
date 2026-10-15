@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getListing, recordVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { getListing, recordVote, removeVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 
@@ -74,6 +74,46 @@ export async function POST(req: NextRequest) {
       { error: 'Failed to record vote. Please try again later.' },
       { status: 500 }
     );
+  }
+}
+
+// DELETE { listingId } — the signed-in user takes back their vote.
+export async function DELETE(req: NextRequest) {
+  try {
+    if (!supabaseConfigured()) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    const user = await getSessionUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const listingId = typeof body.listingId === 'string' ? body.listingId.trim() : '';
+    if (!listingId || listingId.length > 100) {
+      return NextResponse.json({ error: 'Missing listingId' }, { status: 400 });
+    }
+
+    // Shares the vote limit, so voting and unvoting can't be looped to churn the rankings.
+    if (!(await rateLimit(`vote-user:${user.id}`, 60, 60 * 60))) {
+      return NextResponse.json({ error: 'Too many changes. Please try again later.' }, { status: 429 });
+    }
+
+    const listing = await getListing(listingId);
+    if (!listing) {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+    }
+
+    await fetch(
+      sbUrl(`user_votes?user_id=eq.${encodeURIComponent(user.id)}&listing_id=eq.${encodeURIComponent(listing.id)}`),
+      { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
+    );
+    const counts = await removeVote(listing.id, `user:${user.id}`);
+
+    return NextResponse.json({ success: true, voted: false, ...counts });
+  } catch (error) {
+    console.error('Error removing vote:', error);
+    return NextResponse.json({ error: 'Failed to remove vote. Please try again later.' }, { status: 500 });
   }
 }
 

@@ -120,11 +120,12 @@ export default function RankingRow({
         <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           <button
             onClick={handleVote}
-            disabled={voted || busy}
-            aria-label={voted ? 'Voted' : `Vote for ${listing.title}`}
-            className={`inline-flex items-center justify-center gap-1 h-8 min-w-8 px-2 sm:px-3 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+            disabled={busy}
+            aria-label={voted ? `Remove your vote for ${listing.title}` : `Vote for ${listing.title}`}
+            title={voted ? 'Click to remove your vote' : undefined}
+            className={`inline-flex items-center justify-center gap-1 h-8 min-w-8 px-2 sm:px-3 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-60 ${
               voted
-                ? 'bg-[#059669]/10 text-[#059669] cursor-default'
+                ? 'bg-[#059669]/10 text-[#059669] hover:bg-red-50 hover:text-red-600'
                 : 'bg-[#0F3460] text-white hover:bg-[#0D2A50] shadow-sm'
             }`}
           >

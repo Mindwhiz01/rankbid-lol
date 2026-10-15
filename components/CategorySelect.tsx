@@ -1,6 +1,19 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+
+/** Where the open list sits on screen. It's drawn on <body> so a scrolling modal can't clip it. */
+interface ListPosition {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+}
+
+const GAP = 8;
+const MAX_LIST_HEIGHT = 288;
 
 interface Option {
   value: string;
@@ -19,19 +32,44 @@ export default function CategorySelect({ value, onChange, options, placeholder =
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [position, setPosition] = useState<ListPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const selected = options.find(o => o.value === value);
 
+  // Below the field, or above it when there's more room there.
+  const measure = (): ListPosition | null => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const below = window.innerHeight - rect.bottom - GAP * 2;
+    const above = rect.top - GAP * 2;
+    const up = below < 200 && above > below;
+    return {
+      left: rect.left,
+      width: rect.width,
+      ...(up ? { bottom: window.innerHeight - rect.top + GAP } : { top: rect.bottom + GAP }),
+      maxHeight: Math.max(120, Math.min(MAX_LIST_HEIGHT, up ? above : below)),
+    };
+  };
+
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!rootRef.current?.contains(target) && !listRef.current?.contains(target)) setOpen(false);
     };
+    // Follow the field when the page or the modal scrolls.
+    const follow = () => setPosition(measure());
     document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
+    window.addEventListener('scroll', follow, true);
+    window.addEventListener('resize', follow);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('scroll', follow, true);
+      window.removeEventListener('resize', follow);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -40,6 +78,7 @@ export default function CategorySelect({ value, onChange, options, placeholder =
 
   const openList = () => {
     setActive(Math.max(0, options.findIndex(o => o.value === value)));
+    setPosition(measure());
     setOpen(true);
   };
 
@@ -100,12 +139,13 @@ export default function CategorySelect({ value, onChange, options, placeholder =
         </svg>
       </button>
 
-      {open && (
+      {open && position && createPortal(
         <ul
           ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute left-0 right-0 top-full mt-2 z-30 max-h-72 overflow-y-auto py-1.5 bg-white rounded-xl shadow-2xl shadow-[#0F3460]/20 border border-gray-200"
+          style={position}
+          className="fixed z-[70] overflow-y-auto py-1.5 bg-white rounded-xl shadow-2xl shadow-[#0F3460]/20 border border-gray-200"
         >
           {options.map((option, i) => {
             const isSelected = option.value === value;
@@ -131,7 +171,8 @@ export default function CategorySelect({ value, onChange, options, placeholder =
               </li>
             );
           })}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );
