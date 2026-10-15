@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, rankForBid } from '@/lib/premiumSpots';
+import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
 import { PLATFORM_LABELS, normalizePlatform, platformExample, platformUrlProblem, type SubmitPlatform } from '@/lib/platform-url';
 import CategoryField, { categoryChoice, categoryChoiceError, categoryPayload, type CategoryChoice } from '@/components/CategoryField';
 
@@ -123,8 +123,8 @@ export default function PremiumListingModal({
   const [newPlatform, setNewPlatform] = useState<SubmitPlatform>('website');
   const [productCategory, setProductCategory] = useState<CategoryChoice>(() => categoryChoice(initialCategory));
   const [ranked, setRanked] = useState<RankedListing[]>([]);
-  // The rank the buyer picked; null means the suggested one. The price follows from it.
-  const [rankInput, setRankInput] = useState<number | null>(null);
+  // What the buyer typed; empty means the suggested amount. The rank follows from it.
+  const [bidInput, setBidInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -207,6 +207,12 @@ export default function PremiumListingModal({
       return;
     }
 
+    if (!validBid) {
+      setError(`❌ Enter a whole-dollar amount of at least $${MIN_BID_USD}`);
+      setLoading(false);
+      return;
+    }
+
     // Only send the social link rows that are on screen.
     const shown = new Set<string>(visibleRows);
     const payload = { ...formData };
@@ -251,7 +257,7 @@ export default function PremiumListingModal({
           founderYoutube: '',
           founderGithub: '',
         });
-        setRankInput(null);
+        setBidInput('');
         setProductChoice(NEW_PRODUCT);
         setProductUrl('');
         setNewPlatform('website');
@@ -274,20 +280,15 @@ export default function PremiumListingModal({
   const others = ranked.filter(r => r.listingId !== listingId);
   const otherBids = others.map(r => r.bidUsd);
   const lastRank = others.length + 1;
-  const suggestedRank = Math.min(targetRank ?? HOME_SPONSORED, lastRank);
-  const priceFor = (r: number) => bidForRank(Math.min(Math.max(r, 1), lastRank), otherBids);
-  const price = priceFor(rankInput ?? suggestedRank);
-  // Tied bids can make a rank's price land higher, so the rank is read back from the price.
+  const suggested = bidForRank(Math.min(targetRank ?? HOME_SPONSORED, lastRank), otherBids);
+  const bid = bidInput === '' ? suggested : Number(bidInput);
+  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD;
+  const price = validBid ? bid : suggested;
+  // The rank follows from the amount.
   const rank = rankForBid(price, otherBids);
   // The listing the bid lands just above (it currently holds that rank).
   const passes = others[rank - 1];
-  // Every homepage rank that is open, then the next free place on the sponsored page.
-  const rankChoices = [
-    ...new Set(
-      [...Array.from({ length: Math.min(lastRank, HOME_SPONSORED) }, (_, i) => i + 1), suggestedRank, lastRank]
-        .map(r => rankForBid(priceFor(r), otherBids)),
-    ),
-  ].sort((a, b) => a - b);
+  const topBid = bidForRank(1, otherBids);
 
   // Each row picks its own platform; the product's own platform is never offered, so a row
   // holding it (the product link was typed after the rows were set) shows the next free one.
@@ -416,21 +417,32 @@ export default function PremiumListingModal({
                 </section>
               )}
 
-              {/* Rank: pick a place, the price follows */}
+              {/* Amount: the buyer pays what they like, the rank follows */}
               <section>
-                <h3 className={sectionTitle}>Sponsored rank {req}</h3>
-                <select
-                  aria-label="Sponsored rank"
-                  value={rank}
-                  onChange={e => setRankInput(Number(e.target.value))}
-                  className={input + ' font-bold'}
-                >
-                  {rankChoices.map(r => (
-                    <option key={r} value={r}>
-                      #{r} · ${priceFor(r)} · {r <= HOME_SPONSORED ? 'Homepage' : 'Sponsored page'}
-                    </option>
-                  ))}
-                </select>
+                <h3 className={sectionTitle}>Your amount {req}</h3>
+                <label className="block">
+                  <span className="relative block">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-[#1F2937]/50">$</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      aria-label="Amount in USD"
+                      min={MIN_BID_USD}
+                      step="1"
+                      value={bidInput}
+                      onChange={e => setBidInput(e.target.value)}
+                      placeholder={String(suggested)}
+                      className={input + ' pl-9 text-lg font-bold'}
+                    />
+                  </span>
+                </label>
+                {validBid ? (
+                  <p className="mt-1.5 text-xs text-[#1F2937]/55">
+                    Whole dollars, from ${MIN_BID_USD}. {rank > 1 && `The top spot (#1) needs $${topBid}.`}
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-xs font-bold text-red-600">Enter a whole-dollar amount of at least ${MIN_BID_USD}.</p>
+                )}
 
                 <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
                   <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
@@ -612,7 +624,7 @@ export default function PremiumListingModal({
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !validBid}
                 className="mt-6 w-full px-5 py-3.5 bg-gradient-to-r from-[#0F3460] to-[#1a5490] text-white text-sm font-black rounded-xl shadow-lg shadow-[#0F3460]/25 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none transition-all"
               >
                 {loading ? 'Processing…' : `Pay $${price} with Stripe`}
