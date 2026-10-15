@@ -10,7 +10,7 @@ interface PremiumListingModalProps {
   listingId?: string;
   listingTitle?: string;
   /** The signed-in user's products, offered when no listingId is given. */
-  ownListings?: { id: string; title: string; platform?: string }[];
+  ownListings?: { id: string; title: string; platform?: string; url?: string }[];
   /** Rank the suggested amount aims for when the modal opens (default: the lowest homepage rank). */
   targetRank?: number;
   isOpen: boolean;
@@ -73,19 +73,19 @@ const defaultRows = (skip: SocialField | null): SocialField[] =>
   SOCIALS.map(s => s.name).filter(n => n !== skip).slice(0, MAX_SOCIAL_LINKS);
 
 // YouTube and GitHub have no image in /public, so they get inline marks.
-function SocialMark({ field }: { field: SocialField }) {
+function SocialMark({ field, size = 'w-4 h-4' }: { field: SocialField; size?: string }) {
   const social = SOCIALS.find(s => s.name === field)!;
-  if (social.icon) return <img src={social.icon} alt="" className="w-4 h-4 object-contain" />;
+  if (social.icon) return <img src={social.icon} alt="" className={`${size} object-contain`} />;
   if (field === 'founderYoutube') {
     return (
-      <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className={size} aria-hidden="true">
         <rect x="1.5" y="5" width="21" height="14" rx="4" fill="#FF0000" />
         <path d="M10 9v6l5.2-3z" fill="#fff" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="#181717" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={size} fill="#181717" aria-hidden="true">
       <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z" />
     </svg>
   );
@@ -137,6 +137,7 @@ export default function PremiumListingModal({
     ? newPlatform
     : normalizePlatform(ownListings.find(l => l.id === listingId)?.platform);
   const ownField = productPlatform ? PLATFORM_FIELD[productPlatform] : null;
+  const productLink = isNewProduct ? productUrl.trim() : ownListings.find(l => l.id === listingId)?.url;
 
   // Which link type each social row holds, in order. Values live in formData.
   const [linkRows, setLinkRows] = useState<SocialField[]>(() => defaultRows(ownField));
@@ -355,6 +356,23 @@ export default function PremiumListingModal({
             <div className="space-y-9 min-w-0">
               {successMessage && <div className="bg-[#059669]/10 border border-[#059669]/30 text-[#047857] px-4 py-3 rounded-xl text-sm font-semibold">{successMessage}</div>}
               {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">{error}</div>}
+
+              {/* The product being sponsored, with its platform, so it's clear which one this is */}
+              {!isNewProduct && listingId && productPlatform && (
+                <section className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-[#F4F6FA] p-4">
+                  <span className="w-14 h-14 flex-shrink-0 rounded-2xl bg-white border border-gray-200 flex items-center justify-center">
+                    <SocialMark field={PLATFORM_FIELD[productPlatform]} size="w-8 h-8" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/45">Sponsoring</p>
+                    <p className="text-lg font-black text-[#0B2545] truncate">{title}</p>
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]/60 min-w-0">
+                      <span className="flex-shrink-0">{PLATFORM_LABELS[productPlatform]}</span>
+                      {productLink && <span className="truncate">· {productLink.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>}
+                    </p>
+                  </div>
+                </section>
+              )}
 
               {/* Product: an existing one of theirs, or a new URL to list first */}
               {picking && (
@@ -595,7 +613,10 @@ export default function PremiumListingModal({
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="font-bold text-[#1F2937]">Product</dt>
-                  <dd className="text-right font-semibold text-[#1F2937]/70 truncate max-w-[60%]">{title || '—'}</dd>
+                  <dd className="flex items-center justify-end gap-1.5 font-semibold text-[#1F2937]/70 min-w-0 max-w-[65%]">
+                    {productPlatform && <span className="flex-shrink-0" title={PLATFORM_LABELS[productPlatform]}><SocialMark field={PLATFORM_FIELD[productPlatform]} /></span>}
+                    <span className="truncate">{title || '—'}</span>
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-[#1F2937]/70">Duration</dt>

@@ -6,7 +6,7 @@ import Header from '@/components/Header';
 import PremiumListingModal, { type PremiumData } from '@/components/PremiumListingModal';
 import { startPremiumCheckout } from '@/lib/premiumCheckout';
 
-type OwnListing = { id: string; title: string; platform?: string };
+type OwnListing = { id: string; title: string; platform?: string; url?: string };
 
 /**
  * Sponsor checkout as its own page. Every "Sponsor" / "Claim" / "Raise bid" button links here:
@@ -55,6 +55,7 @@ function SponsorCheckout() {
           id: l.id,
           title: l.title || (l.handle ? `@${l.handle}` : l.url || 'Untitled'),
           platform: l.platform,
+          url: l.url,
         })));
       })
       .catch(() => { if (!cancelled) setOwn([]); });
