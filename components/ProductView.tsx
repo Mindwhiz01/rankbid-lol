@@ -11,7 +11,7 @@ import StatusCardModal from '@/components/StatusCardModal';
 import RankingRow from '@/components/RankingRow';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
-import { supportUrl } from '@/lib/site';
+import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { claimClick } from '@/lib/clickCount';
 
 interface Listing {
@@ -126,7 +126,8 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const handleShareLinkedIn = () => {
     if (!product) return;
     const url = supportUrl(product.id);
-    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    const text = `Check out "${product.title}" on RankBid! 🚀\n\nVote for it to help it climb the ${getCategoryLabel(product.category)} rankings. It takes 10 seconds, no account needed.`;
+    const linkedInUrl = linkedInShareUrl(text, url);
     window.open(linkedInUrl, '_blank', 'width=550,height=420');
   };
 

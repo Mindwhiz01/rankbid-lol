@@ -4,6 +4,7 @@ import { useState, useRef, type CSSProperties } from 'react';
 import { X, Download, Copy, Check } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { getCategoryLabel } from '@/lib/categories';
+import { linkedInShareUrl } from '@/lib/site';
 
 interface StatusCardModalProps {
   isOpen: boolean;
@@ -231,7 +232,7 @@ export default function StatusCardModal({ isOpen, onClose, product, productUrl }
           <div className="grid grid-cols-3 gap-2.5">
             <button onClick={() => openShare(`https://wa.me/?text=${encodeURIComponent(shareText)}`)} className="px-3 py-2.5 rounded-xl bg-[#25D366] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">WhatsApp</button>
             <button onClick={() => openShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`)} className="px-3 py-2.5 rounded-xl bg-black text-white text-xs sm:text-sm font-black hover:opacity-90 transition">Post to X</button>
-            <button onClick={() => openShare(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(productUrl)}`)} className="px-3 py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">LinkedIn</button>
+            <button onClick={() => openShare(linkedInShareUrl(shareText, productUrl))} className="px-3 py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">LinkedIn</button>
           </div>
 
           {/* Suggested text */}

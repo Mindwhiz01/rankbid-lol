@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
+import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, rankForBid } from '@/lib/premiumSpots';
+import { detectPlatform, normalizePlatform, type SubmitPlatform } from '@/lib/platform-url';
 import CategoryField, { categoryChoice, categoryChoiceError, categoryPayload, type CategoryChoice } from '@/components/CategoryField';
 
 interface PremiumListingModalProps {
@@ -9,7 +10,7 @@ interface PremiumListingModalProps {
   listingId?: string;
   listingTitle?: string;
   /** The signed-in user's products, offered when no listingId is given. */
-  ownListings?: { id: string; title: string }[];
+  ownListings?: { id: string; title: string; platform?: string }[];
   /** Rank the suggested amount aims for when the modal opens (default: the lowest homepage rank). */
   targetRank?: number;
   isOpen: boolean;
@@ -55,6 +56,21 @@ const SOCIALS = [
 ] as const;
 
 type SocialField = (typeof SOCIALS)[number]['name'];
+
+// The link row that would just repeat the sponsored product itself (an Instagram profile
+// doesn't need an Instagram link under it), so it is left out of the social links.
+const PLATFORM_FIELD: Record<SubmitPlatform, SocialField> = {
+  website: 'founderWebsite',
+  twitter: 'founderTwitter',
+  linkedin: 'founderLinkedin',
+  instagram: 'founderInstagram',
+  facebook: 'founderFacebook',
+  tiktok: 'founderTiktok',
+};
+
+/** The first link types other than the product's own, one row each. */
+const defaultRows = (skip: SocialField | null): SocialField[] =>
+  SOCIALS.map(s => s.name).filter(n => n !== skip).slice(0, MAX_SOCIAL_LINKS);
 
 // YouTube and GitHub have no image in /public, so they get inline marks.
 function SocialMark({ field }: { field: SocialField }) {
@@ -105,13 +121,23 @@ export default function PremiumListingModal({
   const [productUrl, setProductUrl] = useState('');
   const [productCategory, setProductCategory] = useState<CategoryChoice>(() => categoryChoice(initialCategory));
   const [ranked, setRanked] = useState<RankedListing[]>([]);
-  // What the buyer typed; empty means the suggested amount.
-  const [bidInput, setBidInput] = useState('');
+  // The rank the buyer picked; null means the suggested one. The price follows from it.
+  const [rankInput, setRankInput] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const picking = !fixedListingId;
+  const isNewProduct = picking && productChoice === NEW_PRODUCT;
+  const listingId = fixedListingId ?? (isNewProduct ? undefined : productChoice);
+  const title = listingTitle ?? (isNewProduct ? 'New product' : ownListings.find(l => l.id === productChoice)?.title);
+  const productPlatform = isNewProduct
+    ? detectPlatform(productUrl)
+    : normalizePlatform(ownListings.find(l => l.id === listingId)?.platform);
+  const ownField = productPlatform ? PLATFORM_FIELD[productPlatform] : null;
+
   // Which link type each social row holds, in order. Values live in formData.
-  const [linkRows, setLinkRows] = useState<SocialField[]>(['founderWebsite']);
+  const [linkRows, setLinkRows] = useState<SocialField[]>(() => defaultRows(ownField));
   const [formData, setFormData] = useState({
     founderName: '',
     founderEmail: '',
@@ -187,23 +213,17 @@ export default function PremiumListingModal({
 
     try {
       console.log('🎯 Submitting premium listing:', {
-        bidUsd: bid,
+        bidUsd: price,
         name: formData.founderName,
         email: formData.founderEmail,
         phone: formData.founderPhone,
       });
 
-      if (!validBid) {
-        setError(`❌ Enter a whole-dollar amount of at least $${MIN_BID_USD}`);
-        setLoading(false);
-        return;
-      }
-
       await onSubmit({
         ...(isNewProduct
           ? { newProduct: { url: productUrl.trim(), ...categoryPayload(productCategory) } }
           : { listingId }),
-        bidUsd: bid,
+        bidUsd: price,
         ...payload,
         paymentMethod: 'stripe',
       });
@@ -228,11 +248,11 @@ export default function PremiumListingModal({
           founderYoutube: '',
           founderGithub: '',
         });
-        setBidInput('');
+        setRankInput(null);
         setProductChoice(NEW_PRODUCT);
         setProductUrl('');
         setProductCategory(categoryChoice(initialCategory));
-        setLinkRows(['founderWebsite']);
+        setLinkRows(defaultRows(null));
         onClose();
       }, 1500);
     } catch (err: any) {
@@ -245,44 +265,46 @@ export default function PremiumListingModal({
 
   if (!isOpen) return null;
 
-  const picking = !fixedListingId;
-  const isNewProduct = picking && productChoice === NEW_PRODUCT;
-  const listingId = fixedListingId ?? (isNewProduct ? undefined : productChoice);
-  const title = listingTitle ?? (isNewProduct ? 'New product' : ownListings.find(l => l.id === productChoice)?.title);
-
   // Buying again for a product replaces its current listing, so it doesn't compete with itself.
   const current = ranked.find(r => r.listingId === listingId);
   const others = ranked.filter(r => r.listingId !== listingId);
   const otherBids = others.map(r => r.bidUsd);
   const lastRank = others.length + 1;
-  const suggested = bidForRank(Math.min(targetRank ?? HOME_SPONSORED, lastRank), otherBids);
-  const bid = bidInput === '' ? suggested : Number(bidInput);
-  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD;
-  const price = validBid ? bid : suggested;
+  const suggestedRank = Math.min(targetRank ?? HOME_SPONSORED, lastRank);
+  const priceFor = (r: number) => bidForRank(Math.min(Math.max(r, 1), lastRank), otherBids);
+  const price = priceFor(rankInput ?? suggestedRank);
+  // Tied bids can make a rank's price land higher, so the rank is read back from the price.
   const rank = rankForBid(price, otherBids);
   // The listing the bid lands just above (it currently holds that rank).
   const passes = others[rank - 1];
-  const homeBid = bidForRank(HOME_SPONSORED, otherBids);
-  // Shortcuts to the top ranks and the last homepage rank.
-  const shortcuts = [...new Set([1, 2, 3, HOME_SPONSORED].map(r => Math.min(r, lastRank)))];
+  // Every homepage rank that is open, then the next free place on the sponsored page.
+  const rankChoices = [
+    ...new Set(
+      [...Array.from({ length: Math.min(lastRank, HOME_SPONSORED) }, (_, i) => i + 1), suggestedRank, lastRank]
+        .map(r => rankForBid(priceFor(r), otherBids)),
+    ),
+  ].sort((a, b) => a - b);
 
-  // Each row picks its own platform.
-  const visibleRows = linkRows.slice(0, MAX_LINKS);
-  const unusedSocials = SOCIALS.filter(s => !linkRows.includes(s.name));
+  // Each row picks its own platform; the product's own platform is never offered, so a row
+  // holding it (the product link was typed after the rows were set) shows the next free one.
+  const spare = SOCIALS.find(s => s.name !== ownField && !linkRows.includes(s.name))?.name;
+  const rows = linkRows.flatMap(r => (r !== ownField ? [r] : spare ? [spare] : []));
+  const visibleRows = rows.slice(0, MAX_LINKS);
+  const unusedSocials = SOCIALS.filter(s => s.name !== ownField && !rows.includes(s.name));
 
   const changeRowPlatform = (index: number, next: SocialField) => {
-    const prevField = linkRows[index];
-    setLinkRows(rows => rows.map((r, i) => (i === index ? next : r)));
+    const prevField = rows[index];
+    setLinkRows(rows.map((r, i) => (i === index ? next : r)));
     // Carry the typed link over to the newly picked platform.
     setFormData(prev => ({ ...prev, [next]: prev[prevField], [prevField]: '' }));
   };
   const removeRow = (index: number) => {
-    const field = linkRows[index];
-    setLinkRows(rows => rows.filter((_, i) => i !== index));
+    const field = rows[index];
+    setLinkRows(rows.filter((_, i) => i !== index));
     setFormData(prev => ({ ...prev, [field]: '' }));
   };
   const addRow = () => {
-    if (unusedSocials[0]) setLinkRows(rows => [...rows, unusedSocials[0].name]);
+    if (unusedSocials[0]) setLinkRows([...rows, unusedSocials[0].name]);
   };
 
   const input = 'w-full px-4 py-3 text-sm bg-white text-[#1F2937] border border-gray-200 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F3460]/20 focus:border-[#0F3460] transition';
@@ -362,62 +384,47 @@ export default function PremiumListingModal({
                 </section>
               )}
 
-              {/* Price: the rank follows from the amount */}
+              {/* Rank: pick a place, the price follows */}
               <section>
-                <h3 className={sectionTitle}>Your price</h3>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {shortcuts.map(r => {
-                    const amount = bidForRank(r, otherBids);
-                    const active = validBid && bid === amount;
+                <h3 className={sectionTitle}>Sponsored rank {req}</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                  {rankChoices.map(r => {
+                    const amount = priceFor(r);
+                    const active = r === rank;
                     return (
                       <button
                         key={r}
                         type="button"
-                        onClick={() => setBidInput(String(amount))}
+                        onClick={() => setRankInput(r)}
                         aria-pressed={active}
-                        className={`rounded-xl border px-3.5 py-2 text-sm font-black transition-all active:scale-[0.98] ${
-                          active ? 'border-[#0F3460] bg-[#0F3460] text-white' : 'border-gray-200 bg-white text-[#1F2937] hover:border-[#0F3460]/40'
+                        aria-label={`Rank ${r} for $${amount}`}
+                        className={`rounded-2xl border-2 px-2 py-3 text-center transition-all active:scale-[0.98] ${
+                          active ? 'border-[#0F3460] bg-[#0F3460] text-white shadow-lg shadow-[#0F3460]/25' : 'border-gray-200 bg-white text-[#0B2545] hover:border-[#0F3460]/40'
                         }`}
                       >
-                        #{r} <span className={active ? 'text-amber-300' : 'text-amber-600'}>${amount}</span>
+                        <span className="block text-3xl font-black tracking-[-0.04em] leading-none tabular-nums">#{r}</span>
+                        <span className={`block mt-1.5 text-base font-black tabular-nums ${active ? 'text-amber-300' : 'text-amber-600'}`}>${amount}</span>
+                        <span className={`block mt-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? 'text-white/60' : 'text-[#1F2937]/40'}`}>
+                          {r <= HOME_SPONSORED ? 'Homepage' : 'Sponsored'}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
 
-                <label className="block">
-                  <span className={fieldLabel}>Amount (USD) {req}</span>
-                  <span className="relative block">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[#1F2937]/50">$</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={MIN_BID_USD}
-                      step="1"
-                      value={bidInput}
-                      onChange={e => setBidInput(e.target.value)}
-                      placeholder={String(suggested)}
-                      className={input + ' pl-8'}
-                    />
-                  </span>
-                </label>
-
-                {validBid ? (
-                  <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <p className="text-sm font-black text-[#1F2937]">
-                      ${price} puts you at <span className="text-amber-600">#{rank}</span>
-                      <span className="font-semibold text-[#1F2937]/55"> · on the {where.toLowerCase()}</span>
+                <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+                  <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-black text-[#0B2545]">
+                      ${price} <span className="text-sm font-semibold text-[#1F2937]/55">· 30 days on the {where.toLowerCase()}</span>
                     </p>
                     <p className="text-xs text-[#1F2937]/60 mt-0.5">
                       {passes
                         ? `Above ${passes.title ?? 'another product'} ($${passes.bidUsd}), which moves down one place.`
                         : rank === 1 ? 'Nobody is sponsored yet: you take the top place.' : 'You take the next place after the current listings.'}
-                      {rank > HOME_SPONSORED && ` The homepage top ${HOME_SPONSORED} needs $${homeBid}.`}
                     </p>
                   </div>
-                ) : (
-                  <p className="text-xs font-bold text-red-600 mt-2">Enter a whole-dollar amount of at least ${MIN_BID_USD}.</p>
-                )}
+                </div>
                 <p className="text-xs text-[#1F2937]/55 mt-2">
                   Listings are ranked by price for 30 days. Someone paying more later moves you down; equal amounts keep whoever paid first ahead.
                 </p>
@@ -475,7 +482,7 @@ export default function PremiumListingModal({
                             onChange={e => changeRowPlatform(index, e.target.value as SocialField)}
                             className="absolute inset-0 opacity-0 cursor-pointer"
                           >
-                            {SOCIALS.filter(s => s.name === field || !linkRows.includes(s.name)).map(s => (
+                            {SOCIALS.filter(s => s.name === field || (s.name !== ownField && !rows.includes(s.name))).map(s => (
                               <option key={s.name} value={s.name}>{s.label}</option>
                             ))}
                           </select>
@@ -545,17 +552,18 @@ export default function PremiumListingModal({
             {/* Right: order summary */}
             <aside className={`lg:sticky ${asPage ? 'lg:top-32' : 'lg:top-0'} rounded-3xl bg-[#F4F6FA] border border-gray-200 p-6 sm:p-7`}>
               <h3 className={sectionTitle}>Order details</h3>
+              <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl bg-white border border-amber-200 px-5 py-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/50">Sponsored rank</p>
+                  <p className="text-sm font-bold text-[#1F2937]/70">{where}</p>
+                  <p className="mt-1 text-xl font-black text-[#0B2545] tabular-nums">${price}</p>
+                </div>
+                <span className="text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
+              </div>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="font-bold text-[#1F2937]">Product</dt>
                   <dd className="text-right font-semibold text-[#1F2937]/70 truncate max-w-[60%]">{title || '—'}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-[#1F2937]/70">
-                    Sponsored rank
-                    <span className="block text-xs text-[#1F2937]/45">{where}</span>
-                  </dt>
-                  <dd className="font-black text-amber-600">{validBid ? `#${rank}` : '—'}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-[#1F2937]/70">Duration</dt>
@@ -584,7 +592,7 @@ export default function PremiumListingModal({
 
               <button
                 type="submit"
-                disabled={loading || !validBid}
+                disabled={loading}
                 className="mt-6 w-full px-5 py-3.5 bg-gradient-to-r from-[#0F3460] to-[#1a5490] text-white text-sm font-black rounded-xl shadow-lg shadow-[#0F3460]/25 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none transition-all"
               >
                 {loading ? 'Processing…' : `Pay $${price} with Stripe`}

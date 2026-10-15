@@ -10,3 +10,13 @@ export function supportUrl(listingId: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : SITE_URL;
   return `${origin}/support/${listingId}`;
 }
+
+/**
+ * LinkedIn post composer with the text already written. The link inside the text still
+ * becomes LinkedIn's preview card (image + title from the page's Open Graph tags), so the
+ * post gets text, image and link. share-offsite only takes a URL and leaves the text empty.
+ */
+export function linkedInShareUrl(text: string, url: string): string {
+  const body = text.includes(url) ? text : `${text}\n\n${url}`;
+  return `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(body)}`;
+}

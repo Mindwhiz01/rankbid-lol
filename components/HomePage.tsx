@@ -28,7 +28,7 @@ const slideDelay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
 
 import { getPlatformIcon } from '@/lib/platformIcons';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
-import { supportUrl } from '@/lib/site';
+import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 
@@ -349,7 +349,8 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   const handleShareLinkedIn = () => {
     if (!lastSubmittedProduct) return;
     const productUrl = supportUrl(lastSubmittedProduct.id);
-    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(productUrl)}`;
+    const text = `Just submitted ${lastSubmittedProduct.title} on RankBid! 🚀\n\nVote for it and help it climb the rankings. It takes 10 seconds, no account needed.\n\n#RankBid`;
+    const linkedInUrl = linkedInShareUrl(text, productUrl);
     window.open(linkedInUrl, '_blank', 'width=550,height=420');
   };
 

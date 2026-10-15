@@ -6,7 +6,7 @@ import PlatformIcon from '@/components/PlatformIcon';
 import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
 import { getCategoryLabel } from '@/lib/categories';
 import type { PublicListing } from '@/lib/server/votes';
-import { supportUrl } from '@/lib/site';
+import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { safeExternalUrl } from '@/lib/utils';
 
 type SupportType = 'founder' | 'friend' | 'supporter';
@@ -163,7 +163,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
               <a href={`https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2.5 rounded-xl bg-[#25D366] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">WhatsApp</a>
               <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2.5 rounded-xl bg-black text-white text-xs sm:text-sm font-black hover:opacity-90 transition">Post on X</a>
-              <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">LinkedIn</a>
+              <a href={linkedInShareUrl(shareText, shareUrl)} target="_blank" rel="noopener noreferrer" className="px-3 py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs sm:text-sm font-black hover:opacity-90 transition">LinkedIn</a>
               <button onClick={copyLink} className="px-3 py-2.5 rounded-xl bg-white border border-gray-200 text-[#0F3460] text-xs sm:text-sm font-black hover:border-[#0F3460]/40 transition">{copied ? 'Copied!' : 'Copy link'}</button>
             </div>
 
