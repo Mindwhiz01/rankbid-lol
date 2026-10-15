@@ -7,7 +7,8 @@ import AdminPayments from '@/components/AdminPayments';
 /** Standalone payments page; the same panel also opens inline from the admin Overview. */
 export default function PremiumAdmin() {
   const [adminKey, setAdminKey] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // null until the session check answers, so a signed-in admin never sees the login form flash.
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [error, setError] = useState('');
 
   // Exchanges the key for the httpOnly admin cookie; the key itself is never stored in the browser.
@@ -32,8 +33,8 @@ export default function PremiumAdmin() {
     localStorage.removeItem('admin_key');
     fetch('/api/admin/session')
       .then(res => res.json())
-      .then(data => { if (data.admin) setIsAuthenticated(true); })
-      .catch(() => {});
+      .then(data => setIsAuthenticated(!!data.admin))
+      .catch(() => setIsAuthenticated(false));
   }, []);
 
   const handleLogout = async () => {
@@ -41,6 +42,10 @@ export default function PremiumAdmin() {
     setIsAuthenticated(false);
     setAdminKey('');
   };
+
+  if (isAuthenticated === null) {
+    return <div className="min-h-screen bg-[#0B2545] flex items-center justify-center text-white/60">Checking access…</div>;
+  }
 
   if (!isAuthenticated) {
     return (

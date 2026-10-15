@@ -28,13 +28,11 @@ interface PremiumListing {
   approved_by?: string;
 }
 
-type Filter = 'pending' | 'active' | 'needs_refund' | 'ended' | 'all';
+type Filter = 'active' | 'ended' | 'all';
 
 /** Filter pills: which statuses each shows, and what an empty list means. */
 const FILTERS: { key: Filter; label: string; statuses: string[] | null; empty: string }[] = [
-  { key: 'pending', label: 'Pending', statuses: ['pending'], empty: 'No payments waiting. Stripe payments go live on their own; pending ones are checkouts not paid yet or missed by the webhook.' },
   { key: 'active', label: 'Active', statuses: ['active'], empty: 'No sponsored listings are live right now.' },
-  { key: 'needs_refund', label: 'Needs refund', statuses: ['needs_refund'], empty: 'Nothing to refund.' },
   { key: 'ended', label: 'Ended', statuses: ['outbid', 'replaced'], empty: 'No ended listings yet. Listings end when their 30 days run out or the product is sponsored again.' },
   { key: 'all', label: 'All', statuses: null, empty: 'No sponsored orders yet.' },
 ];
@@ -55,7 +53,7 @@ export default function AdminPayments({ title = 'Approve payments' }: { title?: 
   // Every order is loaded once; the filter pills only narrow the list (and show counts).
   const [allListings, setAllListings] = useState<PremiumListing[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<Filter>('pending');
+  const [filter, setFilter] = useState<Filter>('active');
   const current = FILTERS.find(f => f.key === filter)!;
   const inFilter = (f: (typeof FILTERS)[number], l: PremiumListing) => !f.statuses || f.statuses.includes(l.payment_status);
   const premiumListings = allListings.filter(l => inFilter(current, l));
