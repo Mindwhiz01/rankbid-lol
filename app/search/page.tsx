@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 import { useState, useEffect, Suspense, type CSSProperties } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
@@ -28,6 +30,7 @@ function SearchContent() {
   const [input, setInput] = useState(query);
   const [results, setResults] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(!!query);
+  const paged = usePaged(results, query);
 
   useEffect(() => {
     setInput(query);
@@ -47,7 +50,7 @@ function SearchContent() {
         const filtered = (data.listings || []).filter((l: Listing) =>
           [l.title, l.description, l.category, l.url].some(field => (field || '').toLowerCase().includes(q))
         );
-        if (!cancelled) setResults(filtered.slice(0, 50));
+        if (!cancelled) setResults(filtered);
       } catch {
         if (!cancelled) setResults([]);
       } finally {
@@ -107,15 +110,16 @@ function SearchContent() {
             </Link>
           </div>
         ) : (
-          <div>
+          <div id={paged.anchorId} className="scroll-mt-24">
             <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mb-4">
               Found <span className="font-black text-[#1F2937]">{results.length}</span> product{results.length !== 1 ? 's' : ''}
             </p>
             <div className="curve-list space-y-2.5 sm:space-y-3">
-              {results.map((listing, idx) => (
-                <RankingRow key={listing.id} listing={listing} rank={idx + 1} votes={listing.totalVotes || 0} votesLabel="votes" />
+              {paged.pageItems.map((listing, idx) => (
+                <RankingRow key={listing.id} listing={listing} rank={paged.offset + idx + 1} votes={listing.totalVotes || 0} votesLabel="votes" />
               ))}
             </div>
+            <Pagination currentPage={paged.page} totalPages={paged.totalPages} onPageChange={paged.goTo} />
           </div>
         )}
       </div>

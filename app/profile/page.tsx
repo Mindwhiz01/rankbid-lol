@@ -8,6 +8,8 @@ import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
 import SubmissionEditModal from '@/components/SubmissionEditModal';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 
 interface User {
   id: string;
@@ -63,6 +65,8 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState<Listing | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const submissionsPage = usePaged(submissions);
+  const votesPage = usePaged(votes);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -262,13 +266,13 @@ export default function ProfilePage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div id={submissionsPage.anchorId} className="space-y-3 scroll-mt-24">
                     {notice && (
                       <p role="status" className="px-4 py-3 rounded-xl bg-[#059669]/10 border border-[#059669]/25 text-sm font-semibold text-[#065F46]">
                         {notice}
                       </p>
                     )}
-                    {submissions.map((listing) => {
+                    {submissionsPage.pageItems.map((listing) => {
                       const title = listing.title || (listing.handle ? `@${listing.handle}` : listing.url || 'Untitled');
                       const spot = premiumSpots[listing.id];
                       const manage = (
@@ -335,6 +339,7 @@ export default function ProfilePage() {
                         </div>
                       );
                     })}
+                    <Pagination currentPage={submissionsPage.page} totalPages={submissionsPage.totalPages} onPageChange={submissionsPage.goTo} />
                   </div>
                 )}
               </div>
@@ -360,8 +365,8 @@ export default function ProfilePage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {votes.map((vote, idx) => {
+                  <div id={votesPage.anchorId} className="space-y-3 scroll-mt-24">
+                    {votesPage.pageItems.map((vote, idx) => {
                       let faviconUrl = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
 
                       if (vote.listing?.url) {
@@ -415,6 +420,7 @@ export default function ProfilePage() {
                         </Link>
                       );
                     })}
+                    <Pagination currentPage={votesPage.page} totalPages={votesPage.totalPages} onPageChange={votesPage.goTo} />
                   </div>
                 )}
               </div>

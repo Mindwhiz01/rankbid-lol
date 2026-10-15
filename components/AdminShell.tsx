@@ -147,15 +147,14 @@ export default function AdminShell({
               >
                 <UserRound className="w-5 h-5" /> My account <ChevronDown className={`w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
               </button>
-              {menuOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white shadow-xl border border-black/5 p-2 z-40">
-                  {accountMenu && <div className="p-2 border-b border-gray-100 mb-1">{accountMenu}</div>}
-                  <Link href="/" className="block px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-50">View site ↗</Link>
-                  <button type="button" onClick={onSignOut} className="w-full text-left px-3 py-2 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2">
-                    <LogOut className="w-4 h-4" /> Sign out
-                  </button>
-                </div>
-              )}
+              {/* Always mounted so menu contents (e.g. the coming soon switch) load once with the page, not on every open. */}
+              <div hidden={!menuOpen} className="absolute right-0 mt-2 w-80 rounded-2xl bg-white shadow-xl border border-black/5 p-2 z-40">
+                {accountMenu && <div className="p-2 border-b border-gray-100 mb-1">{accountMenu}</div>}
+                <Link href="/" className="block px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-50">View site ↗</Link>
+                <button type="button" onClick={onSignOut} className="w-full text-left px-3 py-2 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2">
+                  <LogOut className="w-4 h-4" /> Sign out
+                </button>
+              </div>
             </div>
           </header>
 

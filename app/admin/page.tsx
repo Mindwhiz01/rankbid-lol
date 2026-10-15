@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell, { ADMIN_TABS, type AdminTab } from '@/components/AdminShell';
 import AdminPayments from '@/components/AdminPayments';
+import PageNav, { PAGE_SIZE } from '@/components/Pagination';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
   RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, Zap,
@@ -411,7 +412,7 @@ function ComingSoonToggle({ toast, confirmAction }: { toast: (m: string, t?: Toa
       disabled={on === null || busy}
       role="switch"
       aria-checked={on ?? false}
-      className="w-full px-3 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60"
+      className="w-full px-3 py-2 rounded-xl text-sm font-bold whitespace-nowrap hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60"
     >
       <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${on ? 'bg-amber-400' : 'bg-green-500'}`}>
         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
@@ -1262,7 +1263,7 @@ function SubmissionsTab({
   const [votersOpen, setVotersOpen] = useState<string | null>(null);
   const debouncedSearch = useDebounced(search);
 
-  const params = new URLSearchParams({ page: String(page), limit: compact ? '10' : '20', sort });
+  const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), sort });
   if (debouncedSearch) params.set('search', debouncedSearch);
   if (platform) params.set('platform', platform);
   if (userId) params.set('userId', userId);
@@ -1407,13 +1408,11 @@ function SubmissionsTab({
       {loading && listings.length === 0 && <p className="text-center text-gray-500 py-8">Loading…</p>}
 
       {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm">
-          <span className="text-gray-600">{fmt(pagination.total)} submissions</span>
-          <div className="flex items-center gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded disabled:opacity-40">Prev</button>
-            <span>Page {page} of {pagination.pages}</span>
-            <button disabled={page >= pagination.pages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded disabled:opacity-40">Next</button>
-          </div>
+        <div className="mt-4">
+          <PageNav currentPage={page} totalPages={pagination.pages} onPageChange={setPage} className="!mt-0" />
+          <p className="mt-2 text-center text-xs text-gray-500">
+            {fmt(pagination.total)} submissions · page {page} of {pagination.pages}
+          </p>
         </div>
       )}
     </div>

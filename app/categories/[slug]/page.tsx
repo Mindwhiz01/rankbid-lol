@@ -7,7 +7,7 @@ import { getCategoryListings, getRankedListings } from '@/lib/server/listings';
 import { getCustomCategories } from '@/lib/server/custom-categories';
 import { breadcrumbSchema, itemListSchema, pageMetadata } from '@/lib/seo';
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string | string[] }> };
 
 const intro = (label: string) =>
   `The best ${label} products on RankBid, ranked live by community votes. Each person gets one vote per product, so the ${label} leaderboard reflects what real users recommend, not who paid the most.`;
@@ -24,8 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CategoryPage({ params }: Props) {
-  const { slug } = await params;
+export default async function CategoryPage({ params, searchParams }: Props) {
+  const [{ slug }, { page }] = await Promise.all([params, searchParams]);
   const custom = await getCustomCategories();
   const category = categoryFromSlug(slug, custom);
   if (!category) notFound();
@@ -48,7 +48,7 @@ export default async function CategoryPage({ params }: Props) {
           itemListSchema(`Top ${label} products on RankBid`, listings),
         ]}
       />
-      <CategoryBrowser selected={category} listings={listings} counts={counts} intro={intro(label)} custom={custom} />
+      <CategoryBrowser selected={category} listings={listings} counts={counts} intro={intro(label)} custom={custom} page={Number(page) || 1} />
     </>
   );
 }

@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import FAQ from '@/components/FAQ';
 import Link from 'next/link';
 import { FAQS } from '@/lib/faqs';
-import Pagination from '@/components/Pagination';
+import Pagination, { PAGE_SIZE } from '@/components/Pagination';
 import PlatformIcon from '@/components/PlatformIcon';
 import SponsoredRow from '@/components/SponsoredRow';
 import VerifiedListingCard from '@/components/VerifiedListingCard';
@@ -154,13 +154,13 @@ const PHOTO_FADE = 'linear-gradient(to right, transparent, black 18%)';
 export default function Home({ initialListings = [] }: { initialListings?: Listing[] }) {
   const router = useRouter();
   const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
-  const [listings, setListings] = useState<Listing[]>(() => initialListings.slice(0, 15));
+  const [listings, setListings] = useState<Listing[]>(() => initialListings.slice(0, PAGE_SIZE));
   const [premiumListings, setPremiumListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTimeFilter] = useState<'alltime' | 'today'>('alltime');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(() => Math.max(1, Math.ceil(initialListings.length / 15)));
+  const [totalPages, setTotalPages] = useState(() => Math.max(1, Math.ceil(initialListings.length / PAGE_SIZE)));
   const [toasts, setToasts] = useState<Toast[]>([]);
   // Listings the signed-in user submitted: only these get the Premium button (the checkout API enforces it too).
   const [ownListingIds, setOwnListingIds] = useState<Set<string>>(new Set());
@@ -260,7 +260,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
           const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
           const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
           const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
-          const fetchRes = await fetch(`/api/listings/submit?sort=${sort}&page=1&pageSize=15${categoryParam}${timeParam}`);
+          const fetchRes = await fetch(`/api/listings/submit?sort=${sort}&page=1&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}`);
           if (fetchRes.ok) {
             const text = await fetchRes.text();
             if (text) {
@@ -301,7 +301,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
       const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
       const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
       const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
-      const res = await fetch(`/api/listings/submit?sort=${sort}&page=${page}&pageSize=15${categoryParam}${timeParam}`);
+      const res = await fetch(`/api/listings/submit?sort=${sort}&page=${page}&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}`);
       if (!res.ok) {
         setListings([]);
         return;
@@ -667,7 +667,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                           youtube: listing.userYoutube || null,
                           github: listing.userGithub || null,
                         }}
-                        position={(currentPage - 1) * 15 + idx + 1}
+                        position={(currentPage - 1) * PAGE_SIZE + idx + 1}
                         onVote={handleVote}
                         hasVoted={votedListings.has(listing.id)}
                       />
@@ -679,7 +679,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                     <RankingRow
                       key={listing.id}
                       listing={listing}
-                      rank={(currentPage - 1) * 15 + idx + 1}
+                      rank={(currentPage - 1) * PAGE_SIZE + idx + 1}
                       votes={(activeTimeFilter === 'today' ? listing.dayVotes : listing.totalVotes) || 0}
                       onPremium={listing.isPremium || !ownListingIds.has(listing.id) ? undefined : () => router.push(`/sponsor?listing=${encodeURIComponent(listing.id)}`)}
                     />
@@ -687,7 +687,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 })}
               </div>
             )}
-            {listings.length > 0 && totalPages > 1 && (
+            {listings.length > 0 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

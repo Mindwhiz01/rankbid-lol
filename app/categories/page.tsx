@@ -11,7 +11,8 @@ export const metadata = pageMetadata({
   path: '/categories',
 });
 
-export default async function CategoriesPage() {
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
+  const { page } = await searchParams;
   const [listings, custom] = await Promise.all([getRankedListings(), getCustomCategories()]);
   const counts: Record<string, number> = {};
   for (const l of listings) counts[l.category] = (counts[l.category] || 0) + 1;
@@ -33,7 +34,8 @@ export default async function CategoriesPage() {
       />
       <CategoryBrowser
         selected={null}
-        listings={top}
+        listings={listings}
+        page={Number(page) || 1}
         counts={counts}
         custom={custom}
         intro={`RankBid groups every launched product into ${CATEGORIES.length} categories. Each category has its own live leaderboard, ranked only by community votes, so you can find the most-loved tools in your niche.`}

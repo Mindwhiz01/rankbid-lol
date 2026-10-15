@@ -7,6 +7,8 @@ import PageHero from '@/components/PageHero';
 import SponsoredRow, { type SponsoredListing } from '@/components/SponsoredRow';
 import { HOME_SPONSORED, MIN_BID_USD } from '@/lib/premiumSpots';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 
 type Ranked = SponsoredListing & { premiumPosition?: number | null };
 
@@ -28,6 +30,7 @@ export default function SponsoredPage() {
   const ranked = (listings || []).slice().sort((a, b) => (a.premiumPosition || 0) - (b.premiumPosition || 0));
   const home = ranked.slice(0, HOME_SPONSORED);
   const rest = ranked.slice(HOME_SPONSORED);
+  const paged = usePaged(rest);
 
   return (
     <>
@@ -63,13 +66,14 @@ export default function SponsoredPage() {
                 </div>
 
                 {rest.length > 0 && (
-                  <div>
+                  <div id={paged.anchorId} className="scroll-mt-24">
                     <h2 className="text-base sm:text-lg font-black text-[#1F2937] mb-3">
                       More sponsored <span className="text-xs font-bold text-[#1F2937]/40">#{HOME_SPONSORED + 1}–#{ranked.length}</span>
                     </h2>
                     <div className="space-y-2 sm:space-y-2.5">
-                      {rest.map(l => <SponsoredRow key={l.id} listing={l} />)}
+                      {paged.pageItems.map(l => <SponsoredRow key={l.id} listing={l} />)}
                     </div>
+                    <Pagination currentPage={paged.page} totalPages={paged.totalPages} onPageChange={paged.goTo} />
                   </div>
                 )}
               </>

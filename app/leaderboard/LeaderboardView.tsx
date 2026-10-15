@@ -4,6 +4,8 @@ import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
 import { useState, useEffect } from 'react';
 import SelectionHeading from '@/components/SelectionHeading';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 
 interface Listing {
   id: string;
@@ -55,6 +57,7 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
     .sort((a, b) => votesFor(b) - votesFor(a) || lastVotedAt(b) - lastVotedAt(a));
 
   const topThree = sortedListings.slice(0, 3);
+  const paged = usePaged(sortedListings, activeTab);
 
   return (
     <>
@@ -156,7 +159,7 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
               )}
 
               {/* Full Rankings */}
-              <div>
+              <div id={paged.anchorId} className="scroll-mt-24">
                 <h2 className="text-xl sm:text-2xl font-black text-[#1F2937] mb-4 sm:mb-6">
                   {activeTab === 'today' ? 'Today' : 'All Time'} Rankings
                 </h2>
@@ -165,11 +168,14 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
                     <p className="text-sm text-[#1F2937]/60 font-semibold">{activeTab === 'today' ? 'No votes yet today' : 'No products ranked yet'}</p>
                   </div>
                 ) : (
-                  <div className="curve-list space-y-3">
-                    {sortedListings.map((listing, idx) => (
-                      <RankingRow key={listing.id} listing={listing} rank={idx + 1} votes={votesFor(listing) || 0} votesLabel={activeTab === 'today' ? 'today' : 'votes'} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="curve-list space-y-3">
+                      {paged.pageItems.map((listing, idx) => (
+                        <RankingRow key={listing.id} listing={listing} rank={paged.offset + idx + 1} votes={votesFor(listing) || 0} votesLabel={activeTab === 'today' ? 'today' : 'votes'} />
+                      ))}
+                    </div>
+                    <Pagination currentPage={paged.page} totalPages={paged.totalPages} onPageChange={paged.goTo} />
+                  </>
                 )}
               </div>
             </>

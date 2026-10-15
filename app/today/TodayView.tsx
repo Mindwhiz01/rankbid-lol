@@ -6,6 +6,8 @@ import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
 import { PremiumIcons } from '@/components/PremiumIcons';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 
 interface Listing {
   id: string;
@@ -63,6 +65,7 @@ export default function TodayView({ initialListings }: { initialListings: Listin
     .filter(l => l.dayVotes > 0)
     .sort((a, b) => b.dayVotes - a.dayVotes)
     .slice(0, 50);
+  const paged = usePaged(topListingsToday);
 
   return (
     <>
@@ -109,11 +112,14 @@ export default function TodayView({ initialListings }: { initialListings: Listin
               </Link>
             </div>
           ) : (
-            <div className="curve-list space-y-3">
-              {topListingsToday.map((listing, idx) => (
-                <RankingRow key={listing.id} listing={listing} rank={idx + 1} votes={listing.dayVotes || 0} votesLabel="today" />
-              ))}
-            </div>
+            <>
+              <div id={paged.anchorId} className="curve-list space-y-3 scroll-mt-24">
+                {paged.pageItems.map((listing, idx) => (
+                  <RankingRow key={listing.id} listing={listing} rank={paged.offset + idx + 1} votes={listing.dayVotes || 0} votesLabel="today" />
+                ))}
+              </div>
+              <Pagination currentPage={paged.page} totalPages={paged.totalPages} onPageChange={paged.goTo} />
+            </>
           )}
         </div>
       </section>

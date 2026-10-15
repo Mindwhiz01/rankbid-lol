@@ -3,7 +3,7 @@
 import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
-import Pagination from '@/components/Pagination';
+import Pagination, { PAGE_SIZE } from '@/components/Pagination';
 import PlatformsCta from '@/components/PlatformsCta';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { EmptyStateIcon } from '@/components/PremiumIcons';
@@ -72,7 +72,7 @@ export default function PlatformsPage() {
       const params = new URLSearchParams();
       params.append('sort', 'totalVotes');
       params.append('page', page.toString());
-      params.append('pageSize', '20');
+      params.append('pageSize', String(PAGE_SIZE));
       platformFilter.forEach(p => params.append('platform', p));
 
       const res = await fetch(`/api/listings/submit?${params.toString()}`);
@@ -180,22 +180,20 @@ export default function PlatformsPage() {
             ) : (
               <div className="curve-list space-y-3 sm:space-y-4">
                 {listings.map((listing, idx) => (
-                  <RankingRow key={listing.id} listing={listing} rank={(currentPage - 1) * 20 + idx + 1} votes={listing.totalVotes || 0} />
+                  <RankingRow key={listing.id} listing={listing} rank={(currentPage - 1) * PAGE_SIZE + idx + 1} votes={listing.totalVotes || 0} />
                 ))}
               </div>
             )}
 
-            {listings.length > 0 && totalPages > 1 && (
-              <div className="mt-8">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={(page) => {
-                    fetchListings(page);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                />
-              </div>
+            {listings.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page) => {
+                  fetchListings(page);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             )}
           </div>
         </section>

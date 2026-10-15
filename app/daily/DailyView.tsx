@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
+import Pagination from '@/components/Pagination';
+import { usePaged } from '@/lib/usePaged';
 import { useState, useEffect, type CSSProperties } from 'react';
 
 interface Listing {
@@ -30,6 +32,7 @@ export default function DailyView({ initialListings }: { initialListings: Listin
   const [listings, setListings] = useState<Listing[]>(initialListings);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<CountdownTime>({ hours: 0, minutes: 0, seconds: 0 });
+  const paged = usePaged(listings);
 
   useEffect(() => {
     fetchListings();
@@ -126,11 +129,14 @@ export default function DailyView({ initialListings }: { initialListings: Listin
                 </Link>
               </div>
             ) : (
-              <div className="curve-list space-y-3">
-                {listings.map((listing, idx) => (
-                  <RankingRow key={listing.id} listing={listing} rank={idx + 1} votes={listing.dayVotes || 0} votesLabel="today" />
-                ))}
-              </div>
+              <>
+                <div id={paged.anchorId} className="curve-list space-y-3 scroll-mt-24">
+                  {paged.pageItems.map((listing, idx) => (
+                    <RankingRow key={listing.id} listing={listing} rank={paged.offset + idx + 1} votes={listing.dayVotes || 0} votesLabel="today" />
+                  ))}
+                </div>
+                <Pagination currentPage={paged.page} totalPages={paged.totalPages} onPageChange={paged.goTo} />
+              </>
             )}
           </div>
         </section>
