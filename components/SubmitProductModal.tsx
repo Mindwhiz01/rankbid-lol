@@ -195,7 +195,7 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
                   <>
                     {plan === 'sponsored' && (
                       <p className="text-xs text-[#1F2937]/55">
-                        Your product is listed first (free, same checks), then you choose your price and pay on the next page.
+                        Your product is listed first (free, same checks), then you choose your rank and pay on the next page.
                       </p>
                     )}
                     {error && <p role="alert" className="text-xs sm:text-sm font-bold text-red-600">{error}</p>}
@@ -204,7 +204,9 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
                 onSubmitted={({ id, displayHandle }) => {
                   setError('');
                   if (plan === 'sponsored') {
+                    // The host lives in the layout, so the dialog would stay open over the checkout.
                     router.push(`/sponsor?listing=${encodeURIComponent(id)}`);
+                    onClose();
                     return;
                   }
                   setDone({ id, name: displayHandle ? `@${displayHandle}` : 'Your product' });
