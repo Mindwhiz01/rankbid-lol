@@ -129,10 +129,10 @@ Visit your production URL (e.g., https://rankbid-lol.vercel.app):
 ### Required for Production
 
 ```
-ADMIN_KEY=rankbid-premium-admin-2026
+ADMIN_KEY=<your admin key>
 NEXT_PUBLIC_SUPABASE_URL=https://yxjcamscavnagixlwyfp.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_r52Fg-l2Egc7JygqlgdDQw_jKsNNonK
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_LoiSawnxQerv1oJvL6VovA_3gqMW_cm
+SUPABASE_SERVICE_ROLE_KEY=<your Supabase secret key>
 ```
 
 All are already configured in Vercel.

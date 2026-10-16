@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://yxjcamscavnagixlwyfp.supabase.co';
-const supabaseServiceKey = 'sb_secret_LoiSawnxQerv1oJvL6VovA_3gqMW_cm';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
