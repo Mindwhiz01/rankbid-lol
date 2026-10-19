@@ -29,12 +29,13 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
     // Record the hit first, then count it with the rest. Counting first let a burst of parallel
     // requests all see the same count and all get through.
     const since = new Date(Date.now() - windowSec * 1000).toISOString();
-    await fetch(sbUrl('rate_limits'), {
+    const insertRes = await fetch(sbUrl('rate_limits?select=id'), {
       method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
       body: JSON.stringify({ key }),
       cache: 'no-store',
     });
+    const hitId: unknown = insertRes.ok ? (await insertRes.json())[0]?.id : undefined;
     const countRes = await fetch(
       sbUrl(`rate_limits?key=eq.${encodeURIComponent(key)}&created_at=gte.${encodeURIComponent(since)}&select=id`),
       { method: 'HEAD', headers: sbHeaders({ Prefer: 'count=exact' }), cache: 'no-store' }
@@ -44,7 +45,16 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
       return true;
     }
     const count = parseInt(countRes.headers.get('content-range')?.split('/')[1] || '0') || 0;
-    return count <= limit;
+    if (count <= limit) return true;
+    // A blocked request doesn't count, so retrying while limited doesn't push the window further out.
+    if (hitId !== undefined) {
+      await fetch(sbUrl(`rate_limits?id=eq.${encodeURIComponent(String(hitId))}`), {
+        method: 'DELETE',
+        headers: sbHeaders(),
+        cache: 'no-store',
+      });
+    }
+    return false;
   } catch (error) {
     console.error('rateLimit error:', error);
     return true;
