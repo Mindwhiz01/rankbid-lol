@@ -178,7 +178,8 @@ export async function POST(req: NextRequest) {
       mode: 'payment',
       // Charge and show the price in USD, as on the site. Adaptive Pricing would show the buyer's local currency (e.g. PKR).
       adaptive_pricing: { enabled: false },
-      // No payment_method_types: Stripe picks the eligible methods.
+      // Stripe picks the eligible methods, minus buy-now-pay-later: the listing goes live on payment.
+      excluded_payment_method_types: ['klarna', 'afterpay_clearpay', 'affirm', 'zip', 'sunbit', 'scalapay', 'alma', 'billie'],
       line_items: [{
         quantity: 1,
         price_data: {
