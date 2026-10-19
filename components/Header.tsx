@@ -122,8 +122,10 @@ export default function Header() {
     // Fetch immediately on mount
     fetchStats();
 
-    // Then update every 5 seconds for real-time updates
-    const interval = setInterval(fetchStats, 5000);
+    // Then refresh once a minute while the tab is visible (the API is CDN-cached for 30s anyway).
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchStats();
+    }, 60_000);
     return () => clearInterval(interval);
   }, []);
 

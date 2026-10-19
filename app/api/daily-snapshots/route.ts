@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       // Fetch today's live data
       const origin = new URL(request.url).origin;
       const listingsRes = await fetch(
-        `${origin}/api/listings/submit?limit=1000&sort=dayVotes&activeToday=1`,
+        `${origin}/api/listings/submit?limit=1000&sort=dayVotes&activeToday=1&fresh=1`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     try {
       // Get today's top listings
       const listingsRes = await fetch(
-        `${origin}/api/listings/submit?limit=1000&sort=dayVotes`,
+        `${origin}/api/listings/submit?limit=1000&sort=dayVotes&fresh=1`,
         {
           headers: {
             'Content-Type': 'application/json',

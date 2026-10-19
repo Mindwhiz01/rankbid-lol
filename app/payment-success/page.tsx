@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
@@ -26,6 +26,15 @@ const usd = (n: number) => `$${n.toFixed(2).replace(/\.00$/, '')}`;
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 
 export default function PaymentSuccessPage() {
+  // useSearchParams needs a Suspense boundary so the rest of the page can be prerendered.
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <PaymentSuccess />
+    </Suspense>
+  );
+}
+
+function PaymentSuccess() {
   const searchParams = useSearchParams();
   const premiumId = searchParams.get('listing_id');
   const sessionRef = searchParams.get('txn_ref');

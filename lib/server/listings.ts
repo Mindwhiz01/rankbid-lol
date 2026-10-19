@@ -44,10 +44,14 @@ function toListing(row: Row): Listing {
 // Same order as the site's rankings: most votes first, ties go to whoever reached the count most recently.
 const RANK_ORDER = 'order=total_votes.desc,updated_at.desc.nullslast';
 
+// Pages that render these are cached (ISR) for the same window, so a busy page reads Supabase
+// about once a minute instead of on every visit. The browser views refetch live data on mount.
+export const LISTINGS_REVALIDATE = 60;
+
 async function query(path: string): Promise<Listing[]> {
   if (!supabaseConfigured()) return [];
   try {
-    const res = await fetch(sbUrl(path), { headers: sbHeaders(), cache: 'no-store' });
+    const res = await fetch(sbUrl(path), { headers: sbHeaders(), next: { revalidate: LISTINGS_REVALIDATE } });
     if (!res.ok) return [];
     const rows: Row[] = await res.json();
     return rows.map(toListing);

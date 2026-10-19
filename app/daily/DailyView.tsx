@@ -57,8 +57,10 @@ export default function DailyView({ initialListings }: { initialListings: Listin
     calculateCountdown();
     const timer = setInterval(calculateCountdown, 1000);
 
-    // Refresh listings every 30 seconds for real-time updates
-    const refreshTimer = setInterval(fetchListings, 30000);
+    // Refresh listings once a minute while the tab is visible
+    const refreshTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchListings();
+    }, 60_000);
 
     return () => {
       clearInterval(timer);

@@ -3,6 +3,9 @@ import { getRankedListings } from '@/lib/server/listings';
 import { breadcrumbSchema, itemListSchema } from '@/lib/seo';
 import LeaderboardView from './LeaderboardView';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
 export default async function LeaderboardPage() {
   const listings = (await getRankedListings()).slice(0, 500);
   return (

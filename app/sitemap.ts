@@ -4,6 +4,9 @@ import { getRankedListings } from '@/lib/server/listings';
 import { getCustomCategories } from '@/lib/server/custom-categories';
 import { absoluteUrl } from '@/lib/seo';
 
+// Served from cache and rebuilt at most once an hour.
+export const revalidate = 3600;
+
 // Indexable public pages only. Members-only pages (MEMBERS_ONLY in proxy.ts), search and
 // account pages are left out.
 const STATIC_PAGES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [

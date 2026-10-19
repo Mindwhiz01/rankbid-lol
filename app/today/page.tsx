@@ -3,6 +3,9 @@ import { getTrendingToday } from '@/lib/server/listings';
 import { breadcrumbSchema, itemListSchema } from '@/lib/seo';
 import TodayView from './TodayView';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
 export default async function TodayPage() {
   const listings = await getTrendingToday();
   return (

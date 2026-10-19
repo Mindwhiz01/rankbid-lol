@@ -6,7 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const revalidate = 0; // Don't cache
+export const dynamic = 'force-dynamic';
+
+// Every open page polls this; let the CDN answer repeats so the function runs about twice a minute.
+const CDN_CACHE = { 'Cache-Control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=60' };
 
 export async function GET() {
   try {
@@ -25,12 +28,11 @@ export async function GET() {
     }
 
     const liveCount = count || 0;
-    console.log(`[LIVE VIEWERS] Current: ${liveCount}`);
 
     return NextResponse.json({
       liveViewers: liveCount,
       timestamp: new Date().toISOString(),
-    });
+    }, { headers: CDN_CACHE });
   } catch (error) {
     console.error('Error fetching live viewers:', error);
     return NextResponse.json(

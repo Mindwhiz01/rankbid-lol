@@ -3,6 +3,9 @@ import { getLaunchedToday } from '@/lib/server/listings';
 import { breadcrumbSchema, itemListSchema } from '@/lib/seo';
 import DailyView from './DailyView';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
 export default async function DailyPage() {
   const listings = await getLaunchedToday(50);
   return (

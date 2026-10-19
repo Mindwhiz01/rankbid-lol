@@ -57,7 +57,9 @@ export default function TodayView({ initialListings }: { initialListings: Listin
     };
 
     fetchListings();
-    const interval = setInterval(fetchListings, 30000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchListings();
+    }, 60_000);
     return () => clearInterval(interval);
   }, []);
 

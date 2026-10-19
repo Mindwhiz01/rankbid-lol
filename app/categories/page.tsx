@@ -5,6 +5,9 @@ import { getRankedListings } from '@/lib/server/listings';
 import { getCustomCategories } from '@/lib/server/custom-categories';
 import { absoluteUrl, breadcrumbSchema, itemListSchema, pageMetadata } from '@/lib/seo';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
 export const metadata = pageMetadata({
   title: 'Product Categories: Community Rankings',
   description: `Browse ${CATEGORIES.length} product categories on RankBid, from AI and marketing to developer tools and crypto. Every category is ranked live by community votes.`,

@@ -104,7 +104,9 @@ export default function StatsPage() {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 15000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchStats();
+    }, 60_000);
     return () => clearInterval(interval);
   }, []);
 

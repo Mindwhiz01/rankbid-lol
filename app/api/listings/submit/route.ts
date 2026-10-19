@@ -477,14 +477,15 @@ export async function GET(req: NextRequest) {
 
     const totalPages = Math.ceil(total / pageSize);
 
+    // Many pages poll this; the CDN serves repeats for a few seconds so the function (and Supabase)
+    // isn't hit per visitor. ?fresh=1 (right after a vote or submit) always reads the database.
+    const fresh = searchParams.has('fresh');
     return NextResponse.json(
       { listings: pageListings, premium, listing: null, pagination: { page, pageSize, total, totalPages } },
       {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
+        headers: fresh
+          ? { 'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0' }
+          : { 'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=30' },
       }
     );
   } catch (error) {

@@ -9,12 +9,16 @@ const CACHE_MS = 30_000;
 const MAX_CUSTOM = 200;
 let cache: { names: string[]; at: number } | null = null;
 
-export async function getCustomCategories(): Promise<string[]> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.names;
+// fresh: skip the shared fetch cache (needed before writing the list back).
+export async function getCustomCategories(fresh = false): Promise<string[]> {
+  if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.names;
   let names: string[] = [];
   if (supabaseConfigured()) {
     try {
-      const res = await fetch(sbUrl(`site_settings?key=eq.${KEY}&select=value`), { headers: sbHeaders(), cache: 'no-store' });
+      const res = await fetch(
+        sbUrl(`site_settings?key=eq.${KEY}&select=value`),
+        fresh ? { headers: sbHeaders(), cache: 'no-store' } : { headers: sbHeaders(), next: { revalidate: 60 } }
+      );
       if (res.ok) {
         const [row] = await res.json();
         if (Array.isArray(row?.value)) names = row.value.filter((n: unknown): n is string => typeof n === 'string');
@@ -39,7 +43,7 @@ export async function addCustomCategory(raw: string): Promise<string | null> {
   // A name matching a built-in category came back as that category; nothing to save.
   if (CATEGORIES.includes(name)) return name;
   cache = null;
-  const names = await getCustomCategories();
+  const names = await getCustomCategories(true);
   const existing = names.find(n => categorySlug(n) === categorySlug(name));
   if (existing) return existing;
   if (names.length >= MAX_CUSTOM) return null;

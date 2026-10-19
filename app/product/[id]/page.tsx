@@ -6,6 +6,14 @@ import { getActiveHolders } from '@/lib/server/premium';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { absoluteUrl, breadcrumbSchema, pageMetadata } from '@/lib/seo';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
+// No product is built ahead of time; each one is rendered on its first visit, then cached (ISR).
+export async function generateStaticParams() {
+  return [];
+}
+
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -28,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
-  const [product, allListings, holders] = await Promise.all([getListingById(id), getRankedListings(), getActiveHolders()]);
+  const [product, allListings, holders] = await Promise.all([getListingById(id), getRankedListings(), getActiveHolders(60)]);
   // A sponsored product shows the founder links saved with its payment.
   const spot = holders.find(h => h.listingId === id);
   // Only the public fields: the founder's email and phone must never reach the page.

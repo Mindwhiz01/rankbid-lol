@@ -3,6 +3,9 @@ import { getListingById, getRankedListings } from '@/lib/server/listings';
 import { getCategoryLabel } from '@/lib/categories';
 import { LOGO_WHITE_RATIO, logoWhiteDataUrl } from '@/lib/server/brand-logo';
 
+// Served from cache and rebuilt at most once an hour.
+export const revalidate = 3600;
+
 export const alt = 'Product ranking on RankBid';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';

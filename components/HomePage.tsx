@@ -260,7 +260,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
           const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
           const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
           const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
-          const fetchRes = await fetch(`/api/listings/submit?sort=${sort}&page=1&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}`);
+          const fetchRes = await fetch(`/api/listings/submit?sort=${sort}&page=1&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}&fresh=1`);
           if (fetchRes.ok) {
             const text = await fetchRes.text();
             if (text) {
@@ -295,13 +295,14 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     }
   }, [activeTimeFilter, selectedCategory, user]);
 
-  const fetchListings = useCallback(async (page: number = 1) => {
+  // fresh: bypass the few-second CDN cache (right after the visitor changed the rankings).
+  const fetchListings = useCallback(async (page: number = 1, fresh = false) => {
     setLoading(true);
     try {
       const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
       const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
       const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
-      const res = await fetch(`/api/listings/submit?sort=${sort}&page=${page}&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}`);
+      const res = await fetch(`/api/listings/submit?sort=${sort}&page=${page}&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}${fresh ? '&fresh=1' : ''}`);
       if (!res.ok) {
         setListings([]);
         return;
@@ -334,7 +335,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     addToast(`🎉 ${displayName} is live! Community voting starts now.`, 'success');
     setLastSubmittedProduct({ id, title: displayName });
     setCurrentPage(1);
-    fetchListings(1);
+    fetchListings(1, true);
     loadOwnListingIds();
   };
 
@@ -387,7 +388,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
         // Keep showing the last known spots.
       }
     };
-    const timer = setInterval(refresh, 15_000);
+    const timer = setInterval(refresh, 60_000);
     document.addEventListener('visibilitychange', refresh);
     return () => {
       clearInterval(timer);

@@ -28,11 +28,16 @@ export interface PremiumHolder {
   founderGithub: string | null;
 }
 
-/** Every live sponsored listing, ranked (expired ones are ignored). */
-export async function getActiveHolders(): Promise<PremiumHolder[]> {
+/**
+ * Every live sponsored listing, ranked (expired ones are ignored).
+ * revalidate: cache the read for that many seconds (public pages only; payment flows read fresh).
+ */
+export async function getActiveHolders(revalidate?: number): Promise<PremiumHolder[]> {
+  // A cached read rounds "now" down to the minute so the URL (the cache key) stays the same.
+  const now = revalidate ? new Date(Math.floor(Date.now() / 60_000) * 60_000) : new Date();
   const res = await fetch(
-    sbUrl(`premium_listings?payment_status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=bid_usd.desc,activated_at.asc&select=*`),
-    { headers: sbHeaders(), cache: 'no-store' }
+    sbUrl(`premium_listings?payment_status=eq.active&expires_at=gt.${encodeURIComponent(now.toISOString())}&order=bid_usd.desc,activated_at.asc&select=*`),
+    revalidate ? { headers: sbHeaders(), next: { revalidate } } : { headers: sbHeaders(), cache: 'no-store' }
   );
   if (!res.ok) {
     console.error('Failed to read premium holders:', res.status, await res.text());

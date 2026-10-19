@@ -3,74 +3,51 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
+// "Live" means active in the last 30 minutes (see /api/analytics/live-viewers), so one ping
+// every 5 minutes of visible time is plenty.
+const PING_MS = 5 * 60 * 1000;
+let lastPing = 0;
+
+function getSessionId(): string {
+  let sessionId = localStorage.getItem('sessionId');
+  if (!sessionId) {
+    sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    localStorage.setItem('sessionId', sessionId);
+  }
+  return sessionId;
+}
+
+async function trackVisit(pageUrl: string) {
+  lastPing = Date.now();
+  try {
+    await fetch('/api/track-visitor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: getSessionId(), pageUrl }),
+    });
+  } catch (error) {
+    console.error('[CLIENT] Failed to track visitor:', error);
+  }
+}
+
 export function VisitorTracker() {
   const pathname = usePathname();
 
+  // Track every page navigation
   useEffect(() => {
-    const trackVisit = async () => {
-      try {
-        // Get or create session ID
-        let sessionId = localStorage.getItem('sessionId');
-        if (!sessionId) {
-          sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-          localStorage.setItem('sessionId', sessionId);
-        }
-
-        const response = await fetch('/api/track-visitor', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            pageUrl: pathname,
-          }),
-        });
-
-        const data = await response.json();
-        console.log('[CLIENT] Visitor tracked on', pathname, ':', data);
-      } catch (error) {
-        console.error('[CLIENT] Failed to track visitor:', error);
-      }
-    };
-
-    // Track every page navigation
-    trackVisit();
+    trackVisit(pathname);
   }, [pathname]);
 
-  // Periodic tracking for idle time
+  // Keep the session live while the tab is open and visible
   useEffect(() => {
-    const trackVisit = async () => {
-      try {
-        const sessionId = localStorage.getItem('sessionId');
-        if (sessionId) {
-          await fetch('/api/track-visitor', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId,
-              pageUrl: pathname,
-            }),
-          });
-        }
-      } catch (error) {
-        console.error('[CLIENT] Periodic tracking failed:', error);
-      }
+    const pingIfDue = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastPing >= PING_MS) trackVisit(pathname);
     };
-
-    // Track every 5 minutes
-    const interval = setInterval(trackVisit, 5 * 60 * 1000);
-
-    // Track when tab becomes visible again
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        trackVisit();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    const interval = setInterval(pingIfDue, PING_MS);
+    document.addEventListener('visibilitychange', pingIfDue);
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', pingIfDue);
     };
   }, [pathname]);
 

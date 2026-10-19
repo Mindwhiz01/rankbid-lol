@@ -16,7 +16,7 @@ interface PodiumListing extends FounderSocials {
 }
 
 // How often the podium re-reads the paid spots while the tab is visible.
-const REFRESH_MS = 10_000;
+const REFRESH_MS = 30_000;
 
 const FALLBACK_ICON =
   'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%230F3460" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';

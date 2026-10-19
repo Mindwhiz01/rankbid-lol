@@ -106,11 +106,14 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api (API routes handle their own auth; the proxy only ever let them through)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - static files by extension (images, robots.txt, sitemap.xml, llms.txt, manifest)
+     * Every match runs this function, so skipping these saves an invocation per request.
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!api/|_next/static|_next/image|favicon.ico|public|.*\\.(?:png|jpe?g|gif|svg|webp|ico|txt|xml|webmanifest)$).*)',
   ],
 };

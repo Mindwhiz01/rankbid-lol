@@ -7,6 +7,9 @@ import { getCategoryListings, getRankedListings } from '@/lib/server/listings';
 import { getCustomCategories } from '@/lib/server/custom-categories';
 import { breadcrumbSchema, itemListSchema, pageMetadata } from '@/lib/seo';
 
+// Served from cache and rebuilt at most once a minute (keeps function CPU low).
+export const revalidate = 60;
+
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string | string[] }> };
 
 const intro = (label: string) =>

@@ -3,7 +3,7 @@ import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 
 // The proxy reads this on every page request, so keep it in memory briefly.
 // Other server instances pick up a change within this window.
-const CACHE_MS = 15_000;
+const CACHE_MS = 60_000;
 let cached: { value: boolean; at: number } | null = null;
 
 /**
