@@ -176,6 +176,8 @@ export async function POST(req: NextRequest) {
     const metadata = { product: 'rankbid', premiumListingId: premiumListing.id, position: String(position) };
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      // Charge and show the price in USD, as on the site. Adaptive Pricing would show the buyer's local currency (e.g. PKR).
+      adaptive_pricing: { enabled: false },
       // No payment_method_types: Stripe picks the eligible methods.
       line_items: [{
         quantity: 1,

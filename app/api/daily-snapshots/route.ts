@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { SITE_URL } from '@/lib/site';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
               listing: {
                 id: listing.id,
                 title: listing.title,
-                url: listing.url || `https://www.rankbid.click/product/${listing.id}`,
+                url: listing.url || `${SITE_URL}/product/${listing.id}`,
               },
               votes: listing.dayVotes || 0,
             })),

@@ -26,7 +26,15 @@ export function ipHash(req: NextRequest): string {
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
   if (!supabaseConfigured()) return true;
   try {
+    // Record the hit first, then count it with the rest. Counting first let a burst of parallel
+    // requests all see the same count and all get through.
     const since = new Date(Date.now() - windowSec * 1000).toISOString();
+    await fetch(sbUrl('rate_limits'), {
+      method: 'POST',
+      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ key }),
+      cache: 'no-store',
+    });
     const countRes = await fetch(
       sbUrl(`rate_limits?key=eq.${encodeURIComponent(key)}&created_at=gte.${encodeURIComponent(since)}&select=id`),
       { method: 'HEAD', headers: sbHeaders({ Prefer: 'count=exact' }), cache: 'no-store' }
@@ -36,14 +44,7 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
       return true;
     }
     const count = parseInt(countRes.headers.get('content-range')?.split('/')[1] || '0') || 0;
-    if (count >= limit) return false;
-
-    await fetch(sbUrl('rate_limits'), {
-      method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify({ key }),
-    });
-    return true;
+    return count <= limit;
   } catch (error) {
     console.error('rateLimit error:', error);
     return true;

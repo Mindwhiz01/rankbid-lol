@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import type { NextRequest } from 'next/server';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { SITE_URL } from '@/lib/site';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const escapeHtml = (s: string) =>
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
             <h2>New waitlist member!</h2>
             <p><strong>Email:</strong> ${escapeHtml(email)}</p>
             <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-            <p><a href="https://www.rankbid.click/admin">View waitlist →</a></p>
+            <p><a href="${SITE_URL}/admin">View waitlist →</a></p>
           `,
         });
       } catch (emailError) {

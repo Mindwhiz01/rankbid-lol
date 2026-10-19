@@ -1,9 +1,15 @@
-// Single source for contact details shown across the site.
-export const SUPPORT_EMAIL = 'support@rankbid.com';
+// Single source for the live domain and contact details shown across the site.
+// NEXT_PUBLIC_SITE_URL moves canonicals, sitemap, share links and emails to another domain (e.g. https://rankbid.lol).
+// Use the host that serves pages directly: www.rankbid.click redirects to the apex.
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://rankbid.click').replace(/\/+$/, '');
+export const SITE_HOST = new URL(SITE_URL).hostname.replace(/^www\./, '');
+
+export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || `support@${SITE_HOST}`;
 export const X_HANDLE = 'rankbidclick';
 export const X_URL = `https://x.com/${X_HANDLE}`;
 
-export const SITE_URL = 'https://www.rankbid.click';
+/** Only production deploys get indexed; previews (the sandbox) and local dev stay out of search. */
+export const INDEXABLE = process.env.VERCEL_ENV === 'production';
 
 /** Public share link for a listing: anyone can vote there with just a name + email. */
 export function supportUrl(listingId: string): string {

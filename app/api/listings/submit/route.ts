@@ -10,6 +10,7 @@ import { detectPlatform, looksLikeUrl, normalizePlatform, platformUrlProblem } f
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { accessibilityProblem, isFlaggedBySafeBrowsing, staticUrlProblem } from '@/lib/server/url-safety';
+import { findDuplicateListing } from '@/lib/server/duplicate-listing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -127,24 +128,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const checkResponse = await fetch(
-      `${supabaseUrl}/rest/v1/listings?location=eq.${encodeURIComponent(normalizedUrl)}&select=id`,
-      {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-        },
-      }
-    );
-
-    if (checkResponse.ok) {
-      const existing = await checkResponse.json();
-      if (existing.length > 0) {
-        return NextResponse.json(
-          { error: 'URL already listed. No duplicate submissions allowed.' },
-          { status: 409 }
-        );
-      }
+    // Same link however it's typed (http/https, www, case, trailing slash).
+    if (await findDuplicateListing(normalizedUrl)) {
+      return NextResponse.json(
+        { error: 'URL already listed. No duplicate submissions allowed.' },
+        { status: 409 }
+      );
     }
 
     const accessProblem = await accessibilityProblem(normalizedUrl);

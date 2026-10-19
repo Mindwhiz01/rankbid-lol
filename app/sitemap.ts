@@ -4,8 +4,8 @@ import { getRankedListings } from '@/lib/server/listings';
 import { getCustomCategories } from '@/lib/server/custom-categories';
 import { absoluteUrl } from '@/lib/seo';
 
-// Only pages that are public before launch (see PUBLIC_PAGES in proxy.ts). Gated pages
-// redirect crawlers to /coming-soon, so listing them here would only report redirects.
+// Indexable public pages only. Members-only pages (MEMBERS_ONLY in proxy.ts), search and
+// account pages are left out.
 const STATIC_PAGES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/', priority: 1, changeFrequency: 'hourly' },
   { path: '/categories', priority: 0.9, changeFrequency: 'daily' },

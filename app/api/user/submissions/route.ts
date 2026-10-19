@@ -6,6 +6,7 @@ import { getActiveHolders } from '@/lib/server/premium';
 import { CATEGORIES, LEGACY_CATEGORIES } from '@/lib/categories';
 import { addCustomCategory, getCustomCategories } from '@/lib/server/custom-categories';
 import { accessibilityProblem, isFlaggedBySafeBrowsing, staticUrlProblem } from '@/lib/server/url-safety';
+import { findDuplicateListing } from '@/lib/server/duplicate-listing';
 import { extractMetadata } from '@/lib/metadata';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 
@@ -102,11 +103,7 @@ export async function PATCH(request: NextRequest) {
           console.warn('Link edit blocked by Safe Browsing:', next, 'user', user.id);
           return NextResponse.json({ error: 'This site is flagged as unsafe (malware or phishing) and cannot be listed.' }, { status: 400 });
         }
-        const dupRes = await fetch(
-          sbUrl(`listings?location=eq.${encodeURIComponent(next)}&id=neq.${encodeURIComponent(listingId)}&select=id`),
-          { headers: sbHeaders(), cache: 'no-store' }
-        );
-        if (dupRes.ok && (await dupRes.json()).length > 0) {
+        if (await findDuplicateListing(next, listingId)) {
           return NextResponse.json({ error: 'That link is already listed on RankBid.' }, { status: 409 });
         }
         const access = await accessibilityProblem(next);

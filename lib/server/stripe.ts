@@ -1,5 +1,6 @@
 // Server-only Stripe client. Stripe charges premium bids in USD (no PKR conversion).
 import Stripe from 'stripe';
+import { SITE_URL } from '@/lib/site';
 
 let client: Stripe | null = null;
 
@@ -16,7 +17,7 @@ export function getStripe(): Stripe | null {
   }
   client ??= new Stripe(key, {
     apiVersion: '2026-08-26.dahlia',
-    appInfo: { name: 'RankBid', url: 'https://rankbid.click' },
+    appInfo: { name: 'RankBid', url: SITE_URL },
   });
   return client;
 }

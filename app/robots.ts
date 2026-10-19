@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { SITE_URL } from '@/lib/site';
+import { INDEXABLE, SITE_URL } from '@/lib/site';
 
 // Private and utility paths; everything else is open to crawlers.
 const DISALLOW = ['/api/', '/admin', '/profile', '/login', '/signup', '/payment-success', '/search'];
@@ -15,6 +15,7 @@ const AI_BOTS = [
 ];
 
 export default function robots(): MetadataRoute.Robots {
+  if (!INDEXABLE) return { rules: [{ userAgent: '*', disallow: '/' }] };
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: DISALLOW },

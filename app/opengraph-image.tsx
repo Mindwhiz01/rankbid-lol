@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { SITE_TAGLINE } from '@/lib/seo';
+import { SITE_HOST } from '@/lib/site';
 import { LOGO_WHITE_RATIO, logoWhiteDataUrl } from '@/lib/server/brand-logo';
 
 export const alt = `RankBid: ${SITE_TAGLINE}`;
@@ -23,7 +24,7 @@ export default async function Image() {
           <div style={{ fontSize: 84, fontWeight: 900, lineHeight: 1.05, letterSpacing: -2 }}>Ranked by people.</div>
           <div style={{ fontSize: 84, fontWeight: 900, lineHeight: 1.05, letterSpacing: -2, color: '#6EE7B7' }}>Not algorithms.</div>
         </div>
-        <div style={{ fontSize: 30, color: 'rgba(255,255,255,0.75)' }}>Free product launches · Live community votes · rankbid.click</div>
+        <div style={{ fontSize: 30, color: 'rgba(255,255,255,0.75)' }}>{`Free product launches · Live community votes · ${SITE_HOST}`}</div>
       </div>
     ),
     size,

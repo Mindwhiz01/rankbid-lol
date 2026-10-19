@@ -61,6 +61,28 @@ export function hostOf(text: string): string | null {
   }
 }
 
+const TRACKING_PARAMS = /^(utm_\w+|fbclid|gclid|igshid|igsh|si|ref|ref_src|s|t)$/i;
+
+/**
+ * What makes two listing links the same listing, ignoring http/https, "www.", letter case,
+ * trailing slashes, #fragments and tracking parameters (twitter.com and x.com count as one).
+ * "http://www.MindWhiz.com/" and "mindwhiz.com" → "mindwhiz.com". Null when the text isn't a link.
+ */
+export function listingUrlKey(text: string): string | null {
+  const host = hostOf(text);
+  if (!host) return null;
+  const t = text.trim();
+  const url = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+  let path = url.pathname;
+  try { path = decodeURIComponent(path); } catch { /* keep it encoded */ }
+  path = path.toLowerCase().replace(/\/+$/, '');
+  const params = [...url.searchParams.entries()]
+    .filter(([k]) => !TRACKING_PARAMS.test(k))
+    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+    .sort();
+  return `${host === 'twitter.com' ? 'x.com' : host}${path}${params.length ? `?${params.join('&')}` : ''}`;
+}
+
 /** Which platform a link belongs to: a social network by its domain, otherwise 'website'. Null if not a link. */
 export function detectPlatform(text: string): SubmitPlatform | null {
   const host = hostOf(text);

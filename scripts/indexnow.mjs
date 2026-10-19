@@ -1,8 +1,9 @@
 // Push every URL in the live sitemap to IndexNow (Bing, Yandex, Seznam, Naver). Bing's index
 // feeds ChatGPT Search, Copilot and DuckDuckGo, so this gets new pages seen without waiting for a crawl.
-// The key is verified against https://www.rankbid.click/<KEY>.txt (public/<KEY>.txt).
+// The key is verified against <SITE_URL>/<KEY>.txt (public/<KEY>.txt).
 // Usage: npm run indexnow   (after a deploy, a launch, or a batch of new listings)
-const SITE_URL = 'https://www.rankbid.click';
+// Set NEXT_PUBLIC_SITE_URL to push a different domain.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://rankbid.click').replace(/\/+$/, '');
 const KEY = '47be621a69687f58d1d60979fb074dbc';
 
 const xml = await (await fetch(`${SITE_URL}/sitemap.xml`)).text();

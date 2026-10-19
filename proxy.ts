@@ -2,37 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { categoryFromSlug, categoryPath } from '@/lib/categories';
 import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
 import { isComingSoonEnabled } from '@/lib/server/site-settings';
+import { SITE_HOST } from '@/lib/site';
 
-// Indexable content pages, open to everyone (and search/AI crawlers) before launch.
-// Matched exactly or as a path prefix ('/product' covers '/product/:id').
-const PUBLIC_PAGES = [
-  '/about',
-  '/why',
-  '/rules',
-  '/faq',
-  '/categories',
-  '/platforms',
-  '/product',
-  '/leaderboard',
-  '/sponsored',
-  '/today',
-  '/daily',
-  '/archive',
-  '/stats',
-];
-
-const PUBLIC_ROUTES = [
-  '/coming-soon',
-  '/login',
-  '/signup',
-  '/admin',
-  '/support', // shareable vote links: guests vote with name + email
-  '/tos',
-  '/privacy',
-  '/cookies',
-  '/api/waitlist',
-  '/api/waitlist/count',
-];
+// Pages that need a signed-in account; a signed-out visitor is sent to /login and back.
+const MEMBERS_ONLY = ['/profile', '/sponsor', '/payment-success'];
 
 // Pages still reachable while coming soon mode is on. /login lets admins who sign in by email get through.
 // Pricing (/rules, /faq), contact (/about) and policies stay public: Stripe reviews them before live payments.
@@ -50,7 +23,7 @@ const COMING_SOON_OPEN = [
 
 function isMainDomain(request: NextRequest): boolean {
   const host = (request.headers.get('host') || '').split(':')[0].toLowerCase();
-  return host === 'rankbid.click' || host.endsWith('.rankbid.click');
+  return host === SITE_HOST || host.endsWith(`.${SITE_HOST}`);
 }
 
 export async function proxy(request: NextRequest) {
@@ -88,7 +61,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Coming soon mode (switched from the admin dashboard): every visitor except admins sees /coming-soon.
-  // It only applies on rankbid.click; the vercel.app domain always shows the full site.
+  // It only applies on the live domain (SITE_HOST); the vercel.app domain always shows the full site.
   if (isMainDomain(request) && await isComingSoonEnabled()) {
     if (COMING_SOON_OPEN.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
       return NextResponse.next();
@@ -107,17 +80,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  if (pathname === '/' || PUBLIC_PAGES.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
-    return NextResponse.next();
-  }
-
-  // Allow public routes
-  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  // Allow API routes (they handle their own auth)
-  if (pathname.startsWith('/api/')) {
+  // Only members-only pages need a sign-in. Everything else renders, so an unknown address
+  // gets the 404 page instead of a login prompt.
+  if (!MEMBERS_ONLY.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
     return NextResponse.next();
   }
 
@@ -125,11 +90,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for auth token (user logged in)
-  const authToken = request.cookies.get('auth_token')?.value;
-
-  // For authenticated users (logged in), allow access
-  if (authToken) {
+  // Signed in (the page and its APIs check the session itself).
+  if (request.cookies.get('auth_token')?.value) {
     return NextResponse.next();
   }
 
