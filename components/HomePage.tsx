@@ -165,6 +165,8 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   // Listings the signed-in user submitted: only these get the Premium button (the checkout API enforces it too).
   const [ownListingIds, setOwnListingIds] = useState<Set<string>>(new Set());
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  // Why the sign-in prompt opened, so its copy matches the action.
+  const [loginReason, setLoginReason] = useState<'vote' | 'sponsor'>('vote');
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const [selectedListingForShare, setSelectedListingForShare] = useState<Listing | null>(null);
   const [allListings, setAllListings] = useState<Listing[]>(initialListings);
@@ -180,13 +182,31 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   const [copied, setCopied] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info', ms = 3000) => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
+    }, ms);
   };
+
+  // One-off notices passed in the URL (back from a cancelled Stripe checkout, or after deleting
+  // an account): show them, then tidy the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('premium') === 'cancelled') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the URL after mount
+      addToast('Payment cancelled. You were not charged; you can sponsor your product any time.', 'info', 7000);
+    } else if (params.get('account') === 'deleted') {
+      addToast('Your account was deleted.', 'info', 7000);
+    } else {
+      return;
+    }
+    params.delete('premium');
+    params.delete('account');
+    const qs = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }, []);
 
   const loadOwnListingIds = async () => {
     try {
@@ -235,6 +255,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
 
   const handleVote = useCallback(async (listingId: string) => {
     if (!user) {
+      setLoginReason('vote');
       setLoginModalOpen(true);
       return;
     }
@@ -370,6 +391,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   // Sponsor checkout is its own page (/sponsor): from the Sponsored section the price aims for that rank.
   const openClaim = (position: number) => {
     if (!user) {
+      setLoginReason('sponsor');
       setLoginModalOpen(true);
       return;
     }
@@ -956,7 +978,12 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
-        title="Login Required to Submit"
+        title={loginReason === 'vote' ? 'Sign in to vote' : 'Sign in to sponsor'}
+        message={
+          loginReason === 'vote'
+            ? 'Voting on the leaderboard is free with a RankBid account. Got a support link from a founder? You can vote there with just your name and email.'
+            : 'Sponsor a product you submitted: sign in to the account you submitted it with.'
+        }
       />
 
       {/* STATUS CARD MODAL */}

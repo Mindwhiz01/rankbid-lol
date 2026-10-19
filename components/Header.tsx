@@ -129,7 +129,9 @@ export default function Header() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // End the server session first; clearing localStorage alone leaves the auth cookie working.
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     localStorage.removeItem('user');
     localStorage.removeItem('auth_token');
     setUser(null);
@@ -143,8 +145,8 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-2 sm:px-3 md:px-6">
           {/* Main Header */}
           <div className="flex items-center justify-between h-12 sm:h-14 md:h-16">
-            {/* Logo & Hamburger */}
-            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4">
+            {/* Logo & Hamburger (never shrinks: the logo must stay whole) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4 flex-shrink-0">
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="lg:hidden p-2 -ml-1 text-[#1F2937] rounded-lg flex-shrink-0 hover:bg-gray-100"
@@ -156,8 +158,8 @@ export default function Header() {
               </Link>
             </div>
 
-            {/* Center Stats */}
-            <div className="hidden md:flex items-center gap-3 ml-4 lg:ml-6 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
+            {/* Center Stats: hidden from 1024px to 1279px, where the desktop nav and the sign-in buttons need the room */}
+            <div className="hidden md:flex lg:hidden xl:flex items-center gap-3 ml-4 lg:ml-6 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                 <span className="text-xs font-semibold text-gray-900">{stats?.live ?? '–'}</span>

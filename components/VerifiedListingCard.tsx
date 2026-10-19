@@ -170,7 +170,7 @@ export default function VerifiedListingCard({
           {/* Vote Count */}
           <div className="mb-4 md:mb-6 bg-white/80 backdrop-blur inline-block px-4 md:px-6 py-3 md:py-4 border-2 border-gray-200 rounded-lg shadow-lg">
             <p className="text-2xl md:text-4xl font-black text-slate-900">
-              💗 {listing.totalVotes.toLocaleString()}
+              💗 {listing.totalVotes.toLocaleString('en-US')}
             </p>
             <p className="text-xs md:text-sm text-slate-600 font-bold mt-1">Community Votes</p>
           </div>

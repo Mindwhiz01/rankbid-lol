@@ -7,6 +7,7 @@ import { LogOut, ChevronRight, Star, Pencil, Trash2 } from 'lucide-react';
 import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
 import SubmissionEditModal from '@/components/SubmissionEditModal';
+import AccountSettings from '@/components/AccountSettings';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
@@ -161,7 +162,9 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // End the server session first; clearing localStorage alone leaves the auth cookie working.
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     localStorage.removeItem('user');
     localStorage.removeItem('auth_token');
     setUser(null);
@@ -431,51 +434,18 @@ export default function ProfilePage() {
               <div>
                 <div className="mb-6">
                   <h2 className="text-lg sm:text-2xl font-black text-[#1F2937] mb-1">Settings</h2>
-                  <p className="text-xs sm:text-sm text-[#1F2937]/60">Manage your account settings and preferences</p>
+                  <p className="text-xs sm:text-sm text-[#1F2937]/60">Your name, password and account</p>
                 </div>
 
-                <div className="bg-white rounded-lg p-8 border border-gray-200">
-                  <div className="space-y-8">
-                    {/* Account Section */}
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">Account Information</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Display Name
-                          </label>
-                          <p className="text-gray-600">{user.name || 'Not set'}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            To change your name, please contact support
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Email Address
-                          </label>
-                          <p className="text-gray-600">{user.email}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Email cannot be changed
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Danger Zone */}
-                    <div className="border-t border-gray-200 pt-8">
-                      <h3 className="text-lg font-bold text-red-600 mb-4">Danger Zone</h3>
-                      <p className="text-gray-600 text-sm mb-4">
-                        Once you delete your account, there is no going back. Please be certain.
-                      </p>
-                      <button
-                        className="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                        disabled
-                      >
-                        Delete Account (Coming Soon)
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <AccountSettings
+                  user={user}
+                  onUserChange={setUser}
+                  onDeleted={() => {
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('auth_token');
+                    router.push('/?account=deleted');
+                  }}
+                />
               </div>
             )}
           </>

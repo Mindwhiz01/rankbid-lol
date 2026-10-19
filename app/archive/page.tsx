@@ -74,6 +74,7 @@ export default function ArchivePage() {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'UTC',
     });
   };
 
@@ -182,7 +183,7 @@ export default function ArchivePage() {
                                 {/* Right: Votes */}
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <p className="text-xs sm:text-sm font-black text-[#0F3460] min-w-[2rem] text-right whitespace-nowrap">
-                                    {item.votes} <span className="font-semibold text-[#1F2937]/50">votes</span>
+                                    {item.votes} <span className="font-semibold text-[#1F2937]/50">{item.votes === 1 ? 'vote' : 'votes'}</span>
                                   </p>
                                 </div>
                               </Link>

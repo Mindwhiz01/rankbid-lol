@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import ProductView from '@/components/ProductView';
 import JsonLd from '@/components/JsonLd';
 import { getListingById, getRankedListings } from '@/lib/server/listings';
@@ -37,6 +38,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
   const [product, allListings, holders] = await Promise.all([getListingById(id), getRankedListings(), getActiveHolders(60)]);
+  // Unknown id: a real 404 (not a 200 page that later says "not found").
+  if (!product) notFound();
   // A sponsored product shows the founder links saved with its payment.
   const spot = holders.find(h => h.listingId === id);
   // Only the public fields: the founder's email and phone must never reach the page.

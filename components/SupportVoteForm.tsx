@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import PlatformIcon from '@/components/PlatformIcon';
+import Turnstile, { TURNSTILE_SITE_KEY, type TurnstileHandle } from '@/components/Turnstile';
 import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
 import { getCategoryLabel } from '@/lib/categories';
 import type { PublicListing } from '@/lib/server/votes';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
+import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import { safeExternalUrl } from '@/lib/utils';
 
 type SupportType = 'founder' | 'friend' | 'supporter';
@@ -49,6 +51,8 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState(''); // honeypot
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<TurnstileHandle>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Name saved from an earlier visit (this browser already voted), or set after voting now.
@@ -74,13 +78,14 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
     if (!supportType) return setError('Choose how you support this maker');
     if (name.trim().length < 2) return setError('Please enter your name');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setError('Please enter a valid email address');
+    if (TURNSTILE_SITE_KEY && !captchaToken) return setError('Please complete the "I am human" check');
 
     setSubmitting(true);
     try {
       const res = await fetch('/api/support-vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId: listing.id, name, email, supportType, company }),
+        body: JSON.stringify({ listingId: listing.id, name, email, supportType, company, turnstileToken: captchaToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -97,6 +102,8 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
       } else {
         setError(data.error || 'Something went wrong. Please try again.');
       }
+      // A token is single-use: get a fresh one for the next try.
+      if (!res.ok) captcha.current?.reset();
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -124,20 +131,20 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
         <p className="relative text-xs font-bold uppercase tracking-[0.15em] text-white/60 mb-3">You’ve been invited to support</p>
         <div className="relative flex items-start gap-3 sm:gap-4">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
-            {favicon ? <img src={favicon} alt="" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" /> : <PlatformIcon platform={listing.platform} size={32} />}
+            {favicon ? <img src={favicon} alt={`${listing.title} logo`} className="w-9 h-9 sm:w-10 sm:h-10 object-contain" /> : <PlatformIcon platform={listing.platform} size={32} />}
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-3xl font-black leading-tight break-words">{listing.title}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-xs font-semibold bg-white/15 px-2 py-0.5 rounded-full">{getCategoryLabel(listing.category)}</span>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold bg-white/15 px-2 py-0.5 rounded-full capitalize">
-                <PlatformIcon platform={listing.platform} size={12} /> {listing.platform === 'twitter' ? 'X' : listing.platform}
+              <span className="inline-flex items-center gap-1 text-xs font-semibold bg-white/15 px-2 py-0.5 rounded-full ">
+                <PlatformIcon platform={listing.platform} size={12} /> {listing.platform === 'twitter' || listing.platform === 'x' ? 'X' : PLATFORM_LABELS[normalizePlatform(listing.platform)]}
               </span>
             </div>
           </div>
           <div className="text-center flex-shrink-0">
             <p className="text-2xl sm:text-4xl font-black leading-none">{votes}</p>
-            <p className="text-[11px] sm:text-xs text-white/60 font-semibold mt-1">votes</p>
+            <p className="text-[11px] sm:text-xs text-white/60 font-semibold mt-1">{votes === 1 ? 'vote' : 'votes'}</p>
           </div>
         </div>
         {listing.description && (
@@ -221,6 +228,8 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
 
             {/* Honeypot: hidden from people, filled by bots */}
             <input value={company} onChange={e => setCompany(e.target.value)} name="company" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
+
+            <Turnstile ref={captcha} onToken={setCaptchaToken} />
 
             {error && <p className="text-xs sm:text-sm font-semibold text-red-600 mb-3" role="alert">{error}</p>}
 

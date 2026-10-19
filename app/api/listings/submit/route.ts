@@ -104,9 +104,11 @@ export async function POST(req: NextRequest) {
     let normalizedUrl = url || getPlatformUrl(platform, typedLink);
     let displayHandle = handle;
 
-    if (normalizedUrl && !normalizedUrl.startsWith('http')) {
+    if (normalizedUrl && !/^https?:\/\//i.test(normalizedUrl)) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
+    // Store a tidy link: "HTTP://WWW.Example.COM" → "http://www.example.com/" (URL lowercases scheme and host).
+    try { if (normalizedUrl) normalizedUrl = new URL(normalizedUrl).href; } catch { /* checked below */ }
 
     // Malware, phishing, adult, gambling, shorteners, downloads.
     const urlProblem = staticUrlProblem(normalizedUrl);

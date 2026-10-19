@@ -6,6 +6,7 @@ import Link from 'next/link';
 import AdminShell, { ADMIN_TABS, type AdminTab } from '@/components/AdminShell';
 import AdminPayments from '@/components/AdminPayments';
 import PageNav, { PAGE_SIZE } from '@/components/Pagination';
+import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
   RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, Zap,
@@ -1193,7 +1194,7 @@ function LiveTab({
               >
                 <div className="flex-1 min-w-0"><ListingTitle listing={l} /></div>
                 {live.freshIds.has(l.id) && <span className="text-[10px] font-black text-green-700 bg-green-100 rounded px-1.5 py-0.5">NEW</span>}
-                <span className="hidden sm:inline text-xs text-gray-500 capitalize">{l.platform}</span>
+                <span className="hidden sm:inline text-xs text-gray-500">{PLATFORM_LABELS[normalizePlatform(l.platform)]}</span>
                 <span className="text-xs text-gray-500 w-16 text-right">{timeAgo(l.createdAt)}</span>
                 <span className="font-bold tabular-nums w-10 text-right">{fmt(l.totalVotes)}</span>
                 <RemoveButton label="" onClick={() => onRemove([l.id], l.title)} />
@@ -1367,7 +1368,7 @@ function SubmissionsTab({
                     )}
                   </td>
                 )}
-                <td className="px-3 py-2.5 capitalize text-gray-600">{l.platform}</td>
+                <td className="px-3 py-2.5 text-gray-600">{PLATFORM_LABELS[normalizePlatform(l.platform)]}</td>
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums">
                   {l.totalVotes > 0 ? (
                     <button
@@ -1505,7 +1506,7 @@ function VotesTable({ voters, showSubmission = false }: { voters: AdminVoter[]; 
                   {v.listing ? (
                     <Link href={`/product/${v.listing.id}`} target="_blank" className="font-semibold text-[#0F3460] hover:underline truncate block">
                       {v.listing.title}
-                      <span className="ml-1.5 text-xs font-normal text-gray-500 capitalize">{v.listing.platform}</span>
+                      <span className="ml-1.5 text-xs font-normal text-gray-500">{PLATFORM_LABELS[normalizePlatform(v.listing.platform)]}</span>
                     </Link>
                   ) : (
                     <span className="text-gray-400 italic">Removed submission</span>

@@ -177,7 +177,7 @@ export default function ComingSoon() {
 
               {waitlistCount !== null && waitlistCount > 0 && (
                 <p className="mt-4 text-sm text-white/55">
-                  <span className="font-black text-white tabular-nums">{waitlistCount.toLocaleString()}</span>{' '}
+                  <span className="font-black text-white tabular-nums">{waitlistCount.toLocaleString('en-US')}</span>{' '}
                   {waitlistCount === 1 ? 'person has' : 'people have'} already joined. First come, first served.
                 </p>
               )}

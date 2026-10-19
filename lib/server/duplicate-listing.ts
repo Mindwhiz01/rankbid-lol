@@ -4,6 +4,7 @@ import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
 /**
  * Id of an existing listing whose link is the same as `url` (see listingUrlKey), or null.
+ * Throws if the lookup fails, so callers refuse the link rather than risk a duplicate.
  * Listings on the same host are fetched and compared by key, so "http://www.MindWhiz.com"
  * matches a stored "https://mindwhiz.com/".
  */
@@ -19,8 +20,8 @@ export async function findDuplicateListing(url: string, excludeId?: string): Pro
     { headers: sbHeaders(), cache: 'no-store' }
   );
   if (!res.ok) {
-    console.error('Duplicate listing check failed:', res.status, await res.text());
-    return null;
+    // Fail closed: an unchecked link could be a duplicate.
+    throw new Error(`Duplicate listing check failed: ${res.status} ${await res.text()}`);
   }
   const rows: { id: string; location: string | null }[] = await res.json();
   return rows.find(r => r.location && listingUrlKey(r.location) === key)?.id ?? null;

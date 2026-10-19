@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { bidForRank, HOME_SPONSORED, MAX_SOCIAL_LINKS, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
+import { useEffect, useRef, useState } from 'react';
+import { bidForRank, HOME_SPONSORED, MAX_BID_USD, MAX_SOCIAL_LINKS, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
 import { PLATFORM_LABELS, normalizePlatform, platformExample, platformUrlProblem, type SubmitPlatform } from '@/lib/platform-url';
 import CategoryField, { categoryChoice, categoryChoiceError, categoryPayload, type CategoryChoice } from '@/components/CategoryField';
 
@@ -128,6 +128,12 @@ export default function PremiumListingModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // The Pay button sits far below the error banner; bring the error into view so it isn't missed.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [error]);
 
   const picking = !fixedListingId;
   const isNewProduct = picking && productChoice === NEW_PRODUCT;
@@ -209,7 +215,7 @@ export default function PremiumListingModal({
     }
 
     if (!validBid) {
-      setError(`❌ Enter a whole-dollar amount of at least $${MIN_BID_USD}`);
+      setError(`❌ Enter a whole-dollar amount from $${MIN_BID_USD} to $${MAX_BID_USD.toLocaleString('en-US')}`);
       setLoading(false);
       return;
     }
@@ -283,7 +289,7 @@ export default function PremiumListingModal({
   const lastRank = others.length + 1;
   const suggested = bidForRank(Math.min(targetRank ?? HOME_SPONSORED, lastRank), otherBids);
   const bid = bidInput === '' ? suggested : Number(bidInput);
-  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD;
+  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD && bid <= MAX_BID_USD;
   const price = validBid ? bid : suggested;
   // The rank follows from the amount.
   const rank = rankForBid(price, otherBids);
@@ -355,7 +361,7 @@ export default function PremiumListingModal({
             {/* Left: the form */}
             <div className="space-y-9 min-w-0">
               {successMessage && <div className="bg-[#059669]/10 border border-[#059669]/30 text-[#047857] px-4 py-3 rounded-xl text-sm font-semibold">{successMessage}</div>}
-              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">{error}</div>}
+              {error && <div ref={errorRef} role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">{error}</div>}
 
               {/* The product being sponsored, with its platform, so it's clear which one this is */}
               {!isNewProduct && listingId && productPlatform && (
@@ -446,6 +452,7 @@ export default function PremiumListingModal({
                       inputMode="numeric"
                       aria-label="Amount in USD"
                       min={MIN_BID_USD}
+                      max={MAX_BID_USD}
                       step="1"
                       value={bidInput}
                       onChange={e => setBidInput(e.target.value)}
@@ -459,7 +466,7 @@ export default function PremiumListingModal({
                     Whole dollars, from ${MIN_BID_USD}. {rank > 1 && `The top spot (#1) needs $${topBid}.`}
                   </p>
                 ) : (
-                  <p className="mt-1.5 text-xs font-bold text-red-600">Enter a whole-dollar amount of at least ${MIN_BID_USD}.</p>
+                  <p className="mt-1.5 text-xs font-bold text-red-600">Enter a whole-dollar amount from ${MIN_BID_USD} to ${MAX_BID_USD.toLocaleString('en-US')}.</p>
                 )}
 
                 <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">

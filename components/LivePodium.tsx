@@ -36,7 +36,7 @@ function PodiumLogo({ listing, rank }: { listing: PodiumListing; rank: number })
     <div className={`relative mx-auto mb-3 sm:mb-4 ${first ? 'w-16 h-16 sm:w-20 sm:h-20' : 'w-14 h-14 sm:w-16 sm:h-16'}`}>
       <img
         src={logoFor(listing)}
-        alt=""
+        alt={`${listing.title} logo`}
         width={80}
         height={80}
         className={`w-full h-full rounded-2xl bg-white object-contain p-2 sm:p-2.5 ${first ? 'shadow-lg shadow-black/20' : 'border border-gray-100 shadow-sm'}`}
@@ -162,9 +162,9 @@ export default function LivePodium({ onClaim }: { onClaim?: (position: number) =
                   #{rank + 1}
                 </p>
                 <p className={`text-xs font-semibold ${first ? 'text-white/70' : 'text-[#1F2937]/60'}`}>
-                  {clicks.toLocaleString()} {clicks === 1 ? 'click' : 'clicks'}
+                  {clicks.toLocaleString('en-US')} {clicks === 1 ? 'click' : 'clicks'}
                   {l.premiumBidUsd != null && (
-                    <span className={first ? 'text-amber-300' : 'text-amber-600'}> · ${Number(l.premiumBidUsd).toLocaleString()} bid</span>
+                    <span className={first ? 'text-amber-300' : 'text-amber-600'}> · ${Number(l.premiumBidUsd).toLocaleString('en-US')} bid</span>
                   )}
                 </p>
                 {/* The link row keeps its height even when empty, so #2 and #3 line up with or without links */}

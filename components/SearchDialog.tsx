@@ -187,7 +187,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
                         <span className="block text-sm font-bold text-[#0B2545] truncate">{l.title}</span>
                         <span className="block text-xs text-[#1F2937]/50 truncate">{getCategoryLabel(l.category)}</span>
                       </span>
-                      <span className="flex-shrink-0 text-xs font-bold text-[#059669] tabular-nums">{(l.totalVotes || 0).toLocaleString()} votes</span>
+                      <span className="flex-shrink-0 text-xs font-bold text-[#059669] tabular-nums">{(l.totalVotes || 0).toLocaleString('en-US')} {l.totalVotes === 1 ? 'vote' : 'votes'}</span>
                     </Link>
                   </li>
                 ))}

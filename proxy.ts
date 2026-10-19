@@ -13,6 +13,8 @@ const COMING_SOON_OPEN = [
   '/coming-soon',
   '/admin',
   '/login',
+  '/forgot-password',
+  '/reset-password',
   '/tos',
   '/privacy',
   '/cookies',

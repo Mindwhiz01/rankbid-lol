@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListing, recordVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
-import { ipHash, rateLimit } from '@/lib/server/rate-limit';
-import { canonicalEmail, isDisposableEmail } from '@/lib/server/guest-email';
+import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { canonicalEmail, domainAcceptsMail, isDisposableEmail } from '@/lib/server/guest-email';
+import { verifyTurnstile } from '@/lib/server/turnstile';
 
 // Guest voting from a shared /support/<id> link: name + email + how they support the maker.
 // One vote per email per listing (voter_id = "email:<email>").
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
     if (isDisposableEmail(email)) return NextResponse.json({ error: 'Please use your real email address, not a temporary one' }, { status: 400 });
     if (!SUPPORT_TYPES.includes(supportType)) return NextResponse.json({ error: 'Please choose how you support this maker' }, { status: 400 });
     if (!supabaseConfigured()) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    // Bot check (Cloudflare Turnstile), when it's configured.
+    if (!(await verifyTurnstile(body.turnstileToken, clientIp(req)))) {
+      return NextResponse.json({ error: 'Please complete the "I am human" check and try again', retryCaptcha: true }, { status: 400 });
+    }
 
     // Emails aren't verified, so cap how many guest votes one network can cast: a few per product
     // (households and offices share an IP) and a modest total per hour and per day.
@@ -45,6 +50,11 @@ export async function POST(req: NextRequest) {
       !(await rateLimit(`support-ip-day:${ip}`, 20, 24 * 60 * 60))
     ) {
       return NextResponse.json({ error: 'Too many votes from your network. Please try again later.' }, { status: 429 });
+    }
+
+    // A made-up domain can't receive mail, so it can't be a real voter.
+    if (!(await domainAcceptsMail(email))) {
+      return NextResponse.json({ error: 'That email domain can’t receive mail. Please use your real email address' }, { status: 400 });
     }
 
     const listing = await getListing(listingId);

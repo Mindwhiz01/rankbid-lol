@@ -1,8 +1,8 @@
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
-  title: 'Daily Product Rankings',
-  description: 'Today’s top new product launches on RankBid, ranked by community votes.',
+  title: 'Launched Today: New Products',
+  description: 'Products launched on RankBid today, ranked by community votes. Only today’s new submissions.',
   path: '/daily',
 });
 

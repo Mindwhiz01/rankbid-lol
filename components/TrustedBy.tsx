@@ -134,7 +134,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
             {stats.map(s => (
               <div key={s.label}>
                 <dd className="text-3xl sm:text-4xl font-bold tracking-[-0.03em] text-[#0B2545] tabular-nums">
-                  {s.value ? s.value.toLocaleString() : '—'}
+                  {s.value ? s.value.toLocaleString('en-US') : '—'}
                 </dd>
                 <dt className="text-xs sm:text-sm text-[#1F2937]/55 mt-1">{s.label}</dt>
               </div>

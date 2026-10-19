@@ -45,7 +45,7 @@ export async function GET() {
     link('Rankings by platform', '/platforms', 'Websites, X, LinkedIn, Instagram, TikTok and Facebook profiles'),
     '',
     ...(top.length
-      ? ['## Current top products', ...top.map((l, i) => link(`#${i + 1} ${l.title.replace(/[[\]]/g, '')}`, `/product/${l.id}`, `${getCategoryLabel(l.category)}, ${l.totalVotes} votes`)), '']
+      ? ['## Current top products', ...top.map((l, i) => link(`#${i + 1} ${l.title.replace(/[[\]]/g, '')}`, `/product/${l.id}`, `${getCategoryLabel(l.category)}, ${l.totalVotes} ${l.totalVotes === 1 ? 'vote' : 'votes'}`)), '']
       : []),
     '## FAQ',
     ...FAQS.flatMap(f => [`### ${f.q}`, f.a, '']),

@@ -1,4 +1,5 @@
 // Server-only: guest voter emails aren't verified, so make one inbox count as one voter.
+import { promises as dns } from 'dns';
 
 // Throwaway inbox providers. Not exhaustive; it covers the ones offered first in search results.
 const DISPOSABLE_DOMAINS = new Set([
@@ -16,11 +17,17 @@ const DISPOSABLE_DOMAINS = new Set([
   'einrot.com', 'fleckens.hu', 'gustr.com', 'jourrapide.com', 'rhyta.com', 'superrito.com', 'teleworm.us',
 ]);
 
+// Reserved for documentation and testing (RFC 2606 / 6761): never a real inbox.
+const RESERVED_DOMAINS = new Set(['example.com', 'example.net', 'example.org', 'localhost']);
+const RESERVED_TLDS = ['.test', '.example', '.invalid', '.localhost', '.local'];
+
 const GMAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
 
 export function isDisposableEmail(email: string): boolean {
   const domain = email.split('@')[1]?.toLowerCase() || '';
-  if (DISPOSABLE_DOMAINS.has(domain)) return true;
+  if (DISPOSABLE_DOMAINS.has(domain) || RESERVED_DOMAINS.has(domain)) return true;
+  if (RESERVED_TLDS.some(tld => domain.endsWith(tld))) return true;
+  for (const d of RESERVED_DOMAINS) if (domain.endsWith(`.${d}`)) return true;
   // Subdomains of a throwaway provider (e.g. x.mailinator.com).
   for (const d of DISPOSABLE_DOMAINS) if (domain.endsWith(`.${d}`)) return true;
   return false;
@@ -40,4 +47,25 @@ export function canonicalEmail(email: string): string {
     domain = 'gmail.com';
   }
   return `${local}@${domain}`;
+}
+
+/**
+ * False when the email's domain can't receive mail: it doesn't exist, has no MX records,
+ * or publishes a "null MX" (RFC 7505). Lookup errors and timeouts count as fine, so a DNS
+ * hiccup never blocks a real voter.
+ */
+export async function domainAcceptsMail(email: string): Promise<boolean> {
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  try {
+    const records = await Promise.race([
+      dns.resolveMx(domain),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+    ]);
+    if (records === null) return true; // timed out
+    return records.some(r => r.exchange && r.exchange !== '.');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return !(code === 'ENOTFOUND' || code === 'ENODATA');
+  }
 }

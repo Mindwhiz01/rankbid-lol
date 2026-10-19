@@ -7,9 +7,11 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  /** Why signing in is needed here; defaults to a general line. */
+  message?: string;
 }
 
-export default function LoginModal({ isOpen, onClose, title = 'Login Required' }: LoginModalProps) {
+export default function LoginModal({ isOpen, onClose, title = 'Sign in to continue', message = 'Sign in or create a free account to continue.' }: LoginModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -39,7 +41,7 @@ export default function LoginModal({ isOpen, onClose, title = 'Login Required' }
 
         {/* Message */}
         <p className="text-gray-600 mb-8">
-          You need to be logged in to submit your product and vote.
+          {message}
         </p>
 
         {/* Buttons */}
@@ -65,13 +67,13 @@ export default function LoginModal({ isOpen, onClose, title = 'Login Required' }
           <div className="flex-1 h-px bg-gray-200"></div>
         </div>
 
-        {/* Continue as Guest */}
+        {/* Dismiss: there's no guest mode, so don't suggest one */}
         <button
           type="button"
           onClick={onClose}
           className="w-full px-6 py-2 text-[#0F3460] font-semibold rounded-lg hover:bg-[#0F3460]/5 transition-colors"
         >
-          Continue as Guest
+          Not now
         </button>
       </div>
     </div>

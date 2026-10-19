@@ -71,7 +71,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
 
       <img
         src={logo}
-        alt=""
+        alt={`${listing.title} logo`}
         width={64}
         height={64}
         loading="lazy"
@@ -89,7 +89,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
           </Link>
           {listing.premiumBidUsd != null && (
             <span className="flex-shrink-0 text-sm sm:text-lg font-black text-amber-600 tabular-nums">
-              ${Number(listing.premiumBidUsd).toLocaleString()}
+              ${Number(listing.premiumBidUsd).toLocaleString('en-US')}
             </span>
           )}
         </div>
@@ -112,7 +112,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
             {host || 'Visit site'} ↗
           </a>
           <span className={meta}>·</span>
-          <span className={meta}>{clicks.toLocaleString()} {clicks === 1 ? 'click' : 'clicks'}</span>
+          <span className={meta}>{clicks.toLocaleString('en-US')} {clicks === 1 ? 'click' : 'clicks'}</span>
           <FounderLinks listing={listing} title={listing.title} className="ml-1" />
         </div>
       </div>

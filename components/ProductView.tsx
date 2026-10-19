@@ -13,6 +13,7 @@ import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { claimClick } from '@/lib/clickCount';
+import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 
 interface Listing {
   id: string;
@@ -48,15 +49,9 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
     if (!initialProduct) fetchProduct();
   }, [id]);
 
-  // Opening a product page counts as a click (once per visitor every 30 minutes, see /api/click).
+  // Only visiting the product counts as a click (once per visitor every 30 minutes, see /api/click);
+  // just opening this page doesn't.
   const [ownClick, setOwnClick] = useState(0);
-  useEffect(() => {
-    claimClick(id);
-    fetch('/api/click', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => { if (data?.counted) setOwnClick(1); })
-      .catch(() => {});
-  }, [id]);
 
   // The person who submitted this product gets a Sponsor button (the checkout checks ownership too).
   const [isOwner, setIsOwner] = useState(false);
@@ -210,8 +205,9 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
 
   const shareLink = supportUrl(product.id);
   const whatsappText = `Support "${product.title}" on RankBid: it takes 10 seconds, no account needed. ${shareLink}`;
-  const listedOn = new Date(product.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const platformName = product.platform === 'twitter' || product.platform === 'x' ? 'X' : product.platform;
+  // UTC on both server and browser, so the rendered date matches during hydration.
+  const listedOn = new Date(product.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const platformName = product.platform === 'twitter' || product.platform === 'x' ? 'X' : PLATFORM_LABELS[normalizePlatform(product.platform)];
 
   return (
     <>
@@ -241,7 +237,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               <div className="flex-1 min-w-0">
                 <div className="slide-up flex flex-wrap items-center gap-2 mb-2 sm:mb-3" style={{ '--d': '140ms' } as CSSProperties}>
                   <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/15 border border-white/15">{getCategoryLabel(product.category)}</span>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-white/15 border border-white/15 capitalize">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-white/15 border border-white/15">
                     <PlatformIcon platform={product.platform} size={12} /> {platformName}
                   </span>
                   {isRanked && allTimeRank <= 3 && (
@@ -270,6 +266,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                   </button>
                   <a
                     href={product.url.startsWith('http') ? `/api/click?id=${encodeURIComponent(product.id)}` : getVisitUrl()}
+                    onClick={() => { if (product.url.startsWith('http') && claimClick(product.id)) setOwnClick(1); }}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 bg-white text-[#0F3460] font-black rounded-xl hover:-translate-y-0.5 active:scale-95 transition-all text-sm shadow-lg shadow-black/10"
@@ -287,7 +284,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                     </Link>
                   )}
                   <span className="text-xs sm:text-sm font-semibold text-white/70 tabular-nums">
-                    {((product.clickCount || 0) + ownClick).toLocaleString()} {(product.clickCount || 0) + ownClick === 1 ? 'click' : 'clicks'}
+                    {((product.clickCount || 0) + ownClick).toLocaleString('en-US')} {(product.clickCount || 0) + ownClick === 1 ? 'click' : 'clicks'}
                   </span>
                   {founder && <FounderLinks listing={founder} title={product.title} size="md" />}
                   {voteMessage && <span className="text-xs sm:text-sm font-semibold text-emerald-300">{voteMessage}</span>}
@@ -334,7 +331,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               )}
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm">
                 <span className="text-[#1F2937]/55">Listed <span className="font-bold text-[#1F2937]">{listedOn}</span></span>
-                <span className="text-[#1F2937]/55">Platform <span className="font-bold text-[#1F2937] capitalize">{platformName}</span></span>
+                <span className="text-[#1F2937]/55">Platform <span className="font-bold text-[#1F2937]">{platformName}</span></span>
               </div>
             </div>
 

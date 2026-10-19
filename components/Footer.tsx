@@ -10,7 +10,7 @@ const LINK_GROUPS = [
     title: 'Rankings',
     links: [
       { href: '/', label: 'All Time' },
-      { href: '/today', label: 'Today' },
+      { href: '/today', label: 'Trending now' },
       { href: '/leaderboard', label: 'Leaderboard' },
       { href: '/sponsored', label: 'Sponsored' },
       { href: '/categories', label: 'Categories' },
@@ -20,7 +20,7 @@ const LINK_GROUPS = [
     title: 'Discover',
     links: [
       { href: '/platforms', label: 'Platforms' },
-      { href: '/daily', label: 'Daily' },
+      { href: '/daily', label: 'Launched today' },
       { href: '/archive', label: 'Archive' },
       { href: '/stats', label: 'Stats' },
     ],

@@ -6,6 +6,8 @@ export const HOME_SPONSORED = 10;
 
 /** Lowest amount (USD) a sponsored listing can be bought for. */
 export const MIN_BID_USD = 1;
+/** Largest amount one checkout accepts (whole USD); guards against typos like $99,999,999. */
+export const MAX_BID_USD = 100_000;
 
 /** Bids are whole dollars; beating a listing takes its bid plus this much. */
 export const OUTBID_STEP_USD = 1;

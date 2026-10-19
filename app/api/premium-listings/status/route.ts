@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveHolders, getPremiumListing } from '@/lib/server/premium';
+import { fulfillPaidSession } from '@/lib/server/premium-fulfill';
 import { getSessionUser } from '@/lib/server/session';
+import { getStripe } from '@/lib/server/stripe';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 
 /**
  * Status of one premium bid, for the payment success page to poll while the Stripe webhook confirms it.
- * Read-only: the listing is only ever activated by the webhook. Only the listing's owner can read it.
+ * The webhook normally activates the bid; if it hasn't yet, this checks the session with Stripe and
+ * activates a paid one, so a missed webhook never leaves a paid listing pending. Only the listing's owner can read it.
  */
 export async function GET(req: NextRequest) {
   if (!supabaseConfigured()) {
@@ -17,7 +20,7 @@ export async function GET(req: NextRequest) {
   }
 
   const id = req.nextUrl.searchParams.get('id') || '';
-  const premium = id ? await getPremiumListing(id) : null;
+  let premium = id ? await getPremiumListing(id) : null;
   if (!premium) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
   }
@@ -29,6 +32,25 @@ export async function GET(req: NextRequest) {
   const [listing] = listingRes.ok ? await listingRes.json() : [];
   if (!listing || String(listing.user_id ?? '') !== user.id) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+  }
+
+  // Webhook late or missing: ask Stripe about the Checkout Session and activate the bid if it's paid.
+  // ('failed' too: a newer checkout may have closed this one just as it was paid.)
+  if ((premium.payment_status === 'pending' || premium.payment_status === 'failed') &&
+      typeof premium.payment_txn_ref === 'string' && premium.payment_txn_ref.startsWith('cs_')) {
+    const stripe = getStripe();
+    if (stripe) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(premium.payment_txn_ref);
+        const sessionPremiumId = session.metadata?.premiumListingId || session.client_reference_id;
+        if (session.payment_status === 'paid' && sessionPremiumId === premium.id) {
+          await fulfillPaidSession(session);
+          premium = (await getPremiumListing(id)) ?? premium;
+        }
+      } catch (err) {
+        console.error('Status: Stripe session check failed', premium.id, err);
+      }
+    }
   }
 
   // Live rank while active (others may have bid since); otherwise the rank it was expected to get.

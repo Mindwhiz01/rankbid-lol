@@ -201,7 +201,7 @@ export default function AdminPayments({ title = 'Approve payments' }: { title?: 
                             {listing.category}
                           </span>
                           <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
-                            {listing.total_votes} votes
+                            {listing.total_votes} {listing.total_votes === 1 ? 'vote' : 'votes'}
                           </span>
                           <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">
                             {listing.day_votes} today

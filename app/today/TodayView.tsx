@@ -74,7 +74,7 @@ export default function TodayView({ initialListings }: { initialListings: Listin
       <Header />
       <div className="bg-gray-50 min-h-screen">
       {/* Header */}
-      <PageHero title="Today’s Hot Rankings" subtitle="The last 24 hours of community votes. See what’s trending right now.">
+      <PageHero title="Trending now" subtitle="Any product, old or new, ranked by its votes in the last 24 hours. New launches only? See Launched today.">
         <div className="slide-up mt-5 sm:mt-7 flex flex-wrap gap-2 sm:gap-3" style={{ '--d': '240ms' } as CSSProperties}>
           <div className="flex items-center gap-2.5 sm:gap-3 bg-white/10 border border-white/15 backdrop-blur-sm rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
             <PremiumIcons.Layers className="w-5 h-5 text-white/80" />

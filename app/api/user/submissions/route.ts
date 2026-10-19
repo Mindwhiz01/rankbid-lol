@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
       let next = url.trim();
       if (!/^https?:\/\//i.test(next)) next = `https://${next}`;
       try {
-        new URL(next);
+        next = new URL(next).href; // lowercases scheme and host
       } catch {
         return NextResponse.json({ error: 'Enter a valid link' }, { status: 400 });
       }
@@ -92,7 +92,8 @@ export async function PATCH(request: NextRequest) {
       const [current] = currentRes.ok ? await currentRes.json() : [];
       if (!current) return NextResponse.json({ error: 'Submission not found' }, { status: 404 });
 
-      if (next !== current.location) {
+      const unchanged = (() => { try { return new URL(current.location).href === next; } catch { return false; } })();
+      if (!unchanged) {
         // Link changes fetch the new site, so keep them occasional.
         if (!(await rateLimit(`link-edit:${user.id}`, 10, 60 * 60)) || !(await rateLimit(`link-edit-ip:${ipHash(request)}`, 20, 60 * 60))) {
           return NextResponse.json({ error: 'Too many link changes. Please try again later.' }, { status: 429 });
@@ -165,7 +166,7 @@ export async function DELETE(request: NextRequest) {
     const holders = await getActiveHolders();
     if (holders.some(h => h.listingId === listingId)) {
       return NextResponse.json(
-        { error: 'This submission is currently sponsored and can be deleted once the sponsorship ends. Contact support if you need it removed sooner.' },
+        { error: 'This submission has a paid sponsored listing, so it can’t be deleted here. Contact support if you need it removed.' },
         { status: 409 }
       );
     }

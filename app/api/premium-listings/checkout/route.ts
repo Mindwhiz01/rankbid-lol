@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 import { getActiveHolders, updatePremiumListing, usdToPkr } from '@/lib/server/premium';
-import { MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
+import { MAX_BID_USD, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
+import type Stripe from 'stripe';
 import { getStripe, usdToCents } from '@/lib/server/stripe';
+import { fulfillPaidSession } from '@/lib/server/premium-fulfill';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { httpUrlOrNull, staticUrlProblem } from '@/lib/server/url-safety';
 import { getSessionUser } from '@/lib/server/session';
@@ -72,6 +74,44 @@ interface CheckoutRequest {
   paymentMethod: 'stripe';
 }
 
+/**
+ * Closes this listing's unpaid checkouts: each pending bid's Stripe session is expired (it can't be paid
+ * after that) and the bid marked failed. Returns 'paid' if one of them was in fact paid; it is activated.
+ */
+async function settleOpenCheckouts(stripe: Stripe, listingId: string): Promise<'paid' | 'clear'> {
+  const res = await fetch(
+    sbUrl(`premium_listings?listing_id=eq.${encodeURIComponent(listingId)}&payment_status=eq.pending&select=id,payment_txn_ref`),
+    { headers: sbHeaders(), cache: 'no-store' }
+  );
+  const rows: { id: string; payment_txn_ref: string | null }[] = res.ok ? await res.json() : [];
+  let paid = false;
+  for (const row of rows) {
+    const ref = row.payment_txn_ref;
+    if (!ref?.startsWith('cs_')) {
+      // No Stripe session was ever opened for this bid.
+      await updatePremiumListing(row.id, { payment_status: 'failed' });
+      continue;
+    }
+    try {
+      const session = await stripe.checkout.sessions.retrieve(ref);
+      if (session.payment_status === 'paid') {
+        await fulfillPaidSession(session);
+        paid = true;
+        continue;
+      }
+      if (session.status === 'open') {
+        await stripe.checkout.sessions.expire(ref);
+      }
+    } catch (err) {
+      // Unknown to this Stripe key (e.g. made with the other mode's key) or already closed. If it was
+      // paid after all, the webhook still activates it: a paid 'failed' bid is revived (premium-fulfill).
+      console.warn('Could not settle earlier checkout', row.id, err instanceof Error ? err.message : err);
+    }
+    await updatePremiumListing(row.id, { payment_status: 'failed' });
+  }
+  return paid ? 'paid' : 'clear';
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!supabaseConfigured()) {
@@ -104,8 +144,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     const bidUsd = Number(item.bidUsd);
-    if (!Number.isInteger(bidUsd) || bidUsd < MIN_BID_USD || bidUsd > 100_000) {
-      return NextResponse.json({ error: `Enter a whole-dollar amount of at least $${MIN_BID_USD}` }, { status: 400 });
+    if (!Number.isInteger(bidUsd) || bidUsd < MIN_BID_USD || bidUsd > MAX_BID_USD) {
+      return NextResponse.json({ error: `Enter a whole-dollar amount from $${MIN_BID_USD} to $${MAX_BID_USD.toLocaleString('en-US')}` }, { status: 400 });
     }
     const founder = validateFounder(item);
     if ('error' in founder) {
@@ -128,6 +168,16 @@ export async function POST(req: NextRequest) {
     }
     if (String(listing.user_id ?? '') !== user.id) {
       return NextResponse.json({ error: 'Only the person who submitted this listing can make it premium' }, { status: 403 });
+    }
+
+    // One open checkout per listing. Older unpaid sessions are expired first, so a buyer can't pay twice;
+    // one that turns out to be paid already is activated and this checkout is refused.
+    const settled = await settleOpenCheckouts(stripe, item.listingId);
+    if (settled === 'paid') {
+      return NextResponse.json(
+        { error: 'Your earlier payment for this product went through. Your sponsored listing is live; refresh to see it.' },
+        { status: 409 }
+      );
     }
 
     // Expected rank right now (recorded for reference; the live rank is worked out from the bids).
@@ -207,6 +257,9 @@ export async function POST(req: NextRequest) {
       // Short-lived so an abandoned checkout doesn't promise a stale rank.
       // Stripe's minimum is 30 minutes; a little extra absorbs clock skew.
       expires_at: Math.floor(Date.now() / 1000) + 35 * 60,
+    }, {
+      // Bound to this bid row: a retried request can't open a second session for it.
+      idempotencyKey: `checkout:${premiumListing.id}`,
     });
 
     await updatePremiumListing(premiumListing.id, { payment_txn_ref: session.id });

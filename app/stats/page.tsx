@@ -6,6 +6,7 @@ import PageHero from '@/components/PageHero';
 import PlatformIcon from '@/components/PlatformIcon';
 import { PremiumIcons } from '@/components/PremiumIcons';
 import { getCategoryLabel } from '@/lib/categories';
+import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 
 interface ListingLite {
   category?: string;
@@ -142,7 +143,7 @@ export default function StatsPage() {
               renderLabel={name => (
                 <>
                   <PlatformIcon platform={name} size={16} />
-                  <span className="capitalize">{name === 'twitter' ? 'X' : name}</span>
+                  <span>{name === 'twitter' ? 'X' : PLATFORM_LABELS[normalizePlatform(name)]}</span>
                 </>
               )}
             />

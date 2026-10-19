@@ -89,7 +89,7 @@ export default function DailyView({ initialListings }: { initialListings: Listin
       <Header />
       <div className="bg-white text-[#1F2937]">
         {/* Header Section */}
-        <PageHero title="Today&apos;s Top Rankings" subtitle="Community-voted products ranking for today.">
+        <PageHero title="Launched today" subtitle="Only products submitted today (UTC), ranked by community votes. Everything trending? See Trending now.">
           <div className="slide-up mt-5 sm:mt-7 inline-flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white/10 border border-white/15 rounded-xl backdrop-blur-sm" style={{ '--d': '240ms' } as CSSProperties}>
             <span className="text-xs sm:text-sm font-bold text-white/80">Resets in</span>
             <div className="flex gap-1.5 sm:gap-2 items-center">
@@ -121,8 +121,8 @@ export default function DailyView({ initialListings }: { initialListings: Listin
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
-                <p className="text-sm sm:text-base font-bold text-[#1F2937] mb-1">No votes yet today</p>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4">Be the first: submit a product or vote for one you love.</p>
+                <p className="text-sm sm:text-base font-bold text-[#1F2937] mb-1">Nothing launched yet today</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4">Launch yours now and get a head start on today’s board.</p>
                 <Link
                   href="/#submit"
                   className="inline-flex px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all"

@@ -18,7 +18,7 @@ export interface RankingListing {
   description?: string;
   category: string;
   platform?: string;
-  /** Product-page opens plus site visits (see /api/click). Hidden when the source doesn't send it. */
+  /** Site visits through /api/click. Hidden when the source doesn't send it. */
   clickCount?: number;
 }
 
@@ -78,7 +78,7 @@ export default function RankingRow({
         {/* Logo */}
         <img
           src={faviconFor(listing.url)}
-          alt=""
+          alt={`${listing.title} logo`}
           className="max-[379px]:hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg border border-gray-100 bg-white p-1 flex-shrink-0 object-contain"
           onError={(e) => { e.currentTarget.src = FALLBACK_ICON; }}
         />
@@ -103,7 +103,7 @@ export default function RankingRow({
             </span>
             {clicks !== undefined && (
               <span className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/50 whitespace-nowrap">
-                {clicks.toLocaleString()} {clicks === 1 ? 'click' : 'clicks'}
+                {clicks.toLocaleString('en-US')} {clicks === 1 ? 'click' : 'clicks'}
               </span>
             )}
             {message && <span className="text-[11px] sm:text-xs font-semibold text-[#059669]">{message}</span>}
@@ -113,7 +113,7 @@ export default function RankingRow({
         {/* Votes */}
         <div className="text-center flex-shrink-0 sm:px-1">
           <p className="text-base sm:text-xl font-black text-[#0F3460] leading-none">{votes + extraVotes}</p>
-          <p className="text-[10px] sm:text-[11px] text-[#1F2937]/50 font-semibold mt-0.5">{votesLabel}</p>
+          <p className="text-[10px] sm:text-[11px] text-[#1F2937]/50 font-semibold mt-0.5">{votesLabel === 'votes' && votes + extraVotes === 1 ? 'vote' : votesLabel}</p>
         </div>
 
         {/* Actions (above the stretched title link) */}

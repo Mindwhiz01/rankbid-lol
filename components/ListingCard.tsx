@@ -60,7 +60,7 @@ export default function ListingCard({
           <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">{description}</p>
 
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3">
-            <span>👁 {clickCount.toLocaleString()} clicks</span>
+            <span>👁 {clickCount.toLocaleString('en-US')} clicks</span>
             <span>📅 Listed {getTimeAgo(createdAt)}</span>
           </div>
         </div>

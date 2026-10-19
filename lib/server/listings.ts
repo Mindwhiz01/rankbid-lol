@@ -61,9 +61,18 @@ async function query(path: string): Promise<Listing[]> {
 }
 
 // Cached per request: generateMetadata and the page both ask for the same listing.
+// Null only when the listing really doesn't exist (so the page can 404); a database error throws
+// instead, so a brief outage isn't cached as "not found".
 export const getListingById = cache(async (id: string): Promise<Listing | null> => {
-  const rows = await query(`listings?id=eq.${encodeURIComponent(id)}&select=*`);
-  return rows[0] ?? null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  if (!supabaseConfigured()) return null;
+  const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(id)}&select=*`), {
+    headers: sbHeaders(),
+    next: { revalidate: LISTINGS_REVALIDATE },
+  });
+  if (!res.ok) throw new Error(`Listing lookup failed: ${res.status}`);
+  const rows: Row[] = await res.json();
+  return rows[0] ? toListing(rows[0]) : null;
 });
 
 /** Every listing in ranking order. */
