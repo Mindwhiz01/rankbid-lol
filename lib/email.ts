@@ -169,7 +169,7 @@ const usd = (n: number) => `$${n.toFixed(2).replace(/\.00$/, '')}`;
 /** Receipt once the webhook has activated a paid bid; `position` is its rank at that moment. */
 export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string | null }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);
-  const until = e.expiresAt ? ` until ${new Date(e.expiresAt).toUTCString().slice(5, 16)}` : ' for 30 days';
+  const until = e.expiresAt ? ` until ${new Date(e.expiresAt).toUTCString().slice(5, 16)}` : ' with no end date';
   const body = `
     <p>Payment received: <strong>${usd(e.bidUsd)}</strong>. <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong>.</p>
     <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you if you drop off the homepage top 10. Payments for active listings are not refundable.</p>`;
@@ -193,7 +193,7 @@ export async function sendPremiumOutbidAlert(e: PremiumEmail & { newPosition: nu
   const where = e.newPosition ? `moved from #${e.position} to <strong>#${e.newPosition}</strong>` : `moved down from #${e.position}`;
   const body = `
     <p>Someone outbid you. <strong>${title}</strong> ${where} and is no longer on the RankBid homepage.</p>
-    <p>It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> until it expires. Raise your bid to get back into the top 10.</p>`;
+    <p>It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> for good. Raise your bid to get back into the top 10.</p>`;
   const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
   const subject = e.newPosition ? `You've been outbid: now #${e.newPosition} on RankBid` : `You've been outbid on RankBid`;
   return send(e.to, subject, premiumHtml('You dropped off the homepage', body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);

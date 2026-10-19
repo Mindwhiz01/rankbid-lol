@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
           unit_amount: usdToCents(bidUsd),
           product_data: {
             name: 'RankBid Sponsored listing',
-            description: `Sponsored for 30 days, ranked by price (currently #${position})`,
+            description: `Lifetime sponsored listing, ranked by price (currently #${position})`,
           },
         },
       }],
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
         statement_descriptor_suffix: 'PREMIUM',
       },
       custom_text: {
-        submit: { message: 'Sponsored listings are ranked by price: a higher bid later can move you down. Your listing stays live for 30 days and is non-refundable once active.' },
+        submit: { message: 'Sponsored listings are ranked by price: a higher bid later can move you down. One payment, no end date: your listing stays live for life and is non-refundable once active.' },
       },
       success_url: successUrl,
       cancel_url: `${appUrl}/?premium=cancelled`,

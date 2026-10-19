@@ -38,7 +38,7 @@ export default function SponsoredPage() {
       <div className="bg-white text-[#1F2937]">
         <PageHero
           title="Sponsored Products"
-          subtitle={`Ranked by price: whoever pays more sits higher. The top ${HOME_SPONSORED} also appear on the homepage. Sponsorship starts at $${MIN_BID_USD} and lasts 30 days.`}
+          subtitle={`Ranked by price: whoever pays more sits higher. The top ${HOME_SPONSORED} also appear on the homepage. Sponsorship starts at $${MIN_BID_USD}: pay once and it stays for life.`}
         />
 
         <section className="bg-gray-50 py-6 sm:py-10 md:py-12 min-h-[40vh]">

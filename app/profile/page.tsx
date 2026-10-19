@@ -308,7 +308,7 @@ export default function ProfilePage() {
                               </span>
                               <span className="text-xs text-amber-700/70">
                                 ${spot.bidUsd} · {spot.position <= HOME_SPONSORED ? 'on the homepage' : 'on the sponsored page'}
-                                {spot.expiresAt && ` · until ${new Date(spot.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                                {spot.expiresAt ? ` · until ${new Date(spot.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ' · lifetime'}
                               </span>
                               <div className="ml-auto flex items-center gap-3">
                                 <button
@@ -323,7 +323,7 @@ export default function ProfilePage() {
                             </div>
                           ) : (
                             <div className="mx-2 sm:mx-3 -mt-1 pt-3 pb-2 px-3 sm:px-4 rounded-b-xl bg-gray-50 border border-t-0 border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <p className="text-xs text-[#1F2937]/60">Sponsor it for 30 days from $1: the higher you pay, the higher it ranks.</p>
+                              <p className="text-xs text-[#1F2937]/60">Sponsor it for life from $1, one payment: the higher you pay, the higher it ranks.</p>
                               <div className="self-start sm:self-auto flex flex-wrap items-center gap-1.5">
                                 {manage}
                                 <button

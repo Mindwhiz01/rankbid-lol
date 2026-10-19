@@ -471,7 +471,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                       >
                         <span className="w-7 sm:w-9 flex-shrink-0 text-sm sm:text-lg font-black text-amber-600/70 tabular-nums">#{pos}</span>
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 rounded-md px-2 py-0.5">Open</span>
-                        <span className="flex-1 min-w-0 text-xs sm:text-sm font-semibold text-[#1F2937]/50 truncate">Feature your product here for 30 days</span>
+                        <span className="flex-1 min-w-0 text-xs sm:text-sm font-semibold text-[#1F2937]/50 truncate">Feature your product here for life</span>
                         <span className="flex-shrink-0 text-xs sm:text-sm font-black text-amber-700 group-hover:underline">Claim</span>
                       </button>
                     );

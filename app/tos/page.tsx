@@ -57,8 +57,8 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
       <ul>
         <li>Sponsored listings are optional and shown in a labeled Sponsored section separate from the vote leaderboard. Buying one does not add votes or change your leaderboard rank.</li>
         <li>You choose the amount you pay, from $1 in whole US dollars. Sponsored listings are ranked by amount paid, highest first; on equal amounts the one paid first ranks higher. The top 10 are shown on the homepage and all are shown on the Sponsored page.</li>
-        <li>Your rank can go down when someone pays more, and up when listings above you expire. A change in rank, including leaving the homepage top 10, is not grounds for a refund.</li>
-        <li>A sponsored listing lasts 30 days from when payment is confirmed. Changes in rank do not change that period. Paying again for the same product replaces its current sponsored listing.</li>
+        <li>Your rank can go down when someone pays more, and up when listings above you are removed or replaced. A change in rank, including leaving the homepage top 10, is not grounds for a refund.</li>
+        <li>A sponsored listing is a one-time payment and stays live for the lifetime of the product&rsquo;s listing on RankBid, from when payment is confirmed. It has no end date, but it ends if the listing is removed for breaking these Terms or the payment is refunded or disputed. Paying again for the same product replaces its current sponsored listing.</li>
         <li>Payments are processed by Stripe in US dollars. The price is shown before you pay.</li>
         <li>Once a sponsored listing is active, payment is final and non-refundable, except where required by law.</li>
         <li>You are responsible for any taxes or fees in your jurisdiction.</li>

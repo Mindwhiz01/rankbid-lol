@@ -33,7 +33,7 @@ type Filter = 'active' | 'ended' | 'all';
 /** Filter pills: which statuses each shows, and what an empty list means. */
 const FILTERS: { key: Filter; label: string; statuses: string[] | null; empty: string }[] = [
   { key: 'active', label: 'Active', statuses: ['active'], empty: 'No sponsored listings are live right now.' },
-  { key: 'ended', label: 'Ended', statuses: ['outbid', 'replaced'], empty: 'No ended listings yet. Listings end when their 30 days run out or the product is sponsored again.' },
+  { key: 'ended', label: 'Ended', statuses: ['outbid', 'replaced'], empty: 'No ended listings yet. Listings end when the product is sponsored again.' },
   { key: 'all', label: 'All', statuses: null, empty: 'No sponsored orders yet.' },
 ];
 
@@ -233,8 +233,8 @@ export default function AdminPayments({ title = 'Approve payments' }: { title?: 
                         {listing.amount_pkr ? ` · PKR ${listing.amount_pkr.toLocaleString()}` : ''}
                         {listing.payment_method ? ` · ${listing.payment_method}` : ''}
                       </p>
-                      {listing.payment_status === 'active' && listing.expires_at && (
-                        <p className="text-xs text-gray-600 mt-1">Until {new Date(listing.expires_at).toLocaleDateString()}</p>
+                      {listing.payment_status === 'active' && (
+                        <p className="text-xs text-gray-600 mt-1">{listing.expires_at ? `Until ${new Date(listing.expires_at).toLocaleDateString()}` : 'Lifetime'}</p>
                       )}
                       <p className={`text-xs font-bold mt-2 ${listing.payment_verified_at ? 'text-green-700' : 'text-gray-500'}`}>
                         {listing.payment_verified_at

@@ -116,7 +116,7 @@ async function handleEvent(event: Stripe.Event): Promise<NextResponse> {
         });
       }
 
-      // Activates the bid for 30 days; it takes its rank among the others by price.
+      // Activates the bid for life; it takes its rank among the others by price.
       const before = wasPending ? await getActiveHolders() : [];
       const result = await activatePremiumBid(premiumListingId);
       console.log('✅ Stripe premium payment processed:', premiumListingId, result);

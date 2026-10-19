@@ -84,7 +84,7 @@ export default function RulesPage() {
               'You choose the price (from $1); sponsored products are ranked by price',
               'Pay more than a listing to rank above it; on equal prices whoever paid first stays ahead',
               'The top 10 show on the homepage; every sponsored product is on the Sponsored page',
-              'Each sponsorship lasts 30 days',
+              'Pay once: a sponsorship has no end date',
               'Sponsored products follow the same content rules as everyone else',
             ]} />
           </RuleCard>

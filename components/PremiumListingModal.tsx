@@ -466,7 +466,7 @@ export default function PremiumListingModal({
                   <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
                   <div className="min-w-0">
                     <p className="text-lg sm:text-xl font-black text-[#0B2545]">
-                      ${price} <span className="text-sm font-semibold text-[#1F2937]/55">· 30 days on the {where.toLowerCase()}</span>
+                      ${price} <span className="text-sm font-semibold text-[#1F2937]/55">· lifetime on the {where.toLowerCase()}</span>
                     </p>
                     <p className="text-xs text-[#1F2937]/60 mt-0.5">
                       {passes
@@ -476,11 +476,11 @@ export default function PremiumListingModal({
                   </div>
                 </div>
                 <p className="text-xs text-[#1F2937]/55 mt-2">
-                  Listings are ranked by price for 30 days. Someone paying more later moves you down; equal amounts keep whoever paid first ahead.
+                  One payment, no end date. Listings are ranked by price: someone paying more later moves you down; equal amounts keep whoever paid first ahead.
                 </p>
                 {current && (
                   <p className="text-xs font-bold text-amber-700 mt-1">
-                    This product is #{current.position} at ${current.bidUsd}. Paying again replaces that listing with a new 30-day one.
+                    This product is #{current.position} at ${current.bidUsd}. Paying again replaces that listing with the new amount.
                   </p>
                 )}
               </section>
@@ -620,7 +620,7 @@ export default function PremiumListingModal({
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-[#1F2937]/70">Duration</dt>
-                  <dd className="font-semibold text-[#1F2937]">30 days</dd>
+                  <dd className="font-semibold text-[#1F2937]">Lifetime</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-[#1F2937]/70">Social links shown</dt>

@@ -34,7 +34,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How do sponsored spots work?',
-    a: 'You choose how much to pay, from $1, and sponsored products are ranked by that amount: the highest payment is #1. To rank above a product, pay more than it did; on equal amounts whoever paid first stays ahead. The top 10 appear on the homepage above the vote leaderboard, every sponsored product is listed on the Sponsored page, and all are labeled Sponsored. Each sponsorship lasts 30 days, payment is by card through Stripe in US dollars, and sponsored products follow the same content rules as everyone else.',
+    a: 'You choose how much to pay, from $1, and sponsored products are ranked by that amount: the highest payment is #1. To rank above a product, pay more than it did; on equal amounts whoever paid first stays ahead. The top 10 appear on the homepage above the vote leaderboard, every sponsored product is listed on the Sponsored page, and all are labeled Sponsored. Each sponsorship is a one-time payment with no end date, paid by card through Stripe in US dollars, and sponsored products follow the same content rules as everyone else.',
   },
   {
     q: 'Do sponsored spots change the vote rankings?',

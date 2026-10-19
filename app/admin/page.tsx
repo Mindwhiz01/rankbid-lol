@@ -1901,7 +1901,7 @@ function SponsoredTab({ toast }: { toast: (m: string, t?: Toast['type']) => void
                         {o.paidAt ? new Date(o.paidAt).toLocaleString() : <span className="text-gray-400">Ordered {timeAgo(o.createdAt)}</span>}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                        {o.status === 'active' && o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : '—'}
+                        {o.status === 'active' ? (o.expiresAt ? new Date(o.expiresAt).toLocaleDateString() : 'Lifetime') : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {o.stripeUrl && (

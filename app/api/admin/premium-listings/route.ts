@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest) {
       ...(status === 'rejected' ? { payment_status: 'rejected' } : {}),
     });
 
-    // Approval activates the bid for 30 days; it takes its rank among the others by price.
+    // Approval activates the bid for life; it takes its rank among the others by price.
     const result = status === 'approved' ? await activatePremiumBid(premiumListingId) : { status: 'rejected' };
 
     return NextResponse.json({

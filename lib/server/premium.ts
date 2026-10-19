@@ -29,14 +29,14 @@ export interface PremiumHolder {
 }
 
 /**
- * Every live sponsored listing, ranked (expired ones are ignored).
+ * Every live sponsored listing, ranked. No end date (expires_at null) means lifetime; older dated ones drop off when their date passes.
  * revalidate: cache the read for that many seconds (public pages only; payment flows read fresh).
  */
 export async function getActiveHolders(revalidate?: number): Promise<PremiumHolder[]> {
   // A cached read rounds "now" down to the minute so the URL (the cache key) stays the same.
   const now = revalidate ? new Date(Math.floor(Date.now() / 60_000) * 60_000) : new Date();
   const res = await fetch(
-    sbUrl(`premium_listings?payment_status=eq.active&expires_at=gt.${encodeURIComponent(now.toISOString())}&order=bid_usd.desc,activated_at.asc&select=*`),
+    sbUrl(`premium_listings?payment_status=eq.active&or=(expires_at.is.null,expires_at.gt.${encodeURIComponent(now.toISOString())})&order=bid_usd.desc,activated_at.asc&select=*`),
     revalidate ? { headers: sbHeaders(), next: { revalidate } } : { headers: sbHeaders(), cache: 'no-store' }
   );
   if (!res.ok) {
@@ -74,7 +74,7 @@ export interface ActivationResult {
   required?: number;
 }
 
-/** Activates a paid bid for 30 days and returns its rank. Safe to call more than once. */
+/** Activates a paid bid for life and returns its rank. Safe to call more than once. */
 export async function activatePremiumBid(premiumListingId: string): Promise<ActivationResult> {
   const res = await fetch(sbUrl('rpc/activate_premium_bid'), {
     method: 'POST',

@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Activates the bid for 30 days; it takes its rank among the others by price.
+        // Activates the bid for life; it takes its rank among the others by price.
         const result = await activatePremiumBid(premiumListingId);
         console.log('✅ Premium payment processed:', premiumListingId, result);
 

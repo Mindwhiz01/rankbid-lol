@@ -225,7 +225,7 @@ function Actions() {
 const PERKS = [
   { icon: PremiumIcons.Shield, text: 'Ranked by price. A higher bid moves you down, and we email you if you drop off the homepage top 10.' },
   { icon: PremiumIcons.Trophy, text: 'The homepage shows the top 10. Every sponsored listing is on the sponsored page.' },
-  { icon: PremiumIcons.Calendar, text: 'After 30 days the listing ends. Your product stays on the free leaderboard.' },
+  { icon: PremiumIcons.Calendar, text: 'One payment, no end date. Your sponsored listing stays live for life.' },
   { icon: PremiumIcons.Bolt, text: 'A receipt is on its way to your email. Payments for active listings are not refundable.' },
 ];
 
@@ -278,7 +278,7 @@ function Live({ bid }: { bid: BidStatus }) {
       <div className="px-6 sm:px-10 pt-8 pb-8 space-y-8">
         <dl className="grid grid-cols-3 gap-3">
           <Stat label="Paid"><span className="text-emerald-600">{usd(bid.bidUsd)}</span></Stat>
-          <Stat label="Runs until">{bid.expiresAt ? day(bid.expiresAt) : '30 days'}</Stat>
+          <Stat label={bid.expiresAt ? 'Runs until' : 'Duration'}>{bid.expiresAt ? day(bid.expiresAt) : 'Lifetime'}</Stat>
           <Stat label="Status">
             <span className="inline-flex items-center gap-1.5 text-emerald-600">
               <span className="relative flex w-2 h-2">
