@@ -450,6 +450,7 @@ export async function GET(req: NextRequest) {
       isPremium: true,
       premiumPosition: holder.position,
       premiumBidUsd: holder.bidUsd,
+      premiumActivatedAt: holder.activatedAt,
       founderName: holder.founderName,
       founderWebsite: holder.founderWebsite,
       founderTwitter: holder.founderTwitter,

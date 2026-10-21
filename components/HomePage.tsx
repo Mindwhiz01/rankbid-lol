@@ -31,6 +31,10 @@ import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
+import TodayRankingCard, { type TodayRankingItem } from '@/components/TodayRankingCard';
+
+/** Rows in each "Today's ranking" side card. */
+const TODAY_CARD_SIZE = 4;
 
 interface Listing {
   id: string;
@@ -48,6 +52,7 @@ interface Listing {
   isPremium: boolean;
   premiumPosition?: number | null;
   premiumBidUsd?: number | null;
+  premiumActivatedAt?: string | null;
   founderName?: string | null;
   founderWebsite?: string | null;
   founderTwitter?: string | null;
@@ -156,6 +161,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
   const [listings, setListings] = useState<Listing[]>(() => initialListings.slice(0, PAGE_SIZE));
   const [premiumListings, setPremiumListings] = useState<Listing[]>([]);
+  const [todayVoted, setTodayVoted] = useState<Listing[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTimeFilter] = useState<'alltime' | 'today'>('alltime');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -398,6 +404,15 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     router.push(`/sponsor?rank=${position}`);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/listings/submit?sort=dayVotes&activeToday=1&limit=${TODAY_CARD_SIZE}`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled && data) setTodayVoted(data.listings || []); })
+      .catch(() => { if (!cancelled) setTodayVoted(prev => prev ?? []); });
+    return () => { cancelled = true; };
+  }, [listings]);
+
   // Sponsored spots change whenever someone's payment lands: keep them fresh without a reload.
   useEffect(() => {
     if (isSponsoredPreview()) return;
@@ -422,6 +437,20 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   // #1-#3 always show (on the podium), then one open rank after the last listing (up to #10).
   const sponsoredCount = premiumListings.length;
   const visibleSpots = Math.min(HOME_SPONSORED, Math.max(3, sponsoredCount + 1));
+
+  // Side cards. Sponsored: spots bought since midnight (the viewer's time), highest price first.
+  // Rankings: the day's most-voted, refetched whenever the main list reloads (after votes, page changes).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const sponsoredToday: TodayRankingItem[] = premiumListings
+    .filter(l => l.premiumActivatedAt && new Date(l.premiumActivatedAt) >= startOfToday)
+    .sort((a, b) => Number(b.premiumBidUsd || 0) - Number(a.premiumBidUsd || 0))
+    .slice(0, TODAY_CARD_SIZE)
+    .map(l => ({ id: l.id, title: l.title, url: l.url, imageUrl: l.imageUrl, value: `$${Number(l.premiumBidUsd || 0).toLocaleString('en-US')}` }));
+  const votedToday: TodayRankingItem[] = (todayVoted || []).map(l => ({
+    id: l.id, title: l.title, url: l.url, imageUrl: l.imageUrl,
+    value: `${(l.dayVotes || 0).toLocaleString('en-US')} ${l.dayVotes === 1 ? 'vote' : 'votes'}`,
+  }));
 
   const totalVotes = allListings.reduce((n, l) => n + (l.totalVotes || 0), 0);
 
@@ -466,9 +495,10 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
           <div style={slideDelay(200)} className="slide-up relative max-w-5xl mx-auto px-4 sm:px-6 mt-10 sm:mt-12 pb-14 sm:pb-20">
             <LivePodium onClaim={openClaim} />
 
-            {/* SPONSORED #4-#10: the podium shows #1-#3; the rest are on /sponsored */}
-            {visibleSpots > 3 && (
-              <div className="mt-8 sm:mt-10">
+            {/* SPONSORED #4-#10 (the podium shows #1-#3; the rest are on /sponsored), with today's sponsors beside them */}
+            <div className="mt-8 sm:mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+            {visibleSpots > 3 ? (
+              <div>
                 <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
                   <div className="flex items-center gap-2 text-amber-500">
                     <Icons.Star />
@@ -500,7 +530,14 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                   })}
                 </div>
               </div>
-            )}
+            ) : <div className="hidden lg:block" />}
+              <TodayRankingCard
+                theme="amber"
+                items={sponsoredToday}
+                seeAllHref="/sponsored"
+                empty={<>No new sponsors yet today. <Link href="/sponsor" className="font-bold text-amber-700 hover:underline">Be the first →</Link></>}
+              />
+            </div>
           </div>
         </section>
 
@@ -640,6 +677,9 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
 
             {/* Category filter moved to header navigation */}
 
+            {/* The rankings, with today's most-voted beside them (below them on smaller screens) */}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+            <div className="min-w-0">
             {loading && listings.length === 0 ? (
               <div className="text-center py-8 sm:py-10 md:py-12">
                 <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
@@ -730,6 +770,17 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 </a>
               </div>
             )}
+            </div>
+              <div className="lg:sticky lg:top-28">
+                <TodayRankingCard
+                  theme="navy"
+                  items={votedToday}
+                  loading={todayVoted === null}
+                  seeAllHref="/today"
+                  empty="No votes yet today. Vote for a product to start today's race."
+                />
+              </div>
+            </div>
           </div>
         </section>
 
