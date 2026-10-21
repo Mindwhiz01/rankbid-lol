@@ -66,10 +66,19 @@ export default function RankingRow({
 
   const platform = listing.platform || 'website';
   const badge = rankBadge[rank] ?? 'bg-[#0F3460] text-white shadow-[#0F3460]/20';
+  // Taking this rank means passing its votes, so it takes one more than it has.
+  const votesToClaim = votes + extraVotes + 1;
 
   return (
     <>
       <div className="spotlight-light group relative flex items-center gap-2 sm:gap-4 p-2.5 sm:p-3.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-[#0F3460]/25 transition-all duration-200">
+        <span
+          aria-hidden="true"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap rounded-full bg-[#0F3460] px-3 py-0.5 text-[11px] sm:text-xs font-black text-white shadow-md opacity-0 pointer-events-none translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200"
+        >
+          {votesToClaim.toLocaleString('en-US')} {votesToClaim === 1 ? 'vote' : 'votes'} to claim this rank
+        </span>
+
         {/* Rank */}
         <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-xs sm:text-sm font-black shadow-md ${badge}`}>
           #{rank}
