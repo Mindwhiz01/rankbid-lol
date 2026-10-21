@@ -20,11 +20,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please sign in to submit', listings: [] }, { status: 401 });
     }
 
-    if (
-      !(await rateLimit(`submit-user:${user.id}`, 5, 60 * 60)) ||
-      !(await rateLimit(`submit-user-day:${user.id}`, 20, 24 * 60 * 60)) ||
-      !(await rateLimit(`submit-ip:${ipHash(req)}`, 10, 60 * 60))
-    ) {
+    // Attempts per network, so the link checks below can't be hammered. Rejected attempts (duplicates, bad
+    // links) count here but not toward the per-account limits, which only count listings that get saved.
+    if (!(await rateLimit(`submit-ip:${ipHash(req)}`, 30, 60 * 60))) {
       return NextResponse.json(
         { error: 'Too many submissions. Please try again later.', listings: [] },
         { status: 429 }
@@ -240,6 +238,17 @@ export async function POST(req: NextRequest) {
         const urlObj = new URL(normalizedUrl);
         imageUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=256`;
       }
+    }
+
+    // Per-account limits, checked once the submission has passed every check, so only saved listings count.
+    if (
+      !(await rateLimit(`submit-saved:${user.id}`, 5, 60 * 60)) ||
+      !(await rateLimit(`submit-saved-day:${user.id}`, 20, 24 * 60 * 60))
+    ) {
+      return NextResponse.json(
+        { error: 'You can submit up to 5 products an hour and 20 a day. Please try again later.', listings: [] },
+        { status: 429 }
+      );
     }
 
     const insertResponse = await fetch(`${supabaseUrl}/rest/v1/listings`, {
