@@ -8,6 +8,7 @@ import { usdToCents } from '@/lib/server/stripe';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { sendPremiumOutbidAlert, sendPremiumReceipt, sendPremiumRefundNotice } from '@/lib/email';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
+import { badgeZip } from '@/lib/server/badges';
 
 export type FulfillResult =
   | { ok: true; premiumListingId: string; result?: unknown; message?: string }
@@ -101,7 +102,13 @@ async function notifyLadderChange(
 
   const sends: Promise<unknown>[] = [];
   if (buyerEmail && result.status === 'active') {
-    sends.push(sendPremiumReceipt({ ...mine, to: buyerEmail, expiresAt: afterById.get(premium.id)?.expiresAt }));
+    // A badge that fails to render must not hold back the receipt.
+    const badges = position > 0
+      ? await badgeZip(premium.listing_id, position)
+          .then(zip => ({ filename: `rankbid-badges-${position}.zip`, content: Buffer.from(zip) }))
+          .catch(err => { console.error('Badge zip failed:', err); return undefined; })
+      : undefined;
+    sends.push(sendPremiumReceipt({ ...mine, to: buyerEmail, expiresAt: afterById.get(premium.id)?.expiresAt, badges }));
   } else if (buyerEmail && result.status === 'needs_refund') {
     sends.push(sendPremiumRefundNotice({ ...mine, to: buyerEmail, requiredUsd: result.required }));
   }

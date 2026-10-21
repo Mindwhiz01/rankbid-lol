@@ -13,6 +13,8 @@ export type SubmissionEmailListing = {
 
 export type EmailResult = { sent: true; id: string; from: string; to: string } | { sent: false; error: string };
 
+export type EmailAttachment = { filename: string; content: Buffer };
+
 // Sender on our own domain (must be verified in Resend). If Resend rejects it, fall back to
 // Resend's shared sender, which can only deliver to the Resend account owner's address.
 const FROM = process.env.NOTIFICATION_FROM || 'RankBid <noreply@rankbid.click>';
@@ -76,7 +78,7 @@ function submissionHtml(listing: SubmissionEmailListing): string {
 }
 
 /** Sends one email through Resend, falling back to the shared sender. Never throws. */
-async function send(to: string, subject: string, html: string, label: string): Promise<EmailResult> {
+async function send(to: string, subject: string, html: string, label: string, attachments?: EmailAttachment[]): Promise<EmailResult> {
   try {
     if (!process.env.RESEND_API_KEY) {
       console.warn(`RESEND_API_KEY not configured, skipping ${label} email`);
@@ -84,7 +86,7 @@ async function send(to: string, subject: string, html: string, label: string): P
     }
 
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const message = { to, subject, html };
+    const message = { to, subject, html, ...(attachments?.length ? { attachments } : {}) };
 
     // Resend reports failures in `error` instead of throwing.
     let from = FROM;
@@ -166,14 +168,29 @@ export type PremiumEmail = { to: string; productTitle: string; listingId: string
 
 const usd = (n: number) => `$${n.toFixed(2).replace(/\.00$/, '')}`;
 
-/** Receipt once the webhook has activated a paid bid; `position` is its rank at that moment. */
-export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string | null }): Promise<EmailResult> {
+/**
+ * Congratulations and receipt once the webhook has activated a paid bid; `position` is its rank at that moment.
+ * `badges` is the badge zip for that rank (lib/server/badges.tsx); without it the email still goes out.
+ */
+export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string | null; badges?: EmailAttachment }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);
   const until = e.expiresAt ? ` until ${new Date(e.expiresAt).toUTCString().slice(5, 16)}` : ' with no end date';
+  const badges = e.badges
+    ? `<p>Your <strong>#${e.position}</strong> badges are attached (<strong>${escapeHtml(e.badges.filename)}</strong>): light and dark versions, plus a ready-to-paste snippet for your website.</p>`
+    : '';
   const body = `
-    <p>Payment received: <strong>${usd(e.bidUsd)}</strong>. <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong>.</p>
+    <p>Congratulations! <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong> on RankBid.</p>
+    <p>Payment received: <strong>${usd(e.bidUsd)}</strong>.</p>
+    ${badges}
     <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you if you drop off the homepage top 10. Payments for active listings are not refundable.</p>`;
-  return send(e.to, `You're #${e.position} on RankBid`, premiumHtml('Your sponsored listing is live', body, { href: SITE_URL, label: 'See it on RankBid' }), `Premium receipt (#${e.position})`);
+  const product = `${SITE_URL}/product/${encodeURIComponent(e.listingId)}`;
+  return send(
+    e.to,
+    `🎉 Congratulations, you're #${e.position} on RankBid`,
+    premiumHtml(`You're #${e.position} on RankBid`, body, { href: product, label: 'See your listing' }),
+    `Premium receipt (#${e.position})`,
+    e.badges ? [e.badges] : undefined,
+  );
 }
 
 /** The bid was paid but couldn't be activated (below the minimum). Admin refunds it. */
