@@ -9,9 +9,8 @@ export type VoteSnapshot = { id: string; title: string; userId: string | null; t
 
 /** At most this many passed listings are emailed per vote (a vote at a big tie can pass many). */
 const MAX_OVERTAKEN = 10;
-/** Each listing's owner hears about new votes at most once an hour, and about being passed once every 6 hours. */
+/** Each listing's owner hears about new votes at most once an hour. Being passed is emailed every time. */
 const VOTE_MAIL_WINDOW = 60 * 60;
-const OVERTAKEN_MAIL_WINDOW = 6 * 60 * 60;
 
 export async function snapshotListing(listingId: string): Promise<VoteSnapshot | null> {
   const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}&select=id,title,user_id,total_votes,updated_at`), {
@@ -72,7 +71,6 @@ export async function notifyVote(before: VoteSnapshot, totalVotes: number, voter
     for (const [i, p] of passed.entries()) {
       const o = p.user_id ? owners.get(p.user_id) : undefined;
       if (!o || p.user_id === before.userId) continue;
-      if (!(await rateLimit(`overtaken-mail:${p.id}`, 1, OVERTAKEN_MAIL_WINDOW))) continue;
       sends.push(sendOvertakenEmail({
         to: o.email,
         listingId: p.id,

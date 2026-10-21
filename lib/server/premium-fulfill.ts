@@ -7,7 +7,6 @@ import { activatePremiumBid, getActiveHolders, getPremiumListing, updatePremiumL
 import { usdToCents } from '@/lib/server/stripe';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { sendPremiumOutbidAlert, sendPremiumReceipt, sendPremiumRefundNotice } from '@/lib/email';
-import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import { badgeZip } from '@/lib/server/badges';
 
 export type FulfillResult =
@@ -80,7 +79,7 @@ export async function claimOnce(id: string, type = 'internal'): Promise<boolean>
   return rows.length > 0;
 }
 
-/** Receipt or refund notice for the buyer, and alerts for holders the bid pushed out of the homepage top 10. */
+/** Receipt or refund notice for the buyer, and alerts for every holder the bid moved down. */
 async function notifyLadderChange(
   premium: { id: string; listing_id: string; position: number | null; bid_usd?: number | string | null; payment_amount?: number | string | null },
   buyerEmail: string | null,
@@ -89,10 +88,9 @@ async function notifyLadderChange(
 ): Promise<void> {
   const now = result.status === 'active' ? await getActiveHolders() : [];
   const afterById = new Map(now.map(h => [h.id, h]));
-  // Holders that were on the homepage and no longer are; the buyer's own previous listing ("replaced") isn't an outbid.
-  // Moving down within the top 10 (or below it) is not emailed.
+  // Every holder the new bid moved down, at any rank; the buyer's own previous listing ("replaced") isn't an outbid.
   const pushed = before.filter(h =>
-    h.listingId !== premium.listing_id && h.position <= HOME_SPONSORED && (afterById.get(h.id)?.position ?? 0) > HOME_SPONSORED
+    h.listingId !== premium.listing_id && (afterById.get(h.id)?.position ?? 0) > h.position
   );
 
   const titles = await listingTitles([premium.listing_id, ...pushed.map(h => h.listingId)]);

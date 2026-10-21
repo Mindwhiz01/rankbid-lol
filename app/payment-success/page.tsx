@@ -223,7 +223,7 @@ function Actions() {
 }
 
 const PERKS = [
-  { icon: PremiumIcons.Shield, text: 'Ranked by price. A higher bid moves you down, and we email you if you drop off the homepage top 10.' },
+  { icon: PremiumIcons.Shield, text: 'Ranked by price. A higher bid moves you down, and we email you every time someone outbids you.' },
   { icon: PremiumIcons.Trophy, text: 'The homepage shows the top 10. Every sponsored listing is on the sponsored page.' },
   { icon: PremiumIcons.Calendar, text: 'One payment, no end date. Your sponsored listing stays live for life.' },
   { icon: PremiumIcons.Bolt, text: 'A receipt is on its way to your email. Payments for active listings are not refundable.' },

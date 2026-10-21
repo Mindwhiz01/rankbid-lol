@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site';
+import { HOME_SPONSORED } from '@/lib/premiumSpots';
 
 export type SubmissionEmailListing = {
   id: string;
@@ -182,7 +183,7 @@ export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string 
     <p>Congratulations! <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong> on RankBid.</p>
     <p>Payment received: <strong>${usd(e.bidUsd)}</strong>.</p>
     ${badges}
-    <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you if you drop off the homepage top 10. Payments for active listings are not refundable.</p>`;
+    <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you every time someone outbids you. Payments for active listings are not refundable.</p>`;
   const product = `${SITE_URL}/product/${encodeURIComponent(e.listingId)}`;
   return send(
     e.to,
@@ -250,16 +251,25 @@ export async function sendPremiumRefundNotice(e: PremiumEmail & { requiredUsd?: 
   return send(e.to, `Your RankBid payment will be refunded`, premiumHtml('Your sponsored listing could not start', body, { href: raise, label: 'Bid again' }), 'Premium refund notice');
 }
 
-/** A higher bid pushed a holder out of the homepage top 10 (newPosition is its new rank). */
+/** A higher bid moved a holder down (newPosition is its new rank); says whether it also left the homepage top 10. */
 export async function sendPremiumOutbidAlert(e: PremiumEmail & { newPosition: number | null }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);
   const where = e.newPosition ? `moved from #${e.position} to <strong>#${e.newPosition}</strong>` : `moved down from #${e.position}`;
+  const leftHome = e.position <= HOME_SPONSORED && (e.newPosition == null || e.newPosition > HOME_SPONSORED);
+  const offHome = e.newPosition != null && e.newPosition > HOME_SPONSORED;
+  const status = leftHome
+    ? ' and is no longer on the RankBid homepage'
+    : offHome ? '' : ', and it is still on the RankBid homepage';
+  const next = offHome
+    ? `It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> for good. Raise your bid to get back into the top 10.`
+    : `Raise your bid to take #${e.position} back.`;
   const body = `
-    <p>Someone outbid you. <strong>${title}</strong> ${where} and is no longer on the RankBid homepage.</p>
-    <p>It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> for good. Raise your bid to get back into the top 10.</p>`;
+    <p>Someone outbid you. <strong>${title}</strong> ${where}${status}.</p>
+    <p>${next}</p>`;
   const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
   const subject = e.newPosition ? `You've been outbid: now #${e.newPosition} on RankBid` : `You've been outbid on RankBid`;
-  return send(e.to, subject, premiumHtml('You dropped off the homepage', body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
+  const heading = leftHome ? 'You dropped off the homepage' : 'Someone outbid you';
+  return send(e.to, subject, premiumHtml(heading, body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
 }
 
 /** Password reset link (valid for an hour, single use). */
