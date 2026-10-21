@@ -193,6 +193,52 @@ export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string 
   );
 }
 
+/** Card layout for the vote-submission emails; same card as the sponsored ones, without the sponsor terms. */
+function voteHtml(heading: string, body: string, button: { href: string; label: string }): string {
+  return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">${escapeHtml(heading)}</h2>
+            ${body}
+            <a href="${button.href}" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">${escapeHtml(button.label)}</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              You're getting this because you submitted this product to RankBid. Questions? Email ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+}
+
+const productLink = (listingId: string) => `${SITE_URL}/product/${encodeURIComponent(listingId)}`;
+const votes = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'vote' : 'votes'}`;
+
+/** Confirms a free submission to the person who submitted it. */
+export async function sendSubmissionConfirmation(e: { to: string; listingId: string; productTitle: string }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const body = `
+    <p>Thanks for submitting <strong>${title}</strong>. It's live on RankBid now.</p>
+    <p>Rankings are decided by votes: the more votes your product gets, the higher it climbs. Share your product page with your users and followers to start collecting votes.</p>`;
+  return send(e.to, `✅ ${e.productTitle} is live on RankBid`, voteHtml('Your submission is live', body, { href: productLink(e.listingId), label: 'View and share your product' }), 'Submission confirmation');
+}
+
+/** A listing got a new vote (throttled per listing by the caller). */
+export async function sendNewVoteEmail(e: { to: string; listingId: string; productTitle: string; totalVotes: number; rank: number }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const body = `
+    <p><strong>${title}</strong> just got a new vote! It now has <strong>${votes(e.totalVotes)}</strong> and is ranked <strong>#${e.rank}</strong>.</p>
+    <p>Keep sharing your product page to climb higher.</p>`;
+  return send(e.to, `👍 New vote for ${e.productTitle}: you're #${e.rank}`, voteHtml('You got a new vote', body, { href: productLink(e.listingId), label: 'See your ranking' }), `New vote (#${e.rank})`);
+}
+
+/** Another listing passed this one in the rankings. */
+export async function sendOvertakenEmail(e: { to: string; listingId: string; productTitle: string; newRank: number; byTitle: string; votesNeeded: number }): Promise<EmailResult> {
+  const title = escapeHtml(e.productTitle);
+  const body = `
+    <p><strong>${escapeHtml(e.byTitle)}</strong> just moved above <strong>${title}</strong>. You're now ranked <strong>#${e.newRank}</strong>.</p>
+    <p>Get <strong>${votes(Math.max(1, e.votesNeeded))}</strong> more to take your spot back. Share your product page and ask your users to vote.</p>`;
+  return send(e.to, `⚠️ You've been passed: ${e.productTitle} is now #${e.newRank}`, voteHtml('Someone moved above you', body, { href: productLink(e.listingId), label: 'Get more votes' }), `Overtaken (#${e.newRank})`);
+}
+
 /** The bid was paid but couldn't be activated (below the minimum). Admin refunds it. */
 export async function sendPremiumRefundNotice(e: PremiumEmail & { requiredUsd?: number }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);

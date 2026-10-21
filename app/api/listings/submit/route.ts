@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractMetadata } from '@/lib/metadata';
 import { query } from '@/lib/db';
 import { extractSocialHandle, formatSocialMediaUrl, isSocialMediaUrl } from '@/lib/social-utils';
-import { sendNewSubmissionEmail } from '@/lib/email';
+import { sendNewSubmissionEmail, sendSubmissionConfirmation } from '@/lib/email';
 import { getActiveHolders, type PremiumHolder } from '@/lib/server/premium';
 import { CATEGORIES, LEGACY_CATEGORIES } from '@/lib/categories';
 import { addCustomCategory, getCustomCategories } from '@/lib/server/custom-categories';
@@ -276,15 +276,18 @@ export async function POST(req: NextRequest) {
     const listing = await insertResponse.json();
     const responseData = listing[0] || listing;
 
-    await sendNewSubmissionEmail({
-      id: responseData.id,
-      title: metaTitle,
-      description: metaDescription,
-      category: category || 'Other',
-      platform: metaPlatform,
-      url: normalizedUrl,
-      imageUrl: imageUrl || undefined,
-    });
+    await Promise.all([
+      sendNewSubmissionEmail({
+        id: responseData.id,
+        title: metaTitle,
+        description: metaDescription,
+        category: category || 'Other',
+        platform: metaPlatform,
+        url: normalizedUrl,
+        imageUrl: imageUrl || undefined,
+      }),
+      user.email ? sendSubmissionConfirmation({ to: user.email, listingId: responseData.id, productTitle: metaTitle }) : null,
+    ]);
 
     return NextResponse.json(
       {

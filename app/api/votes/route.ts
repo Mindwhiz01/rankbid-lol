@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { getListing, recordVote, removeVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { notifyVote, snapshotListing } from '@/lib/server/vote-notify';
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 
@@ -45,10 +46,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Already voted', voted: true }, { status: 400 });
     }
 
+    const before = await snapshotListing(listing.id);
     const result = await recordVote(listing.id, `user:${user.id}`);
     if (result.status === 'duplicate') {
       return NextResponse.json({ error: 'Already voted', voted: true }, { status: 400 });
     }
+    if (before) after(() => notifyVote(before, result.totalVotes, `user:${user.id}`));
 
     const userVoteRes = await fetch(sbUrl('user_votes'), {
       method: 'POST',

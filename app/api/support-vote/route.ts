@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { getListing, recordVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { notifyVote, snapshotListing } from '@/lib/server/vote-notify';
 import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { canonicalEmail, domainAcceptsMail, isDisposableEmail } from '@/lib/server/guest-email';
 import { verifyTurnstile } from '@/lib/server/turnstile';
@@ -61,10 +62,13 @@ export async function POST(req: NextRequest) {
     if (!listing) return NextResponse.json({ error: 'Product not found' }, { status: 404 });
 
     // One vote per inbox: "jo.doe+2@gmail.com" and "jodoe@gmail.com" are the same voter.
-    const result = await recordVote(listing.id, `email:${canonicalEmail(email)}`);
+    const voter = `email:${canonicalEmail(email)}`;
+    const before = await snapshotListing(listing.id);
+    const result = await recordVote(listing.id, voter);
     if (result.status === 'duplicate') {
       return NextResponse.json({ error: 'This email has already voted for this product', alreadyVoted: true }, { status: 409 });
     }
+    if (before) after(() => notifyVote(before, result.totalVotes, voter));
 
     // Supporter details are best-effort: the vote above already counts even if this table is missing.
     const supporterRes = await fetch(sbUrl('supporters'), {
