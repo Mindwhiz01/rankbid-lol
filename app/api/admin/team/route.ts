@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -6,8 +6,6 @@ import {
 } from '@/lib/server/admin';
 import { getSessionUser } from '@/lib/server/session';
 import { sendAdminInviteEmail } from '@/lib/email';
-
-const prisma = new PrismaClient();
 
 // GET: the admin team. Any admin can see it; only the owner can change it (canManage).
 export async function GET(req: NextRequest) {
