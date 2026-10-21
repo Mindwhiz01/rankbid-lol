@@ -534,7 +534,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
               <TodayRankingCard
                 theme="amber"
                 items={sponsoredToday}
-                seeAllHref="/sponsored"
+                seeAllHref="/sponsored?today=1"
                 empty={<>No new sponsors yet today. <Link href="/sponsor" className="font-bold text-amber-700 hover:underline">Be the first →</Link></>}
               />
             </div>

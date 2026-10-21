@@ -10,11 +10,19 @@ import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
 
-type Ranked = SponsoredListing & { premiumPosition?: number | null };
+type Ranked = SponsoredListing & { premiumPosition?: number | null; premiumActivatedAt?: string | null };
 
-/** Every live sponsored listing, ranked by price. The homepage shows only the top HOME_SPONSORED. */
+/**
+ * Every live sponsored listing, ranked by price. The homepage shows only the top HOME_SPONSORED.
+ * /sponsored?today=1 (the homepage's "Today's ranking" card) shows only the spots bought since midnight.
+ */
 export default function SponsoredPage() {
   const [listings, setListings] = useState<Ranked[] | null>(null);
+  const [todayOnly, setTodayOnly] = useState(false);
+
+  useEffect(() => {
+    setTodayOnly(new URLSearchParams(window.location.search).get('today') === '1');
+  }, []);
 
   useEffect(() => {
     if (isSponsoredPreview()) {
@@ -32,23 +40,56 @@ export default function SponsoredPage() {
   const rest = ranked.slice(HOME_SPONSORED);
   const paged = usePaged(rest);
 
+  // Ranked by price already, so today's spots keep that order (each row still shows its overall rank).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const today = ranked.filter(l => l.premiumActivatedAt && new Date(l.premiumActivatedAt) >= startOfToday);
+  const pagedToday = usePaged(today);
+
+  const tab = (active: boolean) =>
+    `px-4 py-2 rounded-xl text-sm font-black transition-colors ${active ? 'bg-[#0F3460] text-white' : 'bg-white border border-gray-200 text-[#1F2937]/70 hover:text-[#0F3460]'}`;
+
   return (
     <>
       <Header />
       <div className="bg-white text-[#1F2937]">
         <PageHero
-          title="Sponsored Products"
-          subtitle={`Ranked by price: whoever pays more sits higher. The top ${HOME_SPONSORED} also appear on the homepage. Sponsorship starts at $${MIN_BID_USD}: pay once and it stays for life.`}
+          title={todayOnly ? "Today's Sponsors" : 'Sponsored Products'}
+          subtitle={todayOnly
+            ? 'Products sponsored since midnight, ranked by price. The number on each row is its rank among all sponsored products.'
+            : `Ranked by price: whoever pays more sits higher. The top ${HOME_SPONSORED} also appear on the homepage. Sponsorship starts at $${MIN_BID_USD}: pay once and it stays for life.`}
         />
 
         <section className="bg-gray-50 py-6 sm:py-10 md:py-12 min-h-[40vh]">
           <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 space-y-8">
+            <div className="flex gap-2">
+              <Link href="/sponsored?today=1" onClick={() => setTodayOnly(true)} className={tab(todayOnly)}>Today</Link>
+              <Link href="/sponsored" onClick={() => setTodayOnly(false)} className={tab(!todayOnly)}>All sponsored</Link>
+            </div>
+
             {listings === null ? (
               <div className="space-y-2.5">
                 {Array.from({ length: 4 }, (_, i) => (
                   <div key={i} className="h-20 rounded-2xl bg-white border border-gray-100 animate-pulse" />
                 ))}
               </div>
+            ) : todayOnly ? (
+              today.length === 0 ? (
+                <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl">
+                  <p className="text-lg font-black text-[#1F2937]">No new sponsors yet today</p>
+                  <p className="text-sm text-[#1F2937]/60 mt-1">Be the first today: sponsor your product from ${MIN_BID_USD}.</p>
+                </div>
+              ) : (
+                <div id={pagedToday.anchorId} className="scroll-mt-24">
+                  <h2 className="text-base sm:text-lg font-black text-[#1F2937] mb-3">
+                    Sponsored today <span className="text-xs font-bold text-[#1F2937]/40">{today.length}</span>
+                  </h2>
+                  <div className="space-y-2 sm:space-y-2.5">
+                    {pagedToday.pageItems.map(l => <SponsoredRow key={l.id} listing={l} />)}
+                  </div>
+                  <Pagination currentPage={pagedToday.page} totalPages={pagedToday.totalPages} onPageChange={pagedToday.goTo} />
+                </div>
+              )
             ) : ranked.length === 0 ? (
               <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl">
                 <p className="text-lg font-black text-[#1F2937]">No sponsored products yet</p>
