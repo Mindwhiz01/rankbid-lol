@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getCategoryLabel } from '@/lib/categories';
 import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
+import { OUTBID_STEP_USD } from '@/lib/premiumSpots';
 import FounderLinks, { type FounderSocials } from '@/components/FounderLinks';
 
 export interface SponsoredListing extends FounderSocials {
@@ -64,9 +65,19 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
   const host = hostOf(listing.url);
   const ago = timeAgo(listing.createdAt);
   const meta = 'text-[#1F2937]/50 font-semibold';
+  // Taking this rank means beating its holder by the outbid step; the pill links to checkout aimed at this rank.
+  const claimUsd = listing.premiumBidUsd != null ? Math.floor(Number(listing.premiumBidUsd)) + OUTBID_STEP_USD : null;
 
   return (
     <div className="group relative flex items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-amber-50/70 border border-amber-200/70 hover:bg-amber-50 hover:border-amber-300 hover:shadow-md transition-all duration-200">
+      {claimUsd != null && (
+        <Link
+          href={`/sponsor?rank=${position}`}
+          className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap rounded-full bg-amber-600 px-3 py-0.5 text-[11px] sm:text-xs font-black text-white shadow-md opacity-0 pointer-events-none translate-y-1 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 focus-visible:opacity-100 focus-visible:pointer-events-auto hover:bg-amber-700 transition-all duration-200"
+        >
+          claim this rank for ${claimUsd.toLocaleString('en-US')}
+        </Link>
+      )}
       <span className="w-7 sm:w-9 flex-shrink-0 pt-4 sm:pt-0 text-sm sm:text-lg font-black text-amber-600 tabular-nums">#{position}</span>
 
       <img
