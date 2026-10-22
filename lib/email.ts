@@ -283,6 +283,24 @@ export async function sendPremiumOutbidAlert(e: PremiumEmail & { newPosition: nu
   return send(e.to, subject, premiumHtml(heading, body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
 }
 
+/** Confirms a coming-soon waitlist signup to the person who joined. */
+export async function sendWaitlistWelcomeEmail(e: { to: string }): Promise<EmailResult> {
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">You're on the RankBid waitlist 🎉</h2>
+            <p>Thanks for joining! We've saved your spot with <strong>${escapeHtml(e.to)}</strong>.</p>
+            <p>RankBid is where the community discovers and votes on the best products. We'll email you as soon as we launch so you can be among the first to submit your product and start collecting votes.</p>
+            <a href="${SITE_URL}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Visit RankBid</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              You're getting this because this email joined the RankBid waitlist. Didn't sign up? Ignore this email or contact ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+  return send(e.to, "🎉 You're on the RankBid waitlist", html, 'Waitlist welcome');
+}
+
 /** Password reset link (valid for an hour, single use). */
 export async function sendPasswordResetEmail(e: { to: string; name?: string | null; resetUrl: string }): Promise<EmailResult> {
   const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';

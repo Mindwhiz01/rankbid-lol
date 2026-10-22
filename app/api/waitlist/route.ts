@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import type { NextRequest } from 'next/server';
+import { sendWaitlistWelcomeEmail } from '@/lib/email';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { SITE_URL } from '@/lib/site';
 
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Confirm to the person who joined. Never throws, so a failed email doesn't fail the signup.
+    await sendWaitlistWelcomeEmail({ to: email });
 
     // Send email notification to admin
     if (resend && process.env.ADMIN_EMAIL) {
