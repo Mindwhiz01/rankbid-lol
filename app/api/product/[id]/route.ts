@@ -66,7 +66,7 @@ export async function GET(
 
     // Also fetch all listings for ranking and "more in this category".
     const allRes = await fetch(
-      `${supabaseUrl}/rest/v1/listings?select=*&order=total_votes.desc,updated_at.desc.nullslast`,
+      `${supabaseUrl}/rest/v1/listings?select=*&order=total_votes.desc,created_at.asc`,
       {
         headers: {
           'apikey': supabaseKey as string,

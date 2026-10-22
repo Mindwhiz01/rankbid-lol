@@ -58,8 +58,6 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
     throw new Error(`Failed to insert vote: ${await insertRes.text()}`);
   }
 
-  // updated_at doubles as "last voted at": among listings with equal votes, the one that
-  // reached that count most recently ranks first.
   const { totalVotes, dayVotes } = await refreshCounts(listingId, { updated_at: new Date().toISOString() });
   return { status: 'ok', totalVotes, dayVotes };
 }
@@ -85,10 +83,7 @@ async function refreshCounts(listingId: string, extra: Record<string, string> = 
   return { totalVotes, dayVotes };
 }
 
-/**
- * Takes back `voterId`'s vote on a listing and refreshes its counts. The listing's
- * "last voted at" is left alone, so an unvote doesn't move it ahead of equal listings.
- */
+/** Takes back `voterId`'s vote on a listing and refreshes its counts. */
 export async function removeVote(listingId: string, voterId: string): Promise<{ totalVotes: number; dayVotes: number }> {
   const res = await fetch(
     sbUrl(`votes?listing_id=eq.${encodeURIComponent(listingId)}&voter_id=eq.${encodeURIComponent(voterId)}`),

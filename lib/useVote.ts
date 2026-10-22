@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 const VOTED_KEY = 'rankbid_voted_listings';
 
@@ -36,14 +36,21 @@ function getUser(): { id: string } | null {
  * Clicks flip the button and count at once; the server is brought in line in the background,
  * and the button only flips back if the server refuses. Clicking "Voted" again takes the vote back.
  * Logged-out visitors are sent to /login and brought back afterwards.
+ * `baseVotes` is the count on screen before this visitor's clicks: when a live refresh brings a new one,
+ * it already includes their synced vote, so the optimistic +1 is dropped.
  */
-export function useVote(listingId: string) {
+export function useVote(listingId: string, baseVotes?: number) {
   const voted = useSyncExternalStore(subscribe, () => readVoted().has(listingId), () => false);
   const [extraVotes, setExtraVotes] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   // What the server has for this user (null until the first click), and whether a request is running.
   const serverVoted = useRef<boolean | null>(null);
   const syncing = useRef(false);
+
+  // A fresh server count replaces the optimistic one.
+  useEffect(() => {
+    if (!syncing.current) setExtraVotes(0);
+  }, [baseVotes]);
 
   const flash = (text: string) => {
     setMessage(text);

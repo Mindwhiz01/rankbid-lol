@@ -57,7 +57,7 @@ export default function RankingRow({
   /** Shows a "Premium" upsell button when provided (homepage opens the premium modal). */
   onPremium?: () => void;
 }) {
-  const { voted, extraVotes, message, vote: handleVote } = useVote(listing.id);
+  const { voted, extraVotes, message, vote: handleVote } = useVote(listing.id, votes);
   const [shareOpen, setShareOpen] = useState(false);
   const [clicks, setClicks] = useState(listing.clickCount);
   const bumpClicks = () => {

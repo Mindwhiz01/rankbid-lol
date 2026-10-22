@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
 import Pagination from '@/components/Pagination';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { usePaged } from '@/lib/usePaged';
 import { useState, useEffect, type CSSProperties } from 'react';
 
@@ -27,7 +28,7 @@ interface CountdownTime {
 }
 
 
-// Server-rendered with today's launches (see page.tsx) so crawlers see them; refreshed live every 30s.
+// Server-rendered with today's launches (see page.tsx) so crawlers see them; refreshed live.
 export default function DailyView({ initialListings }: { initialListings: Listing[] }) {
   const [listings, setListings] = useState<Listing[]>(initialListings);
   const [loading, setLoading] = useState(false);
@@ -57,28 +58,18 @@ export default function DailyView({ initialListings }: { initialListings: Listin
     calculateCountdown();
     const timer = setInterval(calculateCountdown, 1000);
 
-    // Refresh listings once a minute while the tab is visible
-    const refreshTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') fetchListings();
-    }, 60_000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(refreshTimer);
-    };
+    return () => clearInterval(timer);
   }, []);
+  useLiveRefresh(() => fetchListings());
 
   const fetchListings = async () => {
     try {
-      const res = await fetch('/api/listings/submit?sort=dayVotes&limit=100&timeFilter=today');
-      if (!res.ok) {
-        setListings([]);
-        return;
-      }
+      const res = await fetch('/api/listings/submit?sort=dayVotes&limit=100&timeFilter=today&fresh=1', { cache: 'no-store' });
+      if (!res.ok) return;
       const data = await res.json();
       setListings((data.listings || []).sort((a: Listing, b: Listing) => b.dayVotes - a.dayVotes).slice(0, 50));
-    } catch (error) {
-      setListings([]);
+    } catch {
+      // Keep showing the last known rankings.
     } finally {
       setLoading(false);
     }

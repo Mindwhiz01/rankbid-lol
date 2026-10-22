@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import SelectionHeading from '@/components/SelectionHeading';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
 
 interface Listing {
   id: string;
@@ -22,7 +23,7 @@ interface Listing {
 }
 
 
-// Server-rendered with the current rankings (see page.tsx) so crawlers see them; refreshed live on mount.
+// Server-rendered with the current rankings (see page.tsx) so crawlers see them; refreshed live.
 export default function LeaderboardView({ initialListings }: { initialListings: Listing[] }) {
   const [listings, setListings] = useState<Listing[]>(initialListings);
   const [loading, setLoading] = useState(initialListings.length === 0);
@@ -31,18 +32,16 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
   useEffect(() => {
     fetchListings();
   }, []);
+  useLiveRefresh(() => fetchListings());
 
   const fetchListings = async () => {
     try {
-      const res = await fetch('/api/listings/submit?limit=500');
-      if (!res.ok) {
-        setListings([]);
-        return;
-      }
+      const res = await fetch('/api/listings/submit?limit=500&fresh=1', { cache: 'no-store' });
+      if (!res.ok) return;
       const data = await res.json();
       setListings(data.listings || []);
-    } catch (error) {
-      setListings([]);
+    } catch {
+      // Keep showing the last known rankings.
     } finally {
       setLoading(false);
     }
@@ -50,11 +49,11 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
 
   // Ranked by community votes (the old totalPaid/dayPaid bidding fields no longer exist).
   const votesFor = (l: Listing) => (activeTab === 'today' ? l.dayVotes : l.totalVotes) || 0;
-  const lastVotedAt = (l: Listing) => new Date(l.updatedAt || l.createdAt || 0).getTime();
+  const submittedAt = (l: Listing) => new Date(l.createdAt || 0).getTime();
   const sortedListings = [...listings]
     .filter(l => activeTab === 'alltime' || (l.dayVotes || 0) > 0)
-    // On equal votes, whoever reached that count most recently comes first.
-    .sort((a, b) => votesFor(b) - votesFor(a) || lastVotedAt(b) - lastVotedAt(a));
+    // On equal votes, the listing submitted first comes first.
+    .sort((a, b) => votesFor(b) - votesFor(a) || submittedAt(a) - submittedAt(b));
 
   const topThree = sortedListings.slice(0, 3);
   const paged = usePaged(sortedListings, activeTab);

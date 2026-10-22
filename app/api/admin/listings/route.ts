@@ -5,8 +5,8 @@ import { ANONYMOUS_USER_ID, isAdminRequest, removeListing, sbSelect, toAdminList
 const SORTS: Record<string, string> = {
   newest: 'created_at.desc',
   oldest: 'created_at.asc',
-  votes: 'total_votes.desc,updated_at.desc.nullslast',
-  today: 'day_votes.desc,updated_at.desc.nullslast',
+  votes: 'total_votes.desc,created_at.asc',
+  today: 'day_votes.desc,created_at.asc',
 };
 
 // PostgREST filter syntax uses , ( ) * as operators, so keep them out of search text.
@@ -109,7 +109,6 @@ export async function PATCH(req: NextRequest) {
     if (Object.keys(changes).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
-    // updated_at is left alone: it doubles as "last voted at" for ranking ties.
     const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}`), {
       method: 'PATCH',
       headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),

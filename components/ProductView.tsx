@@ -11,6 +11,7 @@ import StatusCardModal from '@/components/StatusCardModal';
 import RankingRow from '@/components/RankingRow';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { claimClick } from '@/lib/clickCount';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
@@ -43,11 +44,24 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const [allListings, setAllListings] = useState<Listing[]>(initialAllListings);
   const [copied, setCopied] = useState(false);
   const [showStatusCard, setShowStatusCard] = useState(false);
-  const { voted, extraVotes, message: voteMessage, vote } = useVote(id);
+  const { voted, extraVotes, message: voteMessage, vote } = useVote(id, product?.totalVotes);
 
   useEffect(() => {
     if (!initialProduct) fetchProduct();
   }, [id]);
+
+  // Other people's votes show up here without a reload.
+  useLiveRefresh(async () => {
+    try {
+      const res = await fetch(`/api/product/${id}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.product) setProduct(data.product);
+      if (Array.isArray(data.allListings)) setAllListings(data.allListings);
+    } catch {
+      // Keep showing the last known counts.
+    }
+  });
 
   // Only visiting the product counts as a click (once per visitor every 30 minutes, see /api/click);
   // just opening this page doesn't.
@@ -177,16 +191,15 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const votes = (product.totalVotes || 0) + extraVotes;
   const isRanked = votes > 0;
 
-  // Rank = products with more votes, plus products that reached the same count more recently, plus one.
-  // A vote cast on this page just now makes this product the most recent at its new count.
-  const lastVotedAt = (l: Listing) => new Date(l.updatedAt || l.createdAt).getTime();
-  const ownLastVotedAt = extraVotes > 0 ? Date.now() : lastVotedAt(product);
+  // Rank = products with more votes, plus products with the same count that were submitted earlier, plus one.
+  // Every product has a position, even with no votes yet.
+  const submittedAt = (l: Listing) => new Date(l.createdAt).getTime();
   const ranksAbove = (pool: Listing[]) =>
     pool.filter(l => {
       if (l.id === product.id) return false;
       const lv = l.totalVotes || 0;
       if (lv !== votes) return lv > votes;
-      return lastVotedAt(l) > ownLastVotedAt;
+      return submittedAt(l) < submittedAt(product);
     }).length;
   const totalProducts = Math.max(allListings.length, 1);
   const allTimeRank = ranksAbove(allListings) + 1;
@@ -303,16 +316,12 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               <div className="grid grid-cols-2 sm:grid-cols-4 -mx-4 sm:-mx-6 border-y border-gray-100 divide-x divide-gray-100 [&>*:nth-child(3)]:border-l-0 sm:[&>*:nth-child(3)]:border-l [&>*:nth-child(n+3)]:border-t sm:[&>*:nth-child(n+3)]:border-t-0">
                 <div className="px-4 sm:px-6 py-4">
                   <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50">Overall rank</p>
-                  {isRanked ? (
-                    <p className="text-2xl sm:text-3xl font-black text-[#0F3460] mt-1 tabular-nums">#{allTimeRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {totalProducts}</span></p>
-                  ) : (
-                    <p className="text-lg sm:text-xl font-black text-[#1F2937] mt-1.5">Unranked</p>
-                  )}
+                  <p className="text-2xl sm:text-3xl font-black text-[#0F3460] mt-1 tabular-nums">#{allTimeRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {totalProducts}</span></p>
                 </div>
                 <div className="px-4 sm:px-6 py-4">
                   <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50 truncate">In {getCategoryLabel(product.category)}</p>
                   <p className="text-2xl sm:text-3xl font-black text-[#0F3460] mt-1 tabular-nums">
-                    {isRanked ? <>#{categoryRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {categoryPool.length}</span></> : '—'}
+                    #{categoryRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {categoryPool.length}</span>
                   </p>
                 </div>
                 <div className="px-4 sm:px-6 py-4">
@@ -326,7 +335,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               </div>
               {!isRanked && (
                 <p className="mt-4 text-xs sm:text-sm text-[#1F2937]/65 bg-[#059669]/5 border border-[#059669]/20 rounded-xl px-3 py-2.5">
-                  No votes yet. Cast the first vote or share the support link to get this product on the leaderboard.
+                  No votes yet. Cast the first vote or share the support link to climb the leaderboard.
                 </p>
               )}
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm">

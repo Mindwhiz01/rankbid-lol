@@ -216,8 +216,8 @@ export interface LiveSnapshot {
   recentSubmissions: AdminListing[];
 }
 
-// Same order as the public rankings: most votes first, ties go to whoever reached the count most recently.
-const RANK_ORDER = 'total_votes.desc,updated_at.desc.nullslast';
+// Same order as the public rankings: most votes first, ties go to the listing submitted first.
+const RANK_ORDER = 'total_votes.desc,created_at.asc';
 const LISTING_COLUMNS = 'id,title,description,location,category,platform,image_url,total_votes,day_votes,views,user_id,created_at,updated_at';
 
 /** Everything the live dashboard shows: headline counts, both leaderboards and the newest submissions. */
@@ -235,7 +235,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
       sbCount(`votes?select=id&voted_at=gte.${since}`),
       sbCount(`users?select=id&created_at=gte.${since}`),
       sbSelect<ListingRow>(`listings?select=${LISTING_COLUMNS}&order=${RANK_ORDER}&limit=10`),
-      sbSelect<ListingRow>(`listings?select=${LISTING_COLUMNS}&day_votes=gt.0&order=day_votes.desc,updated_at.desc.nullslast&limit=10`),
+      sbSelect<ListingRow>(`listings?select=${LISTING_COLUMNS}&day_votes=gt.0&order=day_votes.desc,created_at.asc&limit=10`),
       sbSelect<ListingRow>(`listings?select=${LISTING_COLUMNS}&order=created_at.desc&limit=15`),
     ]);
 

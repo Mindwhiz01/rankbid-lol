@@ -30,6 +30,7 @@ import { getPlatformIcon } from '@/lib/platformIcons';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import TodayRankingCard, { type TodayRankingItem } from '@/components/TodayRankingCard';
 
@@ -352,6 +353,23 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
       setLoading(false);
     }
   }, [activeTimeFilter, selectedCategory]);
+
+  // Other people's votes show up without a reload: re-read the page being viewed (no spinner).
+  useLiveRefresh(async () => {
+    if (loading) return;
+    try {
+      const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
+      const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
+      const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
+      const res = await fetch(`/api/listings/submit?sort=${sort}&page=${currentPage}&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}&fresh=1`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.listings)) setListings(data.listings);
+      if (data.pagination?.totalPages) setTotalPages(data.pagination.totalPages);
+    } catch {
+      // Keep showing the last known rankings.
+    }
+  });
 
   const calculateRank = (totalVotes: number): number => {
     return allListings.filter(l => (l.totalVotes || 0) > totalVotes).length + 1;

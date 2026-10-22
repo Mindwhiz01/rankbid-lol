@@ -8,6 +8,7 @@ import RankingRow from '@/components/RankingRow';
 import { PremiumIcons } from '@/components/PremiumIcons';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
 
 interface Listing {
   id: string;
@@ -23,45 +24,33 @@ interface Listing {
 }
 
 
-// Server-rendered with today's board (see page.tsx) so crawlers see it; refreshed live every 30s.
+// Server-rendered with today's board (see page.tsx) so crawlers see it; refreshed live.
 export default function TodayView({ initialListings }: { initialListings: Listing[] }) {
   const [listings, setListings] = useState<Listing[]>(initialListings);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchListings = async () => {
-      try {
-        const res = await fetch('/api/listings/submit?sort=dayVotes&activeToday=1&limit=100');
-
-        if (!res.ok) {
-          console.error('API error:', res.status);
-          setListings([]);
-          return;
-        }
-
-        const text = await res.text();
-        if (!text) {
-          console.error('Empty response from API');
-          setListings([]);
-          return;
-        }
-
-        const data = JSON.parse(text);
-        setListings(data.listings || []);
-      } catch (error) {
-        console.error('Failed to fetch listings:', error);
-        setListings([]);
-      } finally {
-        setLoading(false);
+  // A failed refresh keeps the board that's on screen.
+  const fetchListings = async () => {
+    try {
+      const res = await fetch('/api/listings/submit?sort=dayVotes&activeToday=1&limit=100&fresh=1', { cache: 'no-store' });
+      if (!res.ok) {
+        console.error('API error:', res.status);
+        return;
       }
-    };
+      const data = await res.json();
+      setListings(data.listings || []);
+    } catch (error) {
+      console.error('Failed to fetch listings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads live data after the server render
     fetchListings();
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') fetchListings();
-    }, 60_000);
-    return () => clearInterval(interval);
   }, []);
+  useLiveRefresh(() => fetchListings());
 
   const topListingsToday = listings
     .filter(l => l.dayVotes > 0)

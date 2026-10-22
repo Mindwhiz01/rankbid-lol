@@ -372,8 +372,8 @@ export async function GET(req: NextRequest) {
     const orderColumn = sort === 'dayVotes' ? 'day_votes' : 'total_votes';
     const offset = (page - 1) * pageSize;
 
-    // Ties go to whoever reached that vote count most recently (updated_at is stamped on each vote).
-    let queryUrl = `${supabaseUrl}/rest/v1/listings?order=${orderColumn}.desc,updated_at.desc.nullslast&limit=${rowLimit}&offset=${offset}`;
+    // Ties go to the listing submitted first.
+    let queryUrl = `${supabaseUrl}/rest/v1/listings?order=${orderColumn}.desc,created_at.asc&limit=${rowLimit}&offset=${offset}`;
 
     // Filter by time - only today's submissions for daily page
     if (timeFilter === 'today') {

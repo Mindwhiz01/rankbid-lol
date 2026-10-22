@@ -41,8 +41,8 @@ function toListing(row: Row): Listing {
   };
 }
 
-// Same order as the site's rankings: most votes first, ties go to whoever reached the count most recently.
-const RANK_ORDER = 'order=total_votes.desc,updated_at.desc.nullslast';
+// Same order as the site's rankings: most votes first, ties go to the listing submitted first.
+const RANK_ORDER = 'order=total_votes.desc,created_at.asc';
 
 // Pages that render these are cached (ISR) for the same window, so a busy page reads Supabase
 // about once a minute instead of on every visit. The browser views refetch live data on mount.
@@ -86,7 +86,7 @@ export function getCategoryListings(category: string, limit = 50): Promise<Listi
 
 /** Listings with votes in the last 24 hours, most of today's votes first (the /today board). */
 export function getTrendingToday(limit = 100): Promise<Listing[]> {
-  return query(`listings?select=*&day_votes=gt.0&order=day_votes.desc,updated_at.desc.nullslast&limit=${limit}`);
+  return query(`listings?select=*&day_votes=gt.0&order=day_votes.desc,created_at.asc&limit=${limit}`);
 }
 
 /** Listings submitted today (UTC), most of today's votes first (the /daily board). */
@@ -95,5 +95,5 @@ export function getLaunchedToday(limit = 100): Promise<Listing[]> {
   start.setUTCHours(0, 0, 0, 0);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const range = `created_at=gte.${encodeURIComponent(start.toISOString())}&created_at=lt.${encodeURIComponent(end.toISOString())}`;
-  return query(`listings?select=*&${range}&order=day_votes.desc,updated_at.desc.nullslast&limit=${limit}`);
+  return query(`listings?select=*&${range}&order=day_votes.desc,created_at.asc&limit=${limit}`);
 }

@@ -126,7 +126,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Filtering on user_id too means another user's listing simply doesn't match.
-    // updated_at is left alone: it doubles as "last voted at" for ranking ties.
     const res = await fetch(
       sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}&user_id=eq.${encodeURIComponent(user.id)}`),
       {
