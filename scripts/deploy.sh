@@ -23,25 +23,23 @@ cd "$WORK"
 # The archive has no node_modules: clone the repo's (APFS copy-on-write, instant). Turbopack rejects a symlink.
 cp -cR "$REPO/node_modules" node_modules
 
+# Prints only the deployment URL on stdout; build logs go to stderr.
 build_and_deploy() { # $1 = production | preview
-  vercel pull --yes --environment="$1" --token "$TOKEN" >/dev/null
-  if [ "$1" = production ]; then
-    vercel build --prod --yes --token "$TOKEN"
-    vercel deploy --prebuilt --prod --yes --token "$TOKEN"
-  else
-    vercel build --yes --token "$TOKEN"
-    vercel deploy --prebuilt --yes --token "$TOKEN"
-  fi
+  local prod=()
+  [ "$1" = production ] && prod=(--prod)
+  vercel pull --yes --environment="$1" --token "$TOKEN" >&2
+  vercel build "${prod[@]}" --yes --token "$TOKEN" >&2
+  vercel deploy --prebuilt "${prod[@]}" --yes --token "$TOKEN" 2>/dev/null | tail -1
 }
 
 if [ "$TARGET" != sandbox ]; then
   echo "▸ production"
-  build_and_deploy production | tail -1
+  build_and_deploy production
 fi
 
 if [ "$TARGET" != prod ]; then
   echo "▸ sandbox"
-  URL="$(build_and_deploy preview | tail -1)"
+  URL="$(build_and_deploy preview)"
   echo "$URL"
   # `vercel alias set` fails with this project-scoped token, so the alias goes through the API.
   ID="$(curl -sf -H "Authorization: Bearer $TOKEN" "https://api.vercel.com/v13/deployments/${URL#https://}?teamId=$VERCEL_ORG_ID" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')"
