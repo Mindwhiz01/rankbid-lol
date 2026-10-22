@@ -24,6 +24,29 @@ function isExemptIp(ip: string): boolean {
 }
 const EXEMPT = 'exempt';
 
+/** Per-account activity limits that RATE_LIMIT_EXEMPT_USERS skips. Login, reset, password and delete limits stay. */
+const ACCOUNT_ACTIVITY = new Set(['vote-user', 'submit-saved', 'submit-saved-day', 'link-edit']);
+let exemptUsers: { ids: Set<string>; at: number } | null = null;
+
+/**
+ * Account ids for RATE_LIMIT_EXEMPT_USERS (comma-separated emails, e.g. testers), looked up once a minute.
+ * A lookup that fails leaves the limits on.
+ */
+async function exemptUserIds(): Promise<Set<string>> {
+  const emails = (process.env.RATE_LIMIT_EXEMPT_USERS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (!emails.length) return new Set();
+  if (exemptUsers && Date.now() - exemptUsers.at < 60_000) return exemptUsers.ids;
+  try {
+    const list = emails.map(e => `"${e.replace(/"/g, '')}"`).join(',');
+    const res = await fetch(sbUrl(`users?email=in.(${encodeURIComponent(list)})&select=id`), { headers: sbHeaders(), cache: 'no-store' });
+    const rows: { id: string }[] = res.ok ? await res.json() : [];
+    exemptUsers = { ids: new Set(rows.map(r => String(r.id))), at: Date.now() };
+  } catch {
+    exemptUsers = { ids: new Set(), at: Date.now() };
+  }
+  return exemptUsers.ids;
+}
+
 /** Salted hash of the client IP, so we can limit abuse without storing raw addresses. */
 export function ipHash(req: NextRequest): string {
   const ip = clientIp(req);
@@ -40,6 +63,8 @@ export function ipHash(req: NextRequest): string {
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
   // Exempt networks skip the abuse limits; click de-duplication still applies so test visits don't inflate counts.
   if (!supabaseConfigured() || (key.includes(`:${EXEMPT}-`) && !key.startsWith('click:'))) return true;
+  const [kind, subject] = key.split(':');
+  if (ACCOUNT_ACTIVITY.has(kind) && (await exemptUserIds()).has(subject)) return true;
   try {
     // Record the hit first, then count it with the rest. Counting first let a burst of parallel
     // requests all see the same count and all get through.
