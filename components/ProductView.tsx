@@ -28,6 +28,7 @@ interface Listing {
   clickCount: number;
   createdAt: string;
   updatedAt?: string;
+  rankReachedAt?: string;
 }
 
 // The server renders this with the listing already loaded (so crawlers see the content);
@@ -191,15 +192,17 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const votes = (product.totalVotes || 0) + extraVotes;
   const isRanked = votes > 0;
 
-  // Rank = products with more votes, plus products with the same count that were submitted earlier, plus one.
-  // Every product has a position, even with no votes yet.
-  const submittedAt = (l: Listing) => new Date(l.createdAt).getTime();
+  // Rank = products with more votes, plus products that reached the same count earlier (queue order), plus one.
+  // A vote cast on this page just now puts this product at the end of its new count. Every product has a
+  // position, even with no votes yet.
+  const reachedAt = (l: Listing) => new Date(l.rankReachedAt || l.createdAt).getTime();
+  const ownReachedAt = extraVotes !== 0 ? Infinity : reachedAt(product);
   const ranksAbove = (pool: Listing[]) =>
     pool.filter(l => {
       if (l.id === product.id) return false;
       const lv = l.totalVotes || 0;
       if (lv !== votes) return lv > votes;
-      return submittedAt(l) < submittedAt(product);
+      return reachedAt(l) < ownReachedAt;
     }).length;
   const totalProducts = Math.max(allListings.length, 1);
   const allTimeRank = ranksAbove(allListings) + 1;

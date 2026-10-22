@@ -5,8 +5,8 @@ import { ANONYMOUS_USER_ID, isAdminRequest, removeListing, sbSelect, toAdminList
 const SORTS: Record<string, string> = {
   newest: 'created_at.desc',
   oldest: 'created_at.asc',
-  votes: 'total_votes.desc,created_at.asc',
-  today: 'day_votes.desc,created_at.asc',
+  votes: 'total_votes.desc,rank_reached_at.asc',
+  today: 'day_votes.desc,rank_reached_at.asc',
 };
 
 // PostgREST filter syntax uses , ( ) * as operators, so keep them out of search text.

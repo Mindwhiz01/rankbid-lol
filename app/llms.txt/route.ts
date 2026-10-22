@@ -19,7 +19,7 @@ export async function GET() {
     '',
     'Key facts:',
     '- Submitting a product and voting are free.',
-    '- Each person gets one vote per product; rankings are ordered by total votes, ties go to the product that was submitted first.',
+    '- Each person gets one vote per product; rankings are ordered by total votes, ties go to the product that reached that count first, so a product that just reached a count joins the end of that group.',
     '- Rankings update in real time: an all-time board, a "today" board (last 24 hours) and one board per category.',
     '- Anyone can vote through a product\'s shareable support link with just a name and email, no account needed.',
     '- Optional sponsored listings: from $1 with no end date (one payment, live for the lifetime of the listing), ranked by amount paid (ties go to whoever paid first). The top 10 show above the leaderboard on the homepage; all are on /sponsored. Sponsored listings never change vote rankings.',

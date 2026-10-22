@@ -61,12 +61,13 @@ export async function GET(
       dayVotes: product.day_votes || 0,
       clickCount: product.click_count || 0,
       createdAt: product.created_at,
+      rankReachedAt: product.rank_reached_at || product.created_at,
       updatedAt: product.updated_at || product.created_at,
     };
 
     // Also fetch all listings for ranking and "more in this category".
     const allRes = await fetch(
-      `${supabaseUrl}/rest/v1/listings?select=*&order=total_votes.desc,created_at.asc`,
+      `${supabaseUrl}/rest/v1/listings?select=*&order=total_votes.desc,rank_reached_at.asc`,
       {
         headers: {
           'apikey': supabaseKey as string,
@@ -75,12 +76,12 @@ export async function GET(
       }
     );
 
-    // Map to the same camelCase shape as `product` (the page ranks on totalVotes, then updatedAt).
+    // Map to the same camelCase shape as `product` (the page ranks on totalVotes, then rankReachedAt).
     let allListings: Record<string, unknown>[] = [];
     if (allRes.ok) {
       const rows: {
         id: string; title: string; description?: string; url?: string; location?: string;
-        category?: string; platform?: string; total_votes?: number; day_votes?: number; created_at: string; updated_at?: string;
+        category?: string; platform?: string; total_votes?: number; day_votes?: number; created_at: string; updated_at?: string; rank_reached_at?: string;
       }[] = await allRes.json();
       allListings = rows.map(l => ({
         id: l.id,
@@ -92,6 +93,7 @@ export async function GET(
         totalVotes: l.total_votes || 0,
         dayVotes: l.day_votes || 0,
         createdAt: l.created_at,
+        rankReachedAt: l.rank_reached_at || l.created_at,
         updatedAt: l.updated_at || l.created_at,
       }));
     } else {

@@ -1,11 +1,11 @@
 // Server-only: emails a listing's owner when it gets a vote, and the owners of listings that vote just passed.
-// Ranking order matches the site: most votes first, ties go to the listing submitted first.
+// Ranking order matches the site: most votes first, ties go to whichever reached that count first (queue order).
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { rateLimit } from '@/lib/server/rate-limit';
 import { sendNewVoteEmail, sendOvertakenEmail } from '@/lib/email';
 
 /** The voted listing as it was just before the vote. */
-export type VoteSnapshot = { id: string; title: string; userId: string | null; totalVotes: number; createdAt: string };
+export type VoteSnapshot = { id: string; title: string; userId: string | null; totalVotes: number; reachedAt: string };
 
 /** At most this many passed listings are emailed per vote (a vote at a big tie can pass many). */
 const MAX_OVERTAKEN = 10;
@@ -15,13 +15,13 @@ const VOTE_MAIL_WINDOW = 60 * 60;
 const SEND_GAP_MS = 600;
 
 export async function snapshotListing(listingId: string): Promise<VoteSnapshot | null> {
-  const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}&select=id,title,user_id,total_votes,created_at`), {
+  const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}&select=id,title,user_id,total_votes,created_at,rank_reached_at`), {
     headers: sbHeaders(),
     cache: 'no-store',
   });
   const row = res.ok ? (await res.json())[0] : null;
   return row
-    ? { id: String(row.id), title: row.title || 'Your product', userId: row.user_id ?? null, totalVotes: row.total_votes || 0, createdAt: String(row.created_at) }
+    ? { id: String(row.id), title: row.title || 'Your product', userId: row.user_id ?? null, totalVotes: row.total_votes || 0, reachedAt: String(row.rank_reached_at || row.created_at) }
     : null;
 }
 
@@ -46,23 +46,20 @@ export async function notifyVote(before: VoteSnapshot, totalVotes: number, voter
   try {
     const v = before.totalVotes;
     // Timestamps carry "+00:00", so the value is quoted and encoded (a bare "+" would arrive as a space).
-    const created = encodeURIComponent(`"${before.createdAt}"`);
-    // Older listings win ties, so the vote passed the newer listings at its new count, and the older ones
-    // at its old count (including listings with no votes yet).
-    const passedFilters = totalVotes > v
-      ? [`and(total_votes.eq.${totalVotes},created_at.gt.${created})`, `and(total_votes.eq.${v},created_at.lt.${created})`]
-      : [];
+    const reached = encodeURIComponent(`"${before.reachedAt}"`);
+    // Ties rank in queue order, so the voted listing joins the end of its new count: it passed only the
+    // listings at its old count that were ahead of it (including listings with no votes yet).
     const [ahead, passedRes] = await Promise.all([
-      countListings(`or=(total_votes.gt.${totalVotes},and(total_votes.eq.${totalVotes},created_at.lt.${created}))`),
-      passedFilters.length
-        ? fetch(sbUrl(`listings?select=id,title,user_id,total_votes,created_at&or=(${passedFilters.join(',')})&order=total_votes.desc,created_at.asc&limit=${MAX_OVERTAKEN}`), {
+      countListings(`total_votes=gte.${totalVotes}&id=neq.${encodeURIComponent(before.id)}`),
+      totalVotes > v
+        ? fetch(sbUrl(`listings?select=id,title,user_id,total_votes&total_votes=eq.${v}&rank_reached_at=lt.${reached}&id=neq.${encodeURIComponent(before.id)}&order=rank_reached_at.asc&limit=${MAX_OVERTAKEN}`), {
             headers: sbHeaders(),
             cache: 'no-store',
           })
         : null,
     ]);
     const rank = ahead + 1;
-    const passed: { id: string; title: string; user_id: string | null; total_votes: number; created_at: string }[] = passedRes?.ok ? await passedRes.json() : [];
+    const passed: { id: string; title: string; user_id: string | null; total_votes: number }[] = passedRes?.ok ? await passedRes.json() : [];
 
     const owners = await ownerEmails([before.userId ?? '', ...passed.map(p => p.user_id ?? '')]);
     const owner = before.userId ? owners.get(before.userId) : undefined;
@@ -78,15 +75,14 @@ export async function notifyVote(before: VoteSnapshot, totalVotes: number, voter
       const o = p.user_id ? owners.get(p.user_id) : undefined;
       if (!o || p.user_id === before.userId) continue;
       await new Promise(r => setTimeout(r, SEND_GAP_MS));
-      // An older listing takes the spot back by tying; a newer one has to pass.
-      const olderThanVoted = new Date(p.created_at).getTime() < new Date(before.createdAt).getTime();
       await sendOvertakenEmail({
         to: o.email,
         listingId: p.id,
         productTitle: p.title || 'Your product',
         newRank: rank + i + 1,
         byTitle: before.title,
-        votesNeeded: totalVotes - (p.total_votes || 0) + (olderThanVoted ? 0 : 1),
+        // Tying would put it behind in the queue, so it has to pass.
+        votesNeeded: totalVotes + 1 - (p.total_votes || 0),
       });
     }
   } catch (err) {

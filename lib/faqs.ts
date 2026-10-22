@@ -18,7 +18,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How are rankings determined?',
-    a: 'RankBid ranks products by total community votes, highest first. When two products have the same number of votes, the product that was submitted first ranks higher. The all-time leaderboard never resets.',
+    a: 'RankBid ranks products by total community votes, highest first. When two products have the same number of votes, the one that reached that count first ranks higher, like a queue: a product that just reached it joins the end of that group. Products with no votes yet are ordered by submission date. The all-time leaderboard never resets.',
   },
   {
     q: 'What is the difference between all-time and today’s rankings?',

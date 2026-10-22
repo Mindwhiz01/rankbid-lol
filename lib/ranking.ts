@@ -28,7 +28,7 @@ export async function getRankedListings(
   if (timeWindow === 'alltime') {
     listings = await prisma.listing.findMany({
       where: category !== 'All' ? { category } : {},
-      orderBy: [{ totalVotes: 'desc' }, { createdAt: 'asc' }],
+      orderBy: { totalVotes: 'desc' },
     });
 
     return listings.map((listing, index) => ({
@@ -42,7 +42,7 @@ export async function getRankedListings(
   if (timeWindow === 'today') {
     listings = await prisma.listing.findMany({
       where: category !== 'All' ? { category } : {},
-      orderBy: [{ dayVotes: 'desc' }, { createdAt: 'asc' }],
+      orderBy: { dayVotes: 'desc' },
     });
 
     return listings.map((listing, index) => ({

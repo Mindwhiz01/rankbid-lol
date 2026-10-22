@@ -58,7 +58,9 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
     throw new Error(`Failed to insert vote: ${await insertRes.text()}`);
   }
 
-  const { totalVotes, dayVotes } = await refreshCounts(listingId, { updated_at: new Date().toISOString() });
+  // The listing joins the end of the queue at its new count.
+  const now = new Date().toISOString();
+  const { totalVotes, dayVotes } = await refreshCounts(listingId, { updated_at: now, rank_reached_at: now });
   return { status: 'ok', totalVotes, dayVotes };
 }
 
@@ -83,14 +85,29 @@ async function refreshCounts(listingId: string, extra: Record<string, string> = 
   return { totalVotes, dayVotes };
 }
 
-/** Takes back `voterId`'s vote on a listing and refreshes its counts. */
+/**
+ * Takes back `voterId`'s vote on a listing and refreshes its counts. The listing drops to the end of the
+ * queue at its lower count; back at zero votes it returns to its submission-date spot.
+ */
 export async function removeVote(listingId: string, voterId: string): Promise<{ totalVotes: number; dayVotes: number }> {
+  const id = encodeURIComponent(listingId);
   const res = await fetch(
-    sbUrl(`votes?listing_id=eq.${encodeURIComponent(listingId)}&voter_id=eq.${encodeURIComponent(voterId)}`),
+    sbUrl(`votes?listing_id=eq.${id}&voter_id=eq.${encodeURIComponent(voterId)}`),
     { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
   );
   if (!res.ok) throw new Error(`Failed to delete vote: ${await res.text()}`);
-  return refreshCounts(listingId);
+  const counts = await refreshCounts(listingId, { rank_reached_at: new Date().toISOString() });
+  if (counts.totalVotes === 0) {
+    const row = await fetch(sbUrl(`listings?id=eq.${id}&select=created_at`), { headers: sbHeaders() }).then(r => (r.ok ? r.json() : []));
+    if (row[0]?.created_at) {
+      await fetch(sbUrl(`listings?id=eq.${id}`), {
+        method: 'PATCH',
+        headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify({ rank_reached_at: row[0].created_at }),
+      });
+    }
+  }
+  return counts;
 }
 
 export interface PublicListing {

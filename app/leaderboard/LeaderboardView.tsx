@@ -20,6 +20,7 @@ interface Listing {
   clickCount: number;
   createdAt?: string;
   updatedAt?: string;
+  rankReachedAt?: string;
 }
 
 
@@ -49,11 +50,11 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
 
   // Ranked by community votes (the old totalPaid/dayPaid bidding fields no longer exist).
   const votesFor = (l: Listing) => (activeTab === 'today' ? l.dayVotes : l.totalVotes) || 0;
-  const submittedAt = (l: Listing) => new Date(l.createdAt || 0).getTime();
+  const reachedAt = (l: Listing) => new Date(l.rankReachedAt || l.createdAt || 0).getTime();
   const sortedListings = [...listings]
     .filter(l => activeTab === 'alltime' || (l.dayVotes || 0) > 0)
-    // On equal votes, the listing submitted first comes first.
-    .sort((a, b) => votesFor(b) - votesFor(a) || submittedAt(a) - submittedAt(b));
+    // On equal votes, whichever reached that count first comes first (queue order).
+    .sort((a, b) => votesFor(b) - votesFor(a) || reachedAt(a) - reachedAt(b));
 
   const topThree = sortedListings.slice(0, 3);
   const paged = usePaged(sortedListings, activeTab);

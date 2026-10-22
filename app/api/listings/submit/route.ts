@@ -372,8 +372,8 @@ export async function GET(req: NextRequest) {
     const orderColumn = sort === 'dayVotes' ? 'day_votes' : 'total_votes';
     const offset = (page - 1) * pageSize;
 
-    // Ties go to the listing submitted first.
-    let queryUrl = `${supabaseUrl}/rest/v1/listings?order=${orderColumn}.desc,created_at.asc&limit=${rowLimit}&offset=${offset}`;
+    // Ties go to whichever listing reached that count first (rank_reached_at), like a queue.
+    let queryUrl = `${supabaseUrl}/rest/v1/listings?order=${orderColumn}.desc,rank_reached_at.asc&limit=${rowLimit}&offset=${offset}`;
 
     // Filter by time - only today's submissions for daily page
     if (timeFilter === 'today') {
@@ -434,6 +434,7 @@ export async function GET(req: NextRequest) {
       dayVotes: item.day_votes || 0,
       clickCount: item.click_count || 0,
       createdAt: item.created_at,
+      rankReachedAt: item.rank_reached_at || item.created_at,
       updatedAt: item.updated_at || item.created_at,
       imageUrl: item.image_url || null,
       isPremium: false,
