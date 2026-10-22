@@ -10,6 +10,8 @@ import { getSessionUser } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { accessibilityProblem, isFlaggedBySafeBrowsing, staticUrlProblem } from '@/lib/server/url-safety';
 import { findDuplicateListing } from '@/lib/server/duplicate-listing';
+import { badgeZip } from '@/lib/server/badges';
+import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -287,6 +289,15 @@ export async function POST(req: NextRequest) {
     const listing = await insertResponse.json();
     const responseData = listing[0] || listing;
 
+    // Its rank right after submitting (queue order: no votes yet, so it follows every listing ahead of it),
+    // and the "#N Ranked on RankBid" cards for that rank. Neither may hold back the confirmation.
+    const rank = await submissionRank(responseData.id, responseData.rank_reached_at || now);
+    const badges = rank
+      ? await badgeZip(responseData.id, rank, 'ranked')
+          .then(zip => ({ filename: `rankbid-rank-${rank}.zip`, content: Buffer.from(zip) }))
+          .catch(err => { console.error('Rank card zip failed:', err); return undefined; })
+      : undefined;
+
     await Promise.all([
       sendNewSubmissionEmail({
         id: responseData.id,
@@ -297,7 +308,7 @@ export async function POST(req: NextRequest) {
         url: normalizedUrl,
         imageUrl: imageUrl || undefined,
       }),
-      user.email ? sendSubmissionConfirmation({ to: user.email, listingId: responseData.id, productTitle: metaTitle }) : null,
+      user.email ? sendSubmissionConfirmation({ to: user.email, listingId: responseData.id, productTitle: metaTitle, rank, badges }) : null,
     ]);
 
     return NextResponse.json(
@@ -322,6 +333,21 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+/** Overall position of a listing that has no votes yet: everything with votes, then the 0-vote listings ahead of it. */
+async function submissionRank(listingId: string, reachedAt: string): Promise<number | undefined> {
+  try {
+    const reached = encodeURIComponent(`"${reachedAt}"`);
+    const res = await fetch(
+      sbUrl(`listings?select=id&id=neq.${encodeURIComponent(listingId)}&or=(total_votes.gt.0,and(total_votes.eq.0,rank_reached_at.lte.${reached}))`),
+      { method: 'HEAD', headers: sbHeaders({ Prefer: 'count=exact' }), cache: 'no-store' }
+    );
+    if (!res.ok) return undefined;
+    return (parseInt(res.headers.get('content-range')?.split('/')[1] || '0') || 0) + 1;
+  } catch {
+    return undefined;
   }
 }
 

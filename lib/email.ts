@@ -213,13 +213,22 @@ function voteHtml(heading: string, body: string, button: { href: string; label: 
 const productLink = (listingId: string) => `${SITE_URL}/product/${encodeURIComponent(listingId)}`;
 const votes = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'vote' : 'votes'}`;
 
-/** Confirms a free submission to the person who submitted it. */
-export async function sendSubmissionConfirmation(e: { to: string; listingId: string; productTitle: string }): Promise<EmailResult> {
+/**
+ * Confirms a free submission to the person who submitted it. `rank` is its position right after submitting;
+ * `badges` is the "#N Ranked on RankBid" card zip for it (lib/server/badges.tsx). Without them the email still goes out.
+ */
+export async function sendSubmissionConfirmation(e: { to: string; listingId: string; productTitle: string; rank?: number; badges?: EmailAttachment }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);
+  const ranked = e.rank ? ` and ranked <strong>#${e.rank}</strong>` : '';
+  const badges = e.badges && e.rank
+    ? `<p>Your <strong>#${e.rank}</strong> rank cards are attached (<strong>${escapeHtml(e.badges.filename)}</strong>): light and dark versions to share or put on your website, plus a ready-to-paste snippet.</p>`
+    : '';
   const body = `
-    <p>Thanks for submitting <strong>${title}</strong>. It's live on RankBid now.</p>
+    <p>Thanks for submitting <strong>${title}</strong>. It's live on RankBid now${ranked}.</p>
+    ${badges}
     <p>Rankings are decided by votes: the more votes your product gets, the higher it climbs. Share your product page with your users and followers to start collecting votes.</p>`;
-  return send(e.to, `✅ ${e.productTitle} is live on RankBid`, voteHtml('Your submission is live', body, { href: productLink(e.listingId), label: 'View and share your product' }), 'Submission confirmation');
+  const subject = e.rank ? `✅ ${e.productTitle} is live on RankBid at #${e.rank}` : `✅ ${e.productTitle} is live on RankBid`;
+  return send(e.to, subject, voteHtml('Your submission is live', body, { href: productLink(e.listingId), label: 'View and share your product' }), 'Submission confirmation', e.badges ? [e.badges] : undefined);
 }
 
 /** A listing got a new vote (throttled per listing by the caller). */
