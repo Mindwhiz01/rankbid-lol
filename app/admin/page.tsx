@@ -961,12 +961,21 @@ function OverviewTab({
                     ['Live', traffic?.live, <span key="d" className="relative flex w-2.5 h-2.5"><span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-60" /><span className="relative w-2.5 h-2.5 rounded-full bg-red-500" /></span>],
                     ['Visitors', traffic?.visitors, <Users key="u" className="w-4 h-4 text-[#1a5490]" />],
                     ['Views', traffic?.views, <Eye key="e" className="w-4 h-4 text-[#1F2937]/50" />],
-                  ] as const).map(([label, value, icon]) => (
-                    <div key={label} className="rounded-2xl bg-[#F4F6FA] px-4 py-4">
-                      <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#1F2937]/45">{icon}{label}</span>
-                      <span className="block mt-1 text-2xl sm:text-3xl font-black tabular-nums">{value === undefined ? '—' : fmt(value)}</span>
-                    </div>
-                  ))}
+                  ] as const).map(([label, value, icon]) => {
+                    const text = value === undefined ? '—' : fmt(value);
+                    return (
+                      <div key={label} className="min-w-0 rounded-2xl bg-[#F4F6FA] px-3 sm:px-4 py-4 [container-type:inline-size]">
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#1F2937]/45 truncate">{icon}{label}</span>
+                        {/* Shrinks with the tile so long numbers (10,919 or 1,250,000) stay inside it. */}
+                        <span
+                          className="block mt-1 font-black tabular-nums leading-tight whitespace-nowrap"
+                          style={{ fontSize: `min(1.875rem, ${Math.floor(160 / Math.max(text.length, 2))}cqw)` }}
+                        >
+                          {text}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
