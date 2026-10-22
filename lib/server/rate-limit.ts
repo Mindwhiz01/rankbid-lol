@@ -13,10 +13,24 @@ export function clientIp(req: NextRequest): string {
   );
 }
 
+/**
+ * Networks that skip the per-network limits (e.g. the team's office while testing): RATE_LIMIT_EXEMPT_IPS,
+ * comma-separated full IPs, or prefixes ending in "." ("203.101." covers 203.101.*.*). Per-account and
+ * per-email limits still apply, so passwords can't be brute-forced from there either.
+ */
+function isExemptIp(ip: string): boolean {
+  return (process.env.RATE_LIMIT_EXEMPT_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
+    .some(entry => (entry.endsWith('.') || entry.endsWith(':') ? ip.startsWith(entry) : ip === entry));
+}
+const EXEMPT = 'exempt';
+
 /** Salted hash of the client IP, so we can limit abuse without storing raw addresses. */
 export function ipHash(req: NextRequest): string {
+  const ip = clientIp(req);
+  // Per-network keys built from this skip rateLimit below. Each exempt visitor still gets its own value.
+  if (isExemptIp(ip)) return `${EXEMPT}-${createHash('sha256').update(`${process.env.SUPABASE_SERVICE_ROLE_KEY || ''}:${ip}`).digest('hex').slice(0, 24)}`;
   const salt = process.env.IP_HASH_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  return createHash('sha256').update(`${salt}:${clientIp(req)}`).digest('hex').slice(0, 32);
+  return createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 32);
 }
 
 /**
@@ -24,7 +38,8 @@ export function ipHash(req: NextRequest): string {
  * Fails open (allows) if the table can't be reached, so an outage doesn't block the site.
  */
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
-  if (!supabaseConfigured()) return true;
+  // Exempt networks skip the abuse limits; click de-duplication still applies so test visits don't inflate counts.
+  if (!supabaseConfigured() || (key.includes(`:${EXEMPT}-`) && !key.startsWith('click:'))) return true;
   try {
     // Record the hit first, then count it with the rest. Counting first let a burst of parallel
     // requests all see the same count and all get through.
