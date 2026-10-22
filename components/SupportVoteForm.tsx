@@ -216,12 +216,12 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <label className="block">
                 <span className="block text-xs font-bold text-[#1F2937] mb-1.5">Your name</span>
-                <input value={name} onChange={e => setName(e.target.value)} autoComplete="name" maxLength={60} placeholder="Ali Khan"
+                <input value={name} onChange={e => setName(e.target.value)} autoComplete="name" maxLength={60} placeholder="John Smith"
                   className="w-full px-3.5 py-2.5 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F3460]/30 focus:border-[#0F3460]" />
               </label>
               <label className="block">
                 <span className="block text-xs font-bold text-[#1F2937] mb-1.5">Your email</span>
-                <input value={email} onChange={e => setEmail(e.target.value)} type="email" autoComplete="email" maxLength={254} placeholder="you@example.com"
+                <input value={email} onChange={e => setEmail(e.target.value)} type="email" autoComplete="email" maxLength={254} placeholder="john@example.com"
                   className="w-full px-3.5 py-2.5 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F3460]/30 focus:border-[#0F3460]" />
               </label>
             </div>

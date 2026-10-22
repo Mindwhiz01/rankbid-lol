@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import PhoneField, { fullPhone } from '@/components/PhoneField';
 import { bidForRank, HOME_SPONSORED, MAX_BID_USD, MAX_SOCIAL_LINKS, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
 import { PLATFORM_LABELS, normalizePlatform, platformExample, platformUrlProblem, type SubmitPlatform } from '@/lib/platform-url';
 import CategoryField, { categoryChoice, categoryChoiceError, categoryPayload, type CategoryChoice } from '@/components/CategoryField';
@@ -147,6 +148,7 @@ export default function PremiumListingModal({
 
   // Which link type each social row holds, in order. Values live in formData.
   const [linkRows, setLinkRows] = useState<SocialField[]>(() => defaultRows(ownField));
+  const [phoneCountry, setPhoneCountry] = useState('US');
   const [formData, setFormData] = useState({
     founderName: '',
     founderEmail: '',
@@ -222,19 +224,12 @@ export default function PremiumListingModal({
 
     // Only send the social link rows that are on screen.
     const shown = new Set<string>(visibleRows);
-    const payload = { ...formData };
+    const payload = { ...formData, founderPhone: fullPhone(phoneCountry, formData.founderPhone) };
     for (const s of SOCIALS) {
       if (!shown.has(s.name)) payload[s.name] = '';
     }
 
     try {
-      console.log('🎯 Submitting premium listing:', {
-        bidUsd: price,
-        name: formData.founderName,
-        email: formData.founderEmail,
-        phone: formData.founderPhone,
-      });
-
       await onSubmit({
         ...(isNewProduct
           ? { newProduct: { link: productUrl.trim(), platform: newPlatform, ...categoryPayload(productCategory) } }
@@ -498,15 +493,21 @@ export default function PremiumListingModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
                     <span className={fieldLabel}>Name {req}</span>
-                    <input type="text" name="founderName" value={formData.founderName} onChange={handleChange} required className={input} placeholder="Your name" />
+                    <input type="text" name="founderName" value={formData.founderName} onChange={handleChange} required autoComplete="name" className={input} placeholder="John Smith" />
                   </label>
                   <label className="block">
                     <span className={fieldLabel}>Phone {req}</span>
-                    <input type="tel" name="founderPhone" value={formData.founderPhone} onChange={handleChange} required className={input} placeholder="+92 300 1234567" />
+                    <PhoneField
+                      country={phoneCountry}
+                      onCountryChange={setPhoneCountry}
+                      value={formData.founderPhone}
+                      onChange={v => setFormData(prev => ({ ...prev, founderPhone: v }))}
+                      required
+                    />
                   </label>
                   <label className="block sm:col-span-2">
                     <span className={fieldLabel}>Email {req}</span>
-                    <input type="email" name="founderEmail" value={formData.founderEmail} onChange={handleChange} required className={input} placeholder="you@example.com" />
+                    <input type="email" name="founderEmail" value={formData.founderEmail} onChange={handleChange} required autoComplete="email" className={input} placeholder="john@example.com" />
                   </label>
                 </div>
               </section>

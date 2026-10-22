@@ -129,7 +129,7 @@ export default function AccountSettings({ user, onUserChange, onDeleted }: {
           <form onSubmit={saveName} className="space-y-3 max-w-md">
             <label className="block">
               <span className={label}>Display name</span>
-              <input value={name} onChange={e => setName(e.target.value)} maxLength={80} autoComplete="name" className={input} placeholder="Your name" />
+              <input value={name} onChange={e => setName(e.target.value)} maxLength={80} autoComplete="name" className={input} placeholder="John Smith" />
             </label>
             <div className="flex items-center gap-3">
               <button type="submit" disabled={nameBusy || name.trim() === (user.name || '')} className={primary}>
