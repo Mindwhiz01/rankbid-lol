@@ -166,6 +166,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   const [activeTimeFilter] = useState<'alltime' | 'today'>('alltime');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sponsoredPage, setSponsoredPage] = useState(1);
   const [totalPages, setTotalPages] = useState(() => Math.max(1, Math.ceil(initialListings.length / PAGE_SIZE)));
   const [toasts, setToasts] = useState<Toast[]>([]);
   // Listings the signed-in user submitted: only these get the Premium button (the checkout API enforces it too).
@@ -433,10 +434,18 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     };
   }, []);
 
-  // Sponsored listings are ranked by price (#1, #2, … with no gaps). The homepage shows the top 10;
-  // #1-#3 always show (on the podium), then one open rank after the last listing (up to #10).
+  // Sponsored listings are ranked by price (#1, #2, … with no gaps), paged in tens: page 1 is #1-#10
+  // (#1-#3 on the podium), page 2 #11-#20, and so on. #1-#3 always show, then one open rank after the last listing.
   const sponsoredCount = premiumListings.length;
-  const visibleSpots = Math.min(HOME_SPONSORED, Math.max(3, sponsoredCount + 1));
+  const sponsoredSpots = Math.max(3, sponsoredCount + 1);
+  const sponsoredPages = Math.ceil(sponsoredSpots / HOME_SPONSORED);
+  const sponsoredPageNow = Math.min(sponsoredPage, sponsoredPages);
+  const firstSpot = sponsoredPageNow === 1 ? 4 : (sponsoredPageNow - 1) * HOME_SPONSORED + 1;
+  const lastSpot = Math.min(sponsoredPageNow * HOME_SPONSORED, sponsoredSpots);
+  const goToSponsoredPage = (page: number) => {
+    setSponsoredPage(page);
+    document.getElementById('more-sponsored')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Side cards. Sponsored: spots bought since midnight (the viewer's time), highest price first.
   // Rankings: the day's most-voted, refetched whenever the main list reloads (after votes, page changes).
@@ -495,22 +504,24 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
           <div style={slideDelay(200)} className="slide-up relative max-w-5xl mx-auto px-4 sm:px-6 mt-10 sm:mt-12 pb-14 sm:pb-20">
             <LivePodium onClaim={openClaim} />
 
-            {/* SPONSORED #4-#10 (the podium shows #1-#3; the rest are on /sponsored), with today's sponsors beside them */}
+            {/* SPONSORED #4-#10, then #11-#20 … on later pages (the podium shows #1-#3), with today's sponsors beside them */}
             <div className="mt-8 sm:mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
-            {visibleSpots > 3 ? (
-              <div>
+            {lastSpot >= firstSpot ? (
+              <div id="more-sponsored" className="scroll-mt-24">
                 <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
                   <div className="flex items-center gap-2 text-amber-500">
                     <Icons.Star />
                     <h3 className="text-base sm:text-lg font-black text-[#1F2937]">More sponsored</h3>
-                    <span className="text-xs font-bold text-[#1F2937]/40">ranked by price</span>
+                    <span className="text-xs font-bold text-[#1F2937]/40">
+                      {sponsoredPages > 1 ? `#${firstSpot}–#${lastSpot}` : 'ranked by price'}
+                    </span>
                   </div>
                   <a href="/sponsored" className="text-xs sm:text-sm font-black text-amber-700 hover:underline whitespace-nowrap">
                     {sponsoredCount > HOME_SPONSORED ? `See all ${sponsoredCount} →` : 'See all →'}
                   </a>
                 </div>
                 <div className="space-y-2 sm:space-y-2.5">
-                  {Array.from({ length: visibleSpots - 3 }, (_, i) => i + 4).map(pos => {
+                  {Array.from({ length: lastSpot - firstSpot + 1 }, (_, i) => i + firstSpot).map(pos => {
                     const holder = premiumListings.find(l => l.premiumPosition === pos);
                     if (holder) return <SponsoredRow key={holder.id} listing={holder} />;
                     return (
@@ -529,6 +540,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                     );
                   })}
                 </div>
+                <Pagination currentPage={sponsoredPageNow} totalPages={sponsoredPages} onPageChange={goToSponsoredPage} />
               </div>
             ) : <div className="hidden lg:block" />}
               <TodayRankingCard
