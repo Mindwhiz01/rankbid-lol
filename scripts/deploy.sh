@@ -14,8 +14,10 @@ TOKEN="$(cat ~/.vercel-mindwhiz-token)"
 unset VERCEL_TOKEN # the shell's token belongs to the old account
 
 REPO="$(git rev-parse --show-toplevel)"
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# Kept between runs only for .next/cache, which makes rebuilds incremental.
+WORK="${XDG_CACHE_HOME:-$HOME/.cache}/rankbid-deploy"
+mkdir -p "$WORK"
+find "$WORK" -mindepth 1 -maxdepth 1 ! -name .next -exec rm -rf {} +
 
 # Build exactly what is committed, not the working tree.
 git -C "$REPO" archive HEAD | tar -x -C "$WORK"
