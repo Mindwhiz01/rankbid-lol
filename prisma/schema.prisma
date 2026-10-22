@@ -3,6 +3,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // rhel-openssl-3.0.x is Vercel's runtime: deploys are built on this Mac (scripts/deploy.sh) and need its engine too.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
