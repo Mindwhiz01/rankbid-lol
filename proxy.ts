@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryFromSlug, categoryPath } from '@/lib/categories';
-import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
+import { ADMIN_COOKIE, isAdminRequest, isValidAdminCookie } from '@/lib/server/admin';
 import { isComingSoonEnabled } from '@/lib/server/site-settings';
 import { SITE_HOST } from '@/lib/site';
 
@@ -46,20 +46,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // ?adminKey=<ADMIN_KEY> signs this browser in as admin, then the key is dropped from the URL.
-  const queryKey = searchParams.get('adminKey');
-  if (queryKey && isValidAdminKey(queryKey)) {
+  // The admin key is never accepted in a URL (it would land in browser history and request logs):
+  // a link carrying one is stripped of it. Admins sign in on /admin, which posts the key.
+  if (searchParams.has('adminKey')) {
     const clean = request.nextUrl.clone();
     clean.searchParams.delete('adminKey');
-    const response = NextResponse.redirect(clean);
-    response.cookies.set(ADMIN_COOKIE, adminCookieValue()!, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    });
-    return response;
+    return NextResponse.redirect(clean);
   }
 
   // Coming soon mode (switched from the admin dashboard): every visitor except admins sees /coming-soon.

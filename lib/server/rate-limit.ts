@@ -61,12 +61,14 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
   }
 }
 
-/** Deletes rate-limit rows older than a day (called by the daily cron). */
+/** Daily cron cleanup: rate-limit rows older than a day, expired sessions and spent or expired reset links. */
 export async function pruneRateLimits(): Promise<void> {
   if (!supabaseConfigured()) return;
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  await fetch(sbUrl(`rate_limits?created_at=lt.${encodeURIComponent(cutoff)}`), {
-    method: 'DELETE',
-    headers: sbHeaders(),
-  }).catch(() => {});
+  const now = encodeURIComponent(new Date().toISOString());
+  const cutoff = encodeURIComponent(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  await Promise.all([
+    `rate_limits?created_at=lt.${cutoff}`,
+    `sessions?expires_at=lt.${now}`,
+    `password_resets?or=(expires_at.lt.${now},used_at.not.is.null)`,
+  ].map(path => fetch(sbUrl(path), { method: 'DELETE', headers: sbHeaders() }).catch(() => {})));
 }

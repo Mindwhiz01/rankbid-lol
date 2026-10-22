@@ -1,10 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
-import { createSessionToken } from '@/lib/server/session';
+import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
+  if (isCrossSiteWrite(request)) {
+    return NextResponse.json({ error: 'Cross-site request refused' }, { status: 403 });
+  }
   try {
     const { email, password, name } = await request.json();
 

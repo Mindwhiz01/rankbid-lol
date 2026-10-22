@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isCrossSiteWrite } from '@/lib/server/session';
 import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminKey } from '@/lib/server/admin';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
@@ -10,6 +11,9 @@ export async function GET(req: NextRequest) {
 
 // POST { key }: exchange the admin key for an httpOnly cookie.
 export async function POST(req: NextRequest) {
+  if (isCrossSiteWrite(req)) {
+    return NextResponse.json({ error: 'Cross-site request refused' }, { status: 403 });
+  }
   if (!(await rateLimit(`admin-login:${ipHash(req)}`, 10, 15 * 60))) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }

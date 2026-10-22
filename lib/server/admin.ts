@@ -2,7 +2,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-import { getSessionUser } from '@/lib/server/session';
+import { getSessionUser, isCrossSiteWrite } from '@/lib/server/session';
 
 // Only list addresses that already have an account: signups aren't email-verified, so an unregistered
 // address here would let anyone register it and become admin.
@@ -82,6 +82,7 @@ export async function setTeamAdminEmails(emails: string[]): Promise<void> {
  * Only the owner can add or remove team admins.
  */
 export async function isOwnerRequest(req: NextRequest): Promise<boolean> {
+  if (isCrossSiteWrite(req)) return false;
   if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
     return true;
   }
@@ -94,6 +95,7 @@ export async function isOwnerRequest(req: NextRequest): Promise<boolean> {
  * email is on the admin team.
  */
 export async function isAdminRequest(req: NextRequest): Promise<boolean> {
+  if (isCrossSiteWrite(req)) return false;
   if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
     return true;
   }

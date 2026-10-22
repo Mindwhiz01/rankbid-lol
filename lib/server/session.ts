@@ -15,7 +15,26 @@ export function createSessionToken(): string {
   return 'session_' + randomBytes(32).toString('base64url');
 }
 
+/**
+ * CSRF guard: true for a state-changing request another site made the browser send. Browsers label
+ * requests with Sec-Fetch-Site (and Origin); scripts and webhooks send neither and are judged by their own auth.
+ */
+export function isCrossSiteWrite(req: NextRequest): boolean {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return false;
+  const site = req.headers.get('sec-fetch-site');
+  if (site) return site === 'cross-site';
+  const origin = req.headers.get('origin');
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== req.headers.get('host');
+  } catch {
+    return true;
+  }
+}
+
 export async function getSessionUser(req: NextRequest): Promise<SessionUser | null> {
+  // A write another site triggered doesn't get the visitor's session, even if the browser sent the cookie.
+  if (isCrossSiteWrite(req)) return null;
   const token = req.cookies.get('auth_token')?.value;
   if (!token || !supabaseConfigured()) return null;
   try {

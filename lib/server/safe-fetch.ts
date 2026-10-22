@@ -1,6 +1,12 @@
 // Server-only fetch for user-supplied URLs. Blocks requests to private, loopback, link-local and
-// cloud-metadata addresses (SSRF), re-checking every redirect hop.
+// cloud-metadata addresses (SSRF), re-checking every redirect hop. The connection goes to the exact
+// address that was checked, so a DNS answer that changes between the check and the fetch (DNS
+// rebinding) can't point it at an internal host.
 import { lookup } from 'dns/promises';
+import http from 'node:http';
+import https from 'node:https';
+import { pipeline, Readable } from 'node:stream';
+import zlib from 'node:zlib';
 import { isIP } from 'net';
 
 export class UnsafeUrlError extends Error {}
@@ -48,6 +54,11 @@ function expandIpv6(ip: string): number[] {
 
 /** Throws UnsafeUrlError unless `raw` is an http(s) URL on a standard port that resolves to public IPs only. */
 export async function assertPublicUrl(raw: string): Promise<URL> {
+  return (await resolvePublic(raw)).url;
+}
+
+/** The checked URL plus the public address it resolved to (the one the request must connect to). */
+async function resolvePublic(raw: string): Promise<{ url: URL; address: string }> {
   let url: URL;
   try {
     url = new URL(raw);
@@ -66,15 +77,50 @@ export async function assertPublicUrl(raw: string): Promise<URL> {
     throw new UnsafeUrlError('Host could not be resolved');
   }
   if (addresses.length === 0 || addresses.some(isPrivateIp)) throw new UnsafeUrlError('Private addresses are not allowed');
-  return url;
+  return { url, address: addresses[0] };
 }
 
-/** fetch() for untrusted URLs: SSRF-checked, manual redirects (max 3), 8s timeout. */
-export async function safeFetch(raw: string, init: RequestInit = {}, maxRedirects = 3): Promise<Response> {
+const TIMEOUT_MS = 8000;
+
+/** One HTTP(S) request connected to `address` (TLS still checks the certificate for the URL's host). */
+function pinnedRequest(url: URL, address: string, init: { method?: string; headers?: HeadersInit }): Promise<Response> {
+  const family = isIP(address);
+  return new Promise((resolve, reject) => {
+    const req = (url.protocol === 'https:' ? https : http).request(url, {
+      method: init.method || 'GET',
+      headers: { ...Object.fromEntries(new Headers(init.headers)), 'accept-encoding': 'gzip, deflate, br' },
+      lookup: (_host, opts, cb) => (opts.all ? cb(null, [{ address, family }]) : (cb as (e: null, a: string, f: number) => void)(null, address, family)),
+    }, res => {
+      const status = res.statusCode ?? 502;
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(res.headers)) if (v != null) headers.set(k, Array.isArray(v) ? v.join(', ') : String(v));
+      const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+      // Lenient flushing (as browsers do), so a body cut short still yields what arrived.
+      const decoder = encoding === 'gzip' || encoding === 'x-gzip' ? zlib.createGunzip({ finishFlush: zlib.constants.Z_SYNC_FLUSH })
+        : encoding === 'deflate' ? zlib.createInflate({ finishFlush: zlib.constants.Z_SYNC_FLUSH })
+        : encoding === 'br' ? zlib.createBrotliDecompress({ finishFlush: zlib.constants.BROTLI_OPERATION_FLUSH })
+        : null;
+      if (decoder) headers.delete('content-encoding');
+      // pipeline() owns the errors: a broken body ends the stream instead of crashing the process.
+      const stream = decoder ? pipeline(res, decoder, () => {}) : res;
+      res.on('error', () => {});
+      const noBody = init.method === 'HEAD' || status === 204 || status === 304;
+      if (noBody) res.resume();
+      resolve(new Response(noBody ? null : (Readable.toWeb(stream) as ReadableStream), { status: status >= 200 && status <= 599 ? status : 502, headers }));
+    });
+    const timer = setTimeout(() => req.destroy(new Error('Request timed out')), TIMEOUT_MS);
+    req.on('close', () => clearTimeout(timer));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+/** fetch() for untrusted URLs: SSRF-checked, pinned to the checked address, manual redirects (max 3), 8s timeout. */
+export async function safeFetch(raw: string, init: { method?: string; headers?: HeadersInit } = {}, maxRedirects = 3): Promise<Response> {
   let current = raw;
   for (let hop = 0; ; hop++) {
-    const url = await assertPublicUrl(current);
-    const res = await fetch(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(8000) });
+    const { url, address } = await resolvePublic(current);
+    const res = await pinnedRequest(url, address, init);
     const location = res.headers.get('location');
     if (res.status >= 300 && res.status < 400 && location) {
       if (hop >= maxRedirects) throw new UnsafeUrlError('Too many redirects');
