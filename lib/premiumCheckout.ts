@@ -2,8 +2,10 @@
 // Handles both checkout responses: Stripe (redirectUrl) and Rapid Gateway (paymentData to initiate).
 
 export interface PremiumFormData {
-  /** Whole USD; the listing's rank follows from it. */
+  /** Whole USD charged; with a live spot it is added to that bid. */
   bidUsd: number;
+  /** The product's current live bid (0 when none): the bid this payment raises. */
+  raiseFromUsd?: number;
   founderName: string;
   founderEmail: string;
   founderPhone: string;

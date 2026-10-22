@@ -28,8 +28,10 @@ export interface PremiumData {
   listingId?: string;
   /** A product that is not listed yet: it is submitted first, then the bid goes to checkout. */
   newProduct?: { link: string; platform: SubmitPlatform; category: string; customCategory?: string };
-  /** Whole USD; the rank follows from it. */
+  /** Whole USD charged; with a live spot it is added to that bid, and the rank follows from the total. */
   bidUsd: number;
+  /** The product's current live bid (0 when none): the bid this payment raises. */
+  raiseFromUsd?: number;
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -217,7 +219,7 @@ export default function PremiumListingModal({
     }
 
     if (!validBid) {
-      setError(`❌ Enter a whole-dollar amount from $${MIN_BID_USD} to $${MAX_BID_USD.toLocaleString('en-US')}`);
+      setError(`❌ Enter a whole-dollar amount from $${MIN_BID_USD} to $${maxAdd.toLocaleString('en-US')}`);
       setLoading(false);
       return;
     }
@@ -235,6 +237,7 @@ export default function PremiumListingModal({
           ? { newProduct: { link: productUrl.trim(), platform: newPlatform, ...categoryPayload(productCategory) } }
           : { listingId }),
         bidUsd: price,
+        raiseFromUsd: raise,
         ...payload,
         paymentMethod: 'stripe',
       });
@@ -277,17 +280,24 @@ export default function PremiumListingModal({
 
   if (!isOpen) return null;
 
-  // Buying again for a product replaces its current listing, so it doesn't compete with itself.
+  // A product that already holds a spot raises it: what the buyer pays is added to its current bid,
+  // so it never competes with itself and keeps what it paid before.
   const current = ranked.find(r => r.listingId === listingId);
+  const raise = current?.bidUsd ?? 0;
+  const maxAdd = MAX_BID_USD - raise;
   const others = ranked.filter(r => r.listingId !== listingId);
   const otherBids = others.map(r => r.bidUsd);
   const lastRank = others.length + 1;
-  const suggested = bidForRank(Math.min(targetRank ?? HOME_SPONSORED, lastRank), otherBids);
+  // New spot: aim for the target rank. Raise: enough to climb one place (or the minimum at #1).
+  const suggested = current
+    ? Math.min(maxAdd, Math.max(MIN_BID_USD, bidForRank(Math.max(1, current.position - 1), otherBids) - raise))
+    : bidForRank(Math.min(targetRank ?? HOME_SPONSORED, lastRank), otherBids);
   const bid = bidInput === '' ? suggested : Number(bidInput);
-  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD && bid <= MAX_BID_USD;
+  const validBid = Number.isInteger(bid) && bid >= MIN_BID_USD && bid <= maxAdd;
+  // price = what is paid now; total = the spot's bid after paying, which sets the rank.
   const price = validBid ? bid : suggested;
-  // The rank follows from the amount.
-  const rank = rankForBid(price, otherBids);
+  const total = raise + price;
+  const rank = rankForBid(total, otherBids);
   // The listing the bid lands just above (it currently holds that rank).
   const passes = others[rank - 1];
   const topBid = bidForRank(1, otherBids);
@@ -438,16 +448,21 @@ export default function PremiumListingModal({
 
               {/* Amount: the buyer pays what they like, the rank follows */}
               <section>
-                <h3 className={sectionTitle}>Your amount {req}</h3>
+                <h3 className={sectionTitle}>{current ? 'Amount to add' : 'Your amount'} {req}</h3>
+                {current && (
+                  <p className="-mt-2 mb-3 text-sm text-[#1F2937]/70">
+                    This product is <strong className="text-[#0B2545]">#{current.position}</strong> with a <strong className="text-[#0B2545]">${current.bidUsd}</strong> bid. What you pay now is added to it: you keep your spot and pay only the difference.
+                  </p>
+                )}
                 <label className="block">
                   <span className="relative block">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-[#1F2937]/50">$</span>
                     <input
                       type="number"
                       inputMode="numeric"
-                      aria-label="Amount in USD"
+                      aria-label={current ? 'Amount to add in USD' : 'Amount in USD'}
                       min={MIN_BID_USD}
-                      max={MAX_BID_USD}
+                      max={maxAdd}
                       step="1"
                       value={bidInput}
                       onChange={e => setBidInput(e.target.value)}
@@ -458,17 +473,17 @@ export default function PremiumListingModal({
                 </label>
                 {validBid ? (
                   <p className="mt-1.5 text-xs text-[#1F2937]/55">
-                    Whole dollars, from ${MIN_BID_USD}. {rank > 1 && `The top spot (#1) needs $${topBid}.`}
+                    Whole dollars, from ${MIN_BID_USD}. {rank > 1 && (current ? `The top spot (#1) needs $${Math.max(MIN_BID_USD, topBid - raise)} more.` : `The top spot (#1) needs $${topBid}.`)}
                   </p>
                 ) : (
-                  <p className="mt-1.5 text-xs font-bold text-red-600">Enter a whole-dollar amount from ${MIN_BID_USD} to ${MAX_BID_USD.toLocaleString('en-US')}.</p>
+                  <p className="mt-1.5 text-xs font-bold text-red-600">Enter a whole-dollar amount from ${MIN_BID_USD} to ${maxAdd.toLocaleString('en-US')}.</p>
                 )}
 
                 <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
                   <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
                   <div className="min-w-0">
                     <p className="text-lg sm:text-xl font-black text-[#0B2545]">
-                      ${price} <span className="text-sm font-semibold text-[#1F2937]/55">· lifetime on the {where.toLowerCase()}</span>
+                      ${total} <span className="text-sm font-semibold text-[#1F2937]/55">· {current ? `$${raise} + $${price} added, ` : ''}lifetime on the {where.toLowerCase()}</span>
                     </p>
                     <p className="text-xs text-[#1F2937]/60 mt-0.5">
                       {passes
@@ -480,11 +495,6 @@ export default function PremiumListingModal({
                 <p className="text-xs text-[#1F2937]/55 mt-2">
                   One payment, no end date. Listings are ranked by price: someone paying more later moves you down; equal amounts keep whoever paid first ahead.
                 </p>
-                {current && (
-                  <p className="text-xs font-bold text-amber-700 mt-1">
-                    This product is #{current.position} at ${current.bidUsd}. Paying again replaces that listing with the new amount.
-                  </p>
-                )}
               </section>
 
               {/* Founder */}
@@ -614,7 +624,7 @@ export default function PremiumListingModal({
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/50">Sponsored rank</p>
                   <p className="text-sm font-bold text-[#1F2937]/70">{where}</p>
-                  <p className="mt-1 text-xl font-black text-[#0B2545] tabular-nums">${price}</p>
+                  <p className="mt-1 text-xl font-black text-[#0B2545] tabular-nums">${total}{current && <span className="ml-1.5 text-xs font-semibold text-[#1F2937]/50">total bid</span>}</p>
                 </div>
                 <span className="text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
               </div>
@@ -637,8 +647,14 @@ export default function PremiumListingModal({
               </dl>
 
               <div className="my-5 border-t border-dashed border-gray-300" />
+              {current && (
+                <div className="flex justify-between text-sm mb-3">
+                  <span className="text-[#1F2937]/70">Current bid (already paid)</span>
+                  <span className="font-semibold tabular-nums text-[#1F2937]/60">${raise}.00</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
-                <span className="text-[#1F2937]/70">Subtotal</span>
+                <span className="text-[#1F2937]/70">{current ? 'Added now' : 'Subtotal'}</span>
                 <span className="font-semibold tabular-nums">${price}.00</span>
               </div>
               <div className="flex justify-between text-sm mt-3">

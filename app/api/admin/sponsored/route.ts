@@ -10,7 +10,8 @@ const EARNED = new Set(['active', 'outbid', 'replaced']);
 /** Paid, but the money goes (or went) back to the buyer. */
 const REFUND = new Set(['needs_refund', 'rejected']);
 
-const amountOf = (r: any) => Number(r.bid_usd ?? r.payment_amount ?? 0) || 0;
+// Money this order took: payment_amount (a raise charges only the added part; bid_usd is the spot's total).
+const amountOf = (r: any) => Number(r.payment_amount ?? r.bid_usd ?? 0) || 0;
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /**

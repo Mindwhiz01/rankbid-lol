@@ -54,8 +54,10 @@ function validateFounder(item: CartItem): { error: string } | { links: Record<st
 
 interface CartItem {
   listingId: string;
-  /** What the buyer pays (whole USD). The rank follows from it. */
+  /** What the buyer pays (whole USD). With a live spot it is added to that bid; the rank follows from the total. */
   bidUsd: number;
+  /** The product's live bid the buyer saw (0 when it has none): the bid being raised. */
+  raiseFromUsd?: number;
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -180,9 +182,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // A product that already holds a spot raises it: the amount is added to its current bid and only the
+    // amount is charged. The browser says which bid it raised from, so a bid that changed meanwhile is caught.
+    const holders = await getActiveHolders();
+    const currentBid = holders.find(h => h.listingId === item.listingId)?.bidUsd ?? 0;
+    if (Number(item.raiseFromUsd ?? 0) !== currentBid) {
+      return NextResponse.json({ error: 'Your current sponsored bid has changed. Refresh the page and try again.' }, { status: 409 });
+    }
+    const totalUsd = currentBid + bidUsd;
+    if (totalUsd > MAX_BID_USD) {
+      return NextResponse.json({ error: `A bid can be at most $${MAX_BID_USD.toLocaleString('en-US')} in total. You can add up to $${MAX_BID_USD - currentBid}.` }, { status: 400 });
+    }
+
     // Expected rank right now (recorded for reference; the live rank is worked out from the bids).
-    const others = (await getActiveHolders()).filter(h => h.listingId !== item.listingId);
-    const position = rankForBid(bidUsd, others.map(h => h.bidUsd));
+    const others = holders.filter(h => h.listingId !== item.listingId);
+    const position = rankForBid(totalUsd, others.map(h => h.bidUsd));
     const amountPkr = usdToPkr(bidUsd);
 
     const insertRes = await fetch(sbUrl('premium_listings'), {
@@ -204,7 +218,8 @@ export async function POST(req: NextRequest) {
         founder_github: founder.links.founderGithub,
         payment_method: paymentMethod,
         payment_status: 'pending',
-        bid_usd: bidUsd,
+        // bid_usd is the spot's total; payment_amount is what this order charges (less, when raising).
+        bid_usd: totalUsd,
         amount_pkr: amountPkr,
         payment_amount: bidUsd,
       }),
@@ -235,10 +250,15 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency: 'usd',
           unit_amount: usdToCents(bidUsd),
-          product_data: {
-            name: 'RankBid Sponsored listing',
-            description: `Lifetime sponsored listing, ranked by price (currently #${position})`,
-          },
+          product_data: currentBid
+            ? {
+                name: 'RankBid Sponsored listing: raise',
+                description: `Raises your sponsored bid from $${currentBid} to $${totalUsd} (currently #${position})`,
+              }
+            : {
+                name: 'RankBid Sponsored listing',
+                description: `Lifetime sponsored listing, ranked by price (currently #${position})`,
+              },
         },
       }],
       customer_email: str(item.founderEmail).toLowerCase(),
@@ -271,6 +291,7 @@ export async function POST(req: NextRequest) {
       redirectUrl: session.url,
       premiumListings: [premiumListing],
       totalPrice: bidUsd,
+      totalBidUsd: totalUsd,
       itemCount: 1,
     });
   } catch (error: any) {

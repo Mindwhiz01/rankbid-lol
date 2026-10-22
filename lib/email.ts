@@ -173,7 +173,7 @@ const usd = (n: number) => `$${n.toFixed(2).replace(/\.00$/, '')}`;
  * Congratulations and receipt once the webhook has activated a paid bid; `position` is its rank at that moment.
  * `badges` is the badge zip for that rank (lib/server/badges.tsx); without it the email still goes out.
  */
-export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string | null; badges?: EmailAttachment }): Promise<EmailResult> {
+export async function sendPremiumReceipt(e: PremiumEmail & { paidUsd?: number; expiresAt?: string | null; badges?: EmailAttachment }): Promise<EmailResult> {
   const title = escapeHtml(e.productTitle);
   const until = e.expiresAt ? ` until ${new Date(e.expiresAt).toUTCString().slice(5, 16)}` : ' with no end date';
   const badges = e.badges
@@ -181,7 +181,9 @@ export async function sendPremiumReceipt(e: PremiumEmail & { expiresAt?: string 
     : '';
   const body = `
     <p>Congratulations! <strong>${title}</strong> is now sponsored and ranked <strong>#${e.position}</strong> on RankBid.</p>
-    <p>Payment received: <strong>${usd(e.bidUsd)}</strong>.</p>
+    ${e.paidUsd != null && e.paidUsd < e.bidUsd
+      ? `<p>Payment received: <strong>${usd(e.paidUsd)}</strong>, raising your bid to <strong>${usd(e.bidUsd)}</strong>.</p>`
+      : `<p>Payment received: <strong>${usd(e.bidUsd)}</strong>.</p>`}
     ${badges}
     <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you every time someone outbids you. Payments for active listings are not refundable.</p>`;
   const product = `${SITE_URL}/product/${encodeURIComponent(e.listingId)}`;

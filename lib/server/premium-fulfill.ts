@@ -29,7 +29,8 @@ export async function fulfillPaidSession(session: Stripe.Checkout.Session): Prom
   const txnRef = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || session.id;
 
   // Underpaying (wrong currency or amount) leaves the order pending for an admin to look at.
-  const expectedCents = usdToCents(Number(premium.bid_usd ?? premium.payment_amount ?? 0));
+  // payment_amount is this order's charge; it is below bid_usd when the order raises a live bid.
+  const expectedCents = usdToCents(Number(premium.payment_amount ?? premium.bid_usd ?? 0));
   if (session.currency !== 'usd' || (session.amount_total ?? 0) < expectedCents) {
     console.error('Stripe amount lower than the bid:', { premiumListingId, amount: session.amount_total, currency: session.currency, expectedCents });
     await updatePremiumListing(premiumListingId, { payment_txn_ref: txnRef });
@@ -95,6 +96,7 @@ async function notifyLadderChange(
 
   const titles = await listingTitles([premium.listing_id, ...pushed.map(h => h.listingId)]);
   const bidUsd = Number(premium.bid_usd ?? premium.payment_amount ?? 0);
+  const paidUsd = Number(premium.payment_amount ?? bidUsd);
   const position = Number(afterById.get(premium.id)?.position ?? result.position ?? premium.position ?? 0);
   const mine = { listingId: premium.listing_id, productTitle: titles.get(premium.listing_id) || 'Your product', position, bidUsd };
 
@@ -106,7 +108,7 @@ async function notifyLadderChange(
           .then(zip => ({ filename: `rankbid-badges-${position}.zip`, content: Buffer.from(zip) }))
           .catch(err => { console.error('Badge zip failed:', err); return undefined; })
       : undefined;
-    sends.push(sendPremiumReceipt({ ...mine, to: buyerEmail, expiresAt: afterById.get(premium.id)?.expiresAt, badges }));
+    sends.push(sendPremiumReceipt({ ...mine, paidUsd, to: buyerEmail, expiresAt: afterById.get(premium.id)?.expiresAt, badges }));
   } else if (buyerEmail && result.status === 'needs_refund') {
     sends.push(sendPremiumRefundNotice({ ...mine, to: buyerEmail, requiredUsd: result.required }));
   }

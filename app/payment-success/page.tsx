@@ -12,7 +12,10 @@ interface BidStatus {
   status: string;
   /** Current rank by price (null if unknown). */
   position: number | null;
+  /** The spot's total bid. */
   bidUsd: number;
+  /** What this payment charged: less than bidUsd when it raised a live bid. */
+  paidUsd?: number;
   expiresAt: string | null;
   productTitle: string | null;
   reference: string | null;
@@ -103,7 +106,7 @@ function PaymentSuccess() {
           ) : status === 'active' ? (
             <Live bid={bid!} />
           ) : status === 'needs_refund' ? (
-            <Outcome tone="amber" title="Your listing could not start" lead={`Your ${usd(bid!.bidUsd)} payment couldn't be used for a sponsored listing.`}>
+            <Outcome tone="amber" title="Your listing could not start" lead={`Your ${usd(bid!.paidUsd ?? bid!.bidUsd)} payment couldn't be used for a sponsored listing.`}>
               Your payment will be refunded in full to your card. You can bid again any time from your listings.
             </Outcome>
           ) : status === 'failed' ? (
@@ -277,7 +280,7 @@ function Live({ bid }: { bid: BidStatus }) {
 
       <div className="px-6 sm:px-10 pt-8 pb-8 space-y-8">
         <dl className="grid grid-cols-3 gap-3">
-          <Stat label="Paid"><span className="text-emerald-600">{usd(bid.bidUsd)}</span></Stat>
+          <Stat label="Paid"><span className="text-emerald-600">{usd(bid.paidUsd ?? bid.bidUsd)}</span></Stat>
           <Stat label={bid.expiresAt ? 'Runs until' : 'Duration'}>{bid.expiresAt ? day(bid.expiresAt) : 'Lifetime'}</Stat>
           <Stat label="Status">
             <span className="inline-flex items-center gap-1.5 text-emerald-600">

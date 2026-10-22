@@ -61,6 +61,8 @@ export async function GET(req: NextRequest) {
       status: premium.payment_status as string,
       position: (live?.position ?? premium.position ?? null) as number | null,
       bidUsd: Number(premium.bid_usd ?? premium.payment_amount ?? 0),
+      // What this order charged: less than bidUsd when it raised a live bid.
+      paidUsd: Number(premium.payment_amount ?? premium.bid_usd ?? 0),
       expiresAt: premium.expires_at ?? null,
       productTitle: listing.title ?? null,
       reference: typeof premium.payment_txn_ref === 'string' && premium.payment_txn_ref.startsWith('pi_') ? premium.payment_txn_ref : null,
