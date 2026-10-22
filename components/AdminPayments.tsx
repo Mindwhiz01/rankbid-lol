@@ -14,7 +14,6 @@ interface PremiumListing {
   /** Live rank by price for active listings; the recorded rank otherwise. */
   position: number | null;
   bid_usd: number | null;
-  amount_pkr: number | null;
   payment_method: string | null;
   expires_at?: string | null;
   founder_name: string;
@@ -230,7 +229,6 @@ export default function AdminPayments({ title = 'Approve payments' }: { title?: 
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
                         {listing.position ? `Rank #${listing.position}` : 'Not ranked'}
-                        {listing.amount_pkr ? ` · PKR ${listing.amount_pkr.toLocaleString()}` : ''}
                         {listing.payment_method ? ` · ${listing.payment_method}` : ''}
                       </p>
                       {listing.payment_status === 'active' && (

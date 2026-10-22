@@ -451,7 +451,7 @@ Current players (Product Hunt, Hacker News, etc.) are capturing value unfairly:
 - Creator outreach program
 
 **Operations (20%):** $40K-60K
-- Payments infrastructure (Rapid Gateway, Stripe)
+- Payments infrastructure (Stripe)
 - Legal and compliance
 - Business operations
 - Admin and overhead

@@ -1,5 +1,5 @@
 // Client-side: send a premium bid from PremiumListingModal to checkout and follow the payment redirect.
-// Handles both checkout responses: Stripe (redirectUrl) and Rapid Gateway (paymentData to initiate).
+// Stripe is the only payment method: checkout answers with the Stripe page to redirect to.
 
 export interface PremiumFormData {
   /** Whole USD charged; with a live spot it is added to that bid. */
@@ -38,20 +38,6 @@ export async function startPremiumCheckout(listingId: string, data: PremiumFormD
   if (result.paymentRequired && result.redirectUrl) {
     window.location.href = result.redirectUrl;
     return 'redirecting';
-  }
-
-  if (result.paymentRequired && result.paymentMethod === 'rapid-gateway' && result.paymentData) {
-    const payRes = await fetch('/api/payment/rapid-gateway/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(result.paymentData),
-    });
-    const pay = await payRes.json().catch(() => ({}));
-    if (!payRes.ok) throw new Error(pay.error || 'Failed to start payment');
-    if (pay.redirectUrl) {
-      window.location.href = pay.redirectUrl;
-      return 'redirecting';
-    }
   }
 
   return 'submitted';

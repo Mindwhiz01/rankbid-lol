@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
-import { getActiveHolders, updatePremiumListing, usdToPkr } from '@/lib/server/premium';
+import { getActiveHolders, updatePremiumListing } from '@/lib/server/premium';
 import { MAX_BID_USD, MIN_BID_USD, rankForBid } from '@/lib/premiumSpots';
 import type Stripe from 'stripe';
 import { getStripe, usdToCents } from '@/lib/server/stripe';
@@ -197,7 +197,6 @@ export async function POST(req: NextRequest) {
     // Expected rank right now (recorded for reference; the live rank is worked out from the bids).
     const others = holders.filter(h => h.listingId !== item.listingId);
     const position = rankForBid(totalUsd, others.map(h => h.bidUsd));
-    const amountPkr = usdToPkr(bidUsd);
 
     const insertRes = await fetch(sbUrl('premium_listings'), {
       method: 'POST',
@@ -220,7 +219,6 @@ export async function POST(req: NextRequest) {
         payment_status: 'pending',
         // bid_usd is the spot's total; payment_amount is what this order charges (less, when raising).
         bid_usd: totalUsd,
-        amount_pkr: amountPkr,
         payment_amount: bidUsd,
       }),
     });

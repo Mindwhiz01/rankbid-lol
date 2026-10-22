@@ -1,12 +1,6 @@
 // Server-only helpers for sponsored listings, ranked by price (see supabase/migrations/premium_rank_by_price.sql).
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
-/** Rapid Gateway charges PKR; prices are set in USD and converted at this rate. */
-export function usdToPkr(usd: number): number {
-  const rate = Number(process.env.USD_TO_PKR) || 280;
-  return Math.round(usd * rate);
-}
-
 export interface PremiumHolder {
   id: string;
   listingId: string;
