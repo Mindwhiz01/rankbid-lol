@@ -963,13 +963,15 @@ function OverviewTab({
                     ['Views', traffic?.views, <Eye key="e" className="w-4 h-4 text-[#1F2937]/50" />],
                   ] as const).map(([label, value, icon]) => {
                     const text = value === undefined ? '—' : fmt(value);
+                    // One size for all three, set by the longest number, so the tiles match.
+                    const longest = Math.max(2, ...[traffic?.live, traffic?.visitors, traffic?.views].map(v => (v === undefined ? 1 : fmt(v).length)));
                     return (
                       <div key={label} className="min-w-0 rounded-2xl bg-[#F4F6FA] px-3 sm:px-4 py-4 [container-type:inline-size]">
                         <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#1F2937]/45 truncate">{icon}{label}</span>
-                        {/* Shrinks with the tile so long numbers (10,919 or 1,250,000) stay inside it. */}
+                        {/* Shrinks with the tile so long numbers (10,919 or 1,250,000) stay inside it; all three share the size. */}
                         <span
                           className="block mt-1 font-black tabular-nums leading-tight whitespace-nowrap"
-                          style={{ fontSize: `min(1.875rem, ${Math.floor(160 / Math.max(text.length, 2))}cqw)` }}
+                          style={{ fontSize: `min(1.875rem, ${Math.floor(160 / longest)}cqw)` }}
                         >
                           {text}
                         </span>
