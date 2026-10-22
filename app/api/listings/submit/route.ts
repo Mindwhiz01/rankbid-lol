@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractMetadata } from '@/lib/metadata';
-import { query } from '@/lib/db';
 import { extractSocialHandle, formatSocialMediaUrl, isSocialMediaUrl } from '@/lib/social-utils';
 import { sendNewSubmissionEmail, sendSubmissionConfirmation } from '@/lib/email';
 import { getActiveHolders, type PremiumHolder } from '@/lib/server/premium';
@@ -83,6 +82,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if ((url || '').length > 500) {
+      return NextResponse.json({ error: 'Link is too long (500 characters max)', listings: [] }, { status: 400 });
+    }
     if ((description || '').length > 500 || (handle || '').length > 200) {
       return NextResponse.json({ error: 'Description is too long (500 characters max)', listings: [] }, { status: 400 });
     }

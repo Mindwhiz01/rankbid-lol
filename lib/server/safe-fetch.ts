@@ -18,10 +18,32 @@ function isPrivateIp(ip: string): boolean {
       (a === 198 && (b === 18 || b === 19))
     );
   }
-  const v = ip.toLowerCase();
-  if (v === '::' || v === '::1') return true;
-  if (v.startsWith('::ffff:')) return isPrivateIp(v.slice(7));
-  return v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80') || v.startsWith('ff');
+  if (isIP(ip) !== 6) return true;
+  const h = expandIpv6(ip);
+  const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  // IPv4 carried inside IPv6 (mapped ::ffff:a.b.c.d, compatible ::a.b.c.d, NAT64 64:ff9b::, 6to4 2002::).
+  // The URL parser rewrites [::ffff:127.0.0.1] as [::ffff:7f00:1], so the hex form has to be decoded too.
+  if (h.slice(0, 5).every(x => x === 0) && (h[5] === 0xffff || h[5] === 0)) {
+    return h[5] === 0 && h[6] === 0 ? true : isPrivateIp(v4(h[6], h[7])); // ::, ::1 and other ::/96 addresses
+  }
+  if (h[0] === 0x64 && h[1] === 0xff9b) return isPrivateIp(v4(h[6], h[7]));
+  if (h[0] === 0x2002) return isPrivateIp(v4(h[1], h[2]));
+  return (h[0] & 0xfe00) === 0xfc00 || (h[0] & 0xffc0) === 0xfe80 || (h[0] & 0xff00) === 0xff00; // ULA, link-local, multicast
+}
+
+/** The eight 16-bit groups of an IPv6 address (expands "::" and a trailing dotted IPv4 part). */
+function expandIpv6(ip: string): number[] {
+  let s = ip.toLowerCase().split('%')[0];
+  const dotted = s.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const [a, b, c, d] = dotted[1].split('.').map(Number);
+    s = s.slice(0, -dotted[1].length) + `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, tail] = s.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail !== undefined && tail ? tail.split(':') : [];
+  const fill = tail !== undefined ? Array(8 - left.length - right.length).fill('0') : [];
+  return [...left, ...fill, ...right].map(x => parseInt(x, 16) || 0);
 }
 
 /** Throws UnsafeUrlError unless `raw` is an http(s) URL on a standard port that resolves to public IPs only. */

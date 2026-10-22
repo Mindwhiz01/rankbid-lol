@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import bcryptjs from 'bcryptjs';
 import { createSessionToken } from '@/lib/server/session';
+import { passwordMatches } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const passwordMatch = await bcryptjs.compare(password, user.password);
+    const passwordMatch = await passwordMatches(user, password);
 
     if (!passwordMatch) {
       return NextResponse.json(

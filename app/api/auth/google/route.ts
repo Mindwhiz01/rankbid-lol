@@ -1,15 +1,19 @@
 import { prisma } from '@/lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
 import { createSessionToken } from '@/lib/server/session';
+import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
 const client = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 
 export async function POST(request: NextRequest) {
   try {
-    const { token } = await request.json();
+    if (!(await rateLimit(`google-ip:${ipHash(request)}`, 30, 15 * 60))) {
+      return NextResponse.json({ error: 'Too many sign-in attempts. Please wait and try again.' }, { status: 429 });
+    }
+    const { token } = await request.json().catch(() => ({}));
 
-    if (!token) {
+    if (typeof token !== 'string' || !token || token.length > 4096) {
       return NextResponse.json(
         { error: 'Token is required' },
         { status: 400 }

@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
 
     // Order by appropriate field
     if (timeWindow === 'today') {
-      query = query.order('day_votes', { ascending: false });
+      query = query.order('day_votes', { ascending: false }).order('rank_reached_at', { ascending: true });
     } else if (timeWindow === 'alltime') {
-      query = query.order('total_votes', { ascending: false });
+      query = query.order('total_votes', { ascending: false }).order('rank_reached_at', { ascending: true });
     } else {
       return NextResponse.json({ error: 'Invalid time window' }, { status: 400 });
     }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       id: listing.id,
       title: listing.title,
       description: listing.description,
-      url: listing.url,
+      url: listing.location || listing.url,
       category: listing.category,
       platform: listing.platform || 'website',
       totalVotes: listing.total_votes || 0,

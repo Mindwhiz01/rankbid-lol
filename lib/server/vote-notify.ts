@@ -9,7 +9,7 @@ export type VoteSnapshot = { id: string; title: string; userId: string | null; t
 
 /** At most this many passed listings are emailed per vote (a vote at a big tie can pass many). */
 const MAX_OVERTAKEN = 10;
-/** Each listing's owner hears about new votes at most once an hour. Being passed is emailed every time. */
+/** New-vote emails go out at most once an hour per listing; passed emails once an hour per pair of listings. */
 const VOTE_MAIL_WINDOW = 60 * 60;
 /** Gap between overtaken emails, to stay under Resend's per-second rate limit. */
 const SEND_GAP_MS = 600;
@@ -74,6 +74,8 @@ export async function notifyVote(before: VoteSnapshot, totalVotes: number, voter
     for (const [i, p] of passed.entries()) {
       const o = p.user_id ? owners.get(p.user_id) : undefined;
       if (!o || p.user_id === before.userId) continue;
+      // Voting and unvoting in a loop would otherwise mail the same owner over and over.
+      if (!(await rateLimit(`passed-mail:${p.id}:${before.id}`, 1, VOTE_MAIL_WINDOW))) continue;
       await new Promise(r => setTimeout(r, SEND_GAP_MS));
       await sendOvertakenEmail({
         to: o.email,

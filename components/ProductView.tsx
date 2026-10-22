@@ -13,6 +13,7 @@ import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
+import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 
@@ -281,7 +282,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                     {voted ? 'Voted' : 'Vote'} · {votes}
                   </button>
                   <a
-                    href={product.url.startsWith('http') ? `/api/click?id=${encodeURIComponent(product.id)}` : getVisitUrl()}
+                    href={product.url.startsWith('http') ? `/api/click?id=${encodeURIComponent(product.id)}` : safeExternalUrl(getVisitUrl()) ?? '#'}
                     onClick={() => { if (product.url.startsWith('http') && claimClick(product.id)) setOwnClick(1); }}
                     target="_blank"
                     rel="noopener noreferrer"

@@ -7,6 +7,7 @@ import AdminShell, { ADMIN_TABS, type AdminTab } from '@/components/AdminShell';
 import AdminPayments from '@/components/AdminPayments';
 import PageNav, { PAGE_SIZE } from '@/components/Pagination';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
+import { safeExternalUrl } from '@/lib/utils';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
   RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, Zap,
@@ -734,7 +735,7 @@ function ListingTitle({ listing }: { listing: AdminListing }) {
         <Link href={`/product/${listing.id}`} target="_blank" className="font-semibold hover:underline line-clamp-1 break-all">
           {listing.title}
         </Link>
-        <a href={listing.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:underline flex items-center gap-1 truncate">
+        <a href={safeExternalUrl(listing.url) ?? '#'} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:underline flex items-center gap-1 truncate">
           <span className="truncate">{listing.url}</span> <ExternalLink className="w-3 h-3 shrink-0" />
         </a>
       </div>

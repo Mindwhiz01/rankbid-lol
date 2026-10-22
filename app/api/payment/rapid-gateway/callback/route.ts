@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
 
     try {
       if (eventType === 'transaction.completed' && status === 'SUCCESS') {
-        // Underpaying (e.g. a tampered amount) leaves the order pending for an admin to look at.
-        if (amount != null && Number(amount) < Number(premium.amount_pkr || 0)) {
+        // Underpaying (e.g. a tampered amount) or no amount at all leaves the order pending for an admin to look at.
+        if (amount == null || !(Number(amount) >= Number(premium.amount_pkr || 0))) {
           console.error('Payment amount lower than the bid:', { premiumListingId, amount, expected: premium.amount_pkr });
           await updatePremiumListing(premiumListingId, { payment_txn_ref: gatewayTxnRef || merchantTransactionId });
           return NextResponse.json({ success: true, message: 'Amount mismatch, held for review' });

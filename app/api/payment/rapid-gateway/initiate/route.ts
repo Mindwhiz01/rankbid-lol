@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPremiumListing } from '@/lib/server/premium';
+import { getSessionUser } from '@/lib/server/session';
+import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
 interface PaymentRequest {
   premiumListingId: string;
@@ -10,10 +13,16 @@ interface PaymentRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser(req);
+    if (!user) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
+    if (!(await rateLimit(`pay-init:${ipHash(req)}`, 20, 60 * 60))) {
+      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
+    }
+
     const { premiumListingId, email, phone, name } = await req.json() as PaymentRequest;
 
     // Validate required fields
-    if (!premiumListingId || !email || !phone || !name) {
+    if ([premiumListingId, email, phone, name].some(v => typeof v !== 'string' || !v || v.length > 254)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -29,6 +38,13 @@ export async function POST(req: NextRequest) {
       );
     }
     const amount: number = premium.amount_pkr;
+
+    // Only the owner of the listing can pay for its order.
+    const listingRes = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(premium.listing_id)}&select=user_id`), { headers: sbHeaders(), cache: 'no-store' });
+    const [listing] = listingRes.ok ? await listingRes.json() : [];
+    if (!listing || String(listing.user_id ?? '') !== user.id) {
+      return NextResponse.json({ error: 'Premium order not found or already paid' }, { status: 404 });
+    }
 
     // Get Rapid Gateway credentials
     const merchantId = process.env.RAPID_GATEWAY_MERCHANT_ID;
