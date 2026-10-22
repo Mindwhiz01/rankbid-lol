@@ -301,3 +301,28 @@ export async function sendPasswordResetEmail(e: { to: string; name?: string | nu
       `;
   return send(e.to, 'Reset your RankBid password', html, 'Password reset');
 }
+
+/** The RankBid team changed this account's email or password. The new password itself is never sent. */
+export async function sendAccountUpdatedEmail(e: { to: string; name?: string | null; email: string | null; password: boolean }): Promise<EmailResult> {
+  const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';
+  const changes = [
+    e.email ? `<li>Your sign-in email is now <strong>${escapeHtml(e.email)}</strong>.</li>` : '',
+    e.password ? '<li>Your password was changed.</li>' : '',
+  ].join('');
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">Your RankBid account was updated</h2>
+            <p>${hello}</p>
+            <p>The RankBid team updated your account:</p>
+            <ul>${changes}</ul>
+            <p>You've been signed out on every device. Sign in again with the new details.</p>
+            <a href="${SITE_URL}/login" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Sign in</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              Didn't ask for this? Email ${SUPPORT_EMAIL} right away.
+            </p>
+          </div>
+        </div>
+      `;
+  return send(e.to, 'Your RankBid account was updated', html, 'Account updated');
+}

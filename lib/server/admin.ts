@@ -126,6 +126,14 @@ export interface AdminUser {
   id: string;
   email: string;
   name: string | null;
+  phone: string | null;
+  city: string | null;
+  country: string | null;
+  bio: string | null;
+  /** How the account signs in: a password, or Google only (no password set yet). */
+  signIn: 'password' | 'google';
+  /** The owner or a team admin: only the owner may edit these accounts. */
+  isAdmin: boolean;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -176,11 +184,26 @@ async function sbCount(path: string): Promise<number> {
 }
 
 /** Strips anything that isn't a public profile field (never send password hashes to the browser). */
-export function toAdminUser(row: Record<string, unknown>, counts?: { submissions: number; votes: number }): AdminUser {
+/** True for the owner's address or a team admin's. */
+export async function isAdminEmail(email: string): Promise<boolean> {
+  const e = email.toLowerCase();
+  return ADMIN_EMAILS.includes(e) || (await getTeamAdminEmails()).includes(e);
+}
+
+/** Never includes the password hash. */
+export function toAdminUser(row: Record<string, unknown>, counts?: { submissions: number; votes: number }, adminEmails: string[] = []): AdminUser {
+  const email = String(row.email ?? '');
+  const text = (v: unknown) => (typeof v === 'string' && v ? v : null);
   return {
     id: String(row.id),
-    email: String(row.email ?? ''),
+    email,
     name: (row.name ?? row.full_name ?? row.username ?? null) as string | null,
+    phone: text(row.phone),
+    city: text(row.city),
+    country: text(row.country),
+    bio: text(row.bio),
+    signIn: row.password === 'google_oauth' ? 'google' : 'password',
+    isAdmin: adminEmails.includes(email.toLowerCase()),
     createdAt: String(row.created_at ?? ''),
     submissions: counts?.submissions ?? 0,
     submissionVotes: counts?.votes ?? 0,

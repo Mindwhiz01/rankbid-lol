@@ -10,7 +10,7 @@ import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import { safeExternalUrl } from '@/lib/utils';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
-  RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, Zap,
+  Pencil, RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, X, Zap,
 } from 'lucide-react';
 
 // ---- Types (mirror lib/server/admin.ts) ----
@@ -36,6 +36,12 @@ interface AdminUser {
   id: string;
   email: string;
   name: string | null;
+  phone: string | null;
+  city: string | null;
+  country: string | null;
+  bio: string | null;
+  signIn: 'password' | 'google';
+  isAdmin: boolean;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -1607,6 +1613,7 @@ function UsersTab({
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
   const debouncedSearch = useDebounced(search);
 
   const params = new URLSearchParams({ page: String(page), limit: '20' });
@@ -1677,6 +1684,7 @@ function UsersTab({
                 open={expanded === u.id}
                 onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
                 onDelete={() => deleteUser(u)}
+                onEdit={() => setEditing(u)}
               >
                 <SubmissionsTab onRemove={onRemove} liveVersion={liveVersion} toast={toast} userId={u.id} compact />
               </UserRow>
@@ -1684,6 +1692,15 @@ function UsersTab({
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <EditUserModal
+          user={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(message) => { setEditing(null); toast(message, 'success'); load(); }}
+          toast={toast}
+        />
+      )}
 
       {!loading && users.length === 0 && <p className="text-center text-gray-500 py-8">No users found</p>}
       {loading && users.length === 0 && <p className="text-center text-gray-500 py-8">Loading…</p>}
@@ -1709,12 +1726,14 @@ function UserRow({
   open,
   onToggle,
   onDelete,
+  onEdit,
   children,
 }: {
   user: AdminUser;
   open: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onEdit: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -1725,7 +1744,11 @@ function UserRow({
             {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
         </td>
-        <td className="px-3 py-2.5 font-semibold">{user.email}</td>
+        <td className="px-3 py-2.5 font-semibold">
+          {user.email}
+          {user.isAdmin && <span className="ml-2 text-[10px] font-black uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Admin</span>}
+          {user.signIn === 'google' && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Google</span>}
+        </td>
         <td className="px-3 py-2.5">{user.name || '—'}</td>
         <td className="px-3 py-2.5 text-right tabular-nums">
           {user.submissions > 0 ? (
@@ -1736,8 +1759,11 @@ function UserRow({
         </td>
         <td className="px-3 py-2.5 text-right tabular-nums">{fmt(user.submissionVotes)}</td>
         <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</td>
-        <td className="px-3 py-2.5">
-          <button onClick={onDelete} title="Delete user" className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
+        <td className="px-3 py-2.5 whitespace-nowrap">
+          <button onClick={onEdit} title="Edit user" aria-label={`Edit ${user.email}`} className="p-1.5 text-gray-400 hover:text-[#0F3460] rounded hover:bg-[#0F3460]/5">
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button onClick={onDelete} title="Delete user" aria-label={`Delete ${user.email}`} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
             <Trash2 className="w-4 h-4" />
           </button>
         </td>
@@ -1750,6 +1776,132 @@ function UserRow({
         </tr>
       )}
     </>
+  );
+}
+
+/** Edit any account: name, email, password and profile fields. Saves only what changed. */
+function EditUserModal({ user, onClose, onSaved, toast }: {
+  user: AdminUser;
+  onClose: () => void;
+  onSaved: (message: string) => void;
+  toast: (m: string, t?: Toast['type']) => void;
+}) {
+  const initial = {
+    name: user.name ?? '', email: user.email, phone: user.phone ?? '', city: user.city ?? '', country: user.country ?? '', bio: user.bio ?? '',
+  };
+  const [form, setForm] = useState(initial);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [signOut, setSignOut] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const set = (k: keyof typeof initial) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const changed = Object.fromEntries(Object.entries(form).filter(([k, v]) => v.trim() !== initial[k as keyof typeof initial].trim()));
+  const credentialsChange = 'email' in changed || password !== '';
+
+  // A strong random password the admin can copy and send to the user.
+  const generate = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(14));
+    setPassword(Array.from(bytes, b => chars[b % chars.length]).join(''));
+    setShowPassword(true);
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!Object.keys(changed).length && !password && !signOut) { setError('Nothing to change'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, ...changed, ...(password ? { password } : {}), ...(signOut ? { signOut: true } : {}) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || 'Could not save the changes'); return; }
+      onSaved(data.signedOut ? 'User updated and signed out everywhere' : 'User updated');
+    } catch {
+      toast('Could not save the changes', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const input = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#0F3460] focus:ring-2 focus:ring-[#0F3460]/15';
+  const label = 'block text-xs font-bold text-gray-600 mb-1';
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[#0F3460]/40 backdrop-blur-sm" onClick={onClose} />
+      <form
+        onSubmit={save}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-user-title"
+        className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-3xl"
+      >
+        <div className="flex items-start justify-between gap-4 p-6 pb-4">
+          <div className="min-w-0">
+            <h2 id="edit-user-title" className="text-lg font-black text-[#1F2937]">Edit user</h2>
+            <p className="text-xs text-gray-500 truncate">{user.email} · joined {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="px-6 space-y-4">
+          {error && <p role="alert" className="text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+          {user.isAdmin && <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">This is an admin account. Only the owner can change it.</p>}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block"><span className={label}>Name</span><input value={form.name} onChange={set('name')} maxLength={80} className={input} placeholder="John Smith" /></label>
+            <label className="block"><span className={label}>Email</span><input type="email" value={form.email} onChange={set('email')} maxLength={254} required className={input} /></label>
+          </div>
+
+          <div>
+            <span className={label}>New password</span>
+            <div className="flex gap-2">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                minLength={8}
+                maxLength={200}
+                autoComplete="new-password"
+                placeholder={user.signIn === 'google' ? 'Google sign-in only: set one to allow password login' : 'Leave empty to keep the current one'}
+                className={input}
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)} className="px-3 text-xs font-bold border border-gray-300 rounded-lg hover:bg-gray-50">{showPassword ? 'Hide' : 'Show'}</button>
+              <button type="button" onClick={generate} className="px-3 text-xs font-bold border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap">Generate</button>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-500">At least 8 characters. The user is emailed that it changed, never the password itself.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block"><span className={label}>Phone</span><input type="tel" value={form.phone} onChange={set('phone')} maxLength={20} className={input} placeholder="+1 201 555 0123" /></label>
+            <label className="block"><span className={label}>City</span><input value={form.city} onChange={set('city')} maxLength={80} className={input} placeholder="New York" /></label>
+            <label className="block"><span className={label}>Country</span><input value={form.country} onChange={set('country')} maxLength={80} className={input} placeholder="United States" /></label>
+          </div>
+          <label className="block"><span className={label}>Bio</span><textarea value={form.bio} onChange={set('bio')} maxLength={500} rows={3} className={input} /></label>
+
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={signOut || credentialsChange} disabled={credentialsChange} onChange={e => setSignOut(e.target.checked)} className="mt-0.5" />
+            <span>Sign this user out on every device{credentialsChange && <span className="text-gray-500"> (always, when the email or password changes)</span>}</span>
+          </label>
+        </div>
+
+        <div className="mt-6 px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-bold text-[#1F2937] bg-white border border-gray-300 hover:bg-gray-100">Cancel</button>
+          <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-[#0F3460] hover:bg-[#0D2A50] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
