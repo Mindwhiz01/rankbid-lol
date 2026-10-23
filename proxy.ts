@@ -15,6 +15,7 @@ const COMING_SOON_OPEN = [
   '/login',
   '/forgot-password',
   '/reset-password',
+  '/verify-email',
   '/tos',
   '/privacy',
   '/cookies',

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GoogleLogin } from '@react-oauth/google';
+import ResendVerification from '@/components/ResendVerification';
 
 // Where to go after login: ?next=/some/path (same-site paths only, never //host or full URLs).
 function nextPath(): string {
@@ -17,10 +18,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setUnverified(false);
     setLoading(true);
 
     try {
@@ -34,6 +37,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error || 'Login failed');
+        setUnverified(Boolean(data.unverified));
         return;
       }
 
@@ -94,6 +98,7 @@ export default function LoginPage() {
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm font-semibold">{error}</p>
+              {unverified && <div className="mt-2"><ResendVerification email={email} next={nextPath()} /></div>}
             </div>
           )}
 

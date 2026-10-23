@@ -44,6 +44,7 @@ interface AdminUser {
   isAdmin: boolean;
   blockedAt: string | null;
   blockedReason: string | null;
+  emailVerified: boolean;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -1900,6 +1901,7 @@ function UserRow({
           {user.email}
           {user.isAdmin && <span className="ml-2 text-[10px] font-black uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Admin</span>}
           {user.signIn === 'google' && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Google</span>}
+          {!user.emailVerified && <span title="Hasn't opened the confirmation email yet" className="ml-2 text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">Unverified</span>}
           {user.blockedAt && (
             <span
               title={`Blocked ${new Date(user.blockedAt).toLocaleString()}${user.blockedReason ? `: ${user.blockedReason}` : ''}`}

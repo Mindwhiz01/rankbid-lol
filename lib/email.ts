@@ -301,6 +301,25 @@ export async function sendWaitlistWelcomeEmail(e: { to: string }): Promise<Email
   return send(e.to, "🎉 You're on the RankBid waitlist", html, 'Waitlist welcome');
 }
 
+/** "Confirm your email" link sent after an email signup (valid 24 hours, single use). */
+export async function sendVerifyEmail(e: { to: string; name?: string | null; verifyUrl: string }): Promise<EmailResult> {
+  const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">Confirm your email</h2>
+            <p>${hello}</p>
+            <p>Thanks for joining RankBid! Click the button to confirm <strong>${escapeHtml(e.to)}</strong> and finish creating your account. The link works once and expires in 24 hours.</p>
+            <a href="${safeHref(e.verifyUrl)}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Confirm my email</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              Didn't sign up? Ignore this email and no account will be activated. Questions? Email ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+  return send(e.to, 'Confirm your RankBid email', html, 'Verify email');
+}
+
 /** Password reset link (valid for an hour, single use). */
 export async function sendPasswordResetEmail(e: { to: string; name?: string | null; resetUrl: string }): Promise<EmailResult> {
   const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';

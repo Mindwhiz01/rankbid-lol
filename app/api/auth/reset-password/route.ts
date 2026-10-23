@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { INVITE_PLACEHOLDER, endSessions, getAccount, passwordProblem, setPassword } from '@/lib/server/account';
+import { INVITE_PLACEHOLDER, endSessions, getAccount, markEmailVerified, passwordProblem, setPassword } from '@/lib/server/account';
 import { logAdminActivity } from '@/lib/server/admin-activity';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
 
     const account = await getAccount({ id: row.user_id });
     await setPassword(row.user_id, password);
+    // The link was emailed to this address, so opening it confirms the email too.
+    await markEmailVerified(row.user_id);
     await endSessions(row.user_id);
     // An invited admin choosing their first password: their invite is now accepted.
     if (account?.password === INVITE_PLACEHOLDER) {

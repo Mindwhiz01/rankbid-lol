@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
-import { BLOCKED_MESSAGE, isBlocked, passwordMatches } from '@/lib/server/account';
+import { BLOCKED_MESSAGE, isBlocked, isEmailVerified, passwordMatches } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
 
     if (await isBlocked(user.id)) {
       return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
+    }
+
+    if (!(await isEmailVerified(user.id))) {
+      return NextResponse.json(
+        { error: 'Please confirm your email first. Check your inbox for the link we sent.', unverified: true },
+        { status: 403 }
+      );
     }
 
     const token = createSessionToken();

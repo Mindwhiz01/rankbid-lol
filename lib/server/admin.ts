@@ -137,6 +137,8 @@ export interface AdminUser {
   /** When an admin blocked the account (it can't sign in), else null. */
   blockedAt: string | null;
   blockedReason: string | null;
+  /** False for an email signup that hasn't opened its confirmation link yet. */
+  emailVerified: boolean;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -209,6 +211,7 @@ export function toAdminUser(row: Record<string, unknown>, counts?: { submissions
     isAdmin: adminEmails.includes(email.toLowerCase()),
     blockedAt: text(row.blocked_at),
     blockedReason: text(row.blocked_reason),
+    emailVerified: !('email_verified_at' in row) || Boolean(row.email_verified_at),
     createdAt: String(row.created_at ?? ''),
     submissions: counts?.submissions ?? 0,
     submissionVotes: counts?.votes ?? 0,

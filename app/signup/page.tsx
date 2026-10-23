@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { GoogleLogin } from '@react-oauth/google';
 import PasswordInput from '@/components/PasswordInput';
 import Turnstile, { TURNSTILE_SITE_KEY, type TurnstileHandle } from '@/components/Turnstile';
+import ResendVerification from '@/components/ResendVerification';
 
 // After sign-up: ?next=/path (same-site only), otherwise straight to the submit form.
 function nextPath(): string {
@@ -22,6 +23,8 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // Set once the account is created: the address we sent the confirmation link to.
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const captcha = useRef<TurnstileHandle>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +52,7 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, turnstileToken: captchaToken }),
+        body: JSON.stringify({ name, email, password, turnstileToken: captchaToken, next: nextPath() }),
       });
 
       const data = await res.json();
@@ -61,10 +64,8 @@ export default function SignupPage() {
         return;
       }
 
-      // Store user info in localStorage
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      router.push(nextPath());
+      // The account works once the emailed link is opened.
+      setSentTo(data.email || email);
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {
@@ -112,9 +113,20 @@ export default function SignupPage() {
             <Link href="/" className="inline-flex mb-4">
               <img src="/brand/logo.png" alt="RankBid" width={491} height={295} className="h-24 w-auto" />
             </Link>
-            <p className="text-gray-600 text-sm mt-4">Create a new account</p>
+            <p className="text-gray-600 text-sm mt-4">{sentTo ? 'Confirm your email' : 'Create a new account'}</p>
           </div>
 
+          {sentTo ? (
+            <div className="text-center">
+              <p className="text-[#1F2937] font-semibold mb-2">Check your inbox</p>
+              <p className="text-sm text-gray-600 mb-5">
+                We sent a confirmation link to <span className="font-semibold text-[#1F2937]">{sentTo}</span>.
+                Open it to finish creating your account. The link expires in 24 hours.
+              </p>
+              <ResendVerification email={sentTo} next={nextPath()} />
+            </div>
+          ) : (
+          <>
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm font-semibold">{error}</p>
@@ -217,6 +229,9 @@ export default function SignupPage() {
               />
             )}
           </div>
+
+          </>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">

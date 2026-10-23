@@ -93,3 +93,65 @@ export async function isBlocked(userId: string): Promise<boolean> {
     return false;
   }
 }
+
+// ---- Email verification (supabase/migrations/email_verification.sql) ----
+
+/** How long a "confirm your email" link works. */
+const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** True once the account confirmed its email (or was created before verification existed). True on lookup errors, so sign-in never breaks over it. */
+export async function isEmailVerified(userId: string): Promise<boolean> {
+  try {
+    const res = await fetch(sbUrl(`users?id=eq.${encodeURIComponent(userId)}&select=*`), { headers: sbHeaders(), cache: 'no-store' });
+    if (!res.ok) return true;
+    const [row] = await res.json();
+    return !row || !('email_verified_at' in row) || Boolean(row.email_verified_at);
+  } catch {
+    return true;
+  }
+}
+
+/** Marks the account's email as confirmed; `extra` columns are set in the same update. */
+export async function markEmailVerified(userId: string, extra: Record<string, unknown> = {}): Promise<void> {
+  const res = await fetch(sbUrl(`users?id=eq.${encodeURIComponent(userId)}`), {
+    method: 'PATCH',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+    body: JSON.stringify({ email_verified_at: new Date().toISOString(), ...extra }),
+  });
+  if (!res.ok) throw new Error(`Marking email verified failed: ${res.status} ${await res.text()}`);
+}
+
+/**
+ * A one-time /verify-email link for the account (valid 24 hours). Earlier unused links stop working.
+ * `next` is where to go after confirming (same-site paths only).
+ */
+export async function createVerifyEmailLink(userId: string, baseUrl: string, next?: string | null): Promise<string> {
+  await fetch(sbUrl(`email_verifications?user_id=eq.${encodeURIComponent(userId)}&used_at=is.null`), { method: 'DELETE', headers: sbHeaders() });
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const res = await fetch(sbUrl('email_verifications'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+    body: JSON.stringify({ token_hash: tokenHash, user_id: userId, expires_at: new Date(Date.now() + VERIFY_TTL_MS).toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Saving verification token failed: ${res.status} ${await res.text()}`);
+  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? `&next=${encodeURIComponent(next)}` : '';
+  return `${baseUrl.replace(/\/+$/, '')}/verify-email?token=${token}${safeNext}`;
+}
+
+/** Uses a verification token once. Returns the account's id, or null when it's unknown, used or expired. */
+export async function claimVerifyEmailToken(token: string): Promise<string | null> {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const now = new Date().toISOString();
+  const res = await fetch(
+    sbUrl(`email_verifications?token_hash=eq.${tokenHash}&used_at=is.null&expires_at=gt.${encodeURIComponent(now)}`),
+    {
+      method: 'PATCH',
+      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ used_at: now }),
+    }
+  );
+  if (!res.ok) throw new Error(`Verification token lookup failed: ${res.status} ${await res.text()}`);
+  const [row] = await res.json();
+  return row?.user_id ?? null;
+}

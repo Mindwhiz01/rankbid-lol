@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
-import { BLOCKED_MESSAGE, isBlocked } from '@/lib/server/account';
+import { BLOCKED_MESSAGE, GOOGLE_PLACEHOLDER, isBlocked, isEmailVerified, markEmailVerified } from '@/lib/server/account';
 import { NextRequest, NextResponse } from 'next/server';
 
 const client = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
@@ -61,6 +61,12 @@ export async function POST(request: NextRequest) {
           password: 'google_oauth', // Placeholder for OAuth users
         },
       });
+    }
+
+    // Google has verified this address. An unconfirmed email signup for it may have been made by
+    // someone else, so its password is dropped: from now on it signs in with Google (or a reset).
+    if (!(await isEmailVerified(user.id))) {
+      await markEmailVerified(user.id, { password: GOOGLE_PLACEHOLDER });
     }
 
     if (await isBlocked(user.id)) {

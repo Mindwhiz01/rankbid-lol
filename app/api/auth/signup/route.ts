@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
-import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
+import { isCrossSiteWrite } from '@/lib/server/session';
+import { GOOGLE_PLACEHOLDER, INVITE_PLACEHOLDER, createVerifyEmailLink, isEmailVerified } from '@/lib/server/account';
+import { sendVerifyEmail } from '@/lib/email';
 import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { verifyTurnstile } from '@/lib/server/turnstile';
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,7 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Cross-site request refused' }, { status: 403 });
   }
   try {
-    const { email, password, name, turnstileToken } = await request.json();
+    const { email, password, name, turnstileToken, next } = await request.json();
 
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return NextResponse.json(
@@ -47,59 +49,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Email already in use' },
-        { status: 400 }
-      );
-    }
-
+    const key = email.toLowerCase();
+    const existingUser = await prisma.user.findUnique({ where: { email: key } });
     const hashedPassword = await bcryptjs.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        name: name || undefined,
-      },
-    });
+    // An account that never confirmed its email proves nothing about who made it, so signing up
+    // again replaces its password; only whoever can open the confirmation email gets in.
+    let userId: string;
+    if (existingUser) {
+      const pending = existingUser.password !== GOOGLE_PLACEHOLDER && existingUser.password !== INVITE_PLACEHOLDER
+        && !(await isEmailVerified(existingUser.id));
+      if (!pending) {
+        return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
+      }
+      await prisma.user.update({ where: { id: existingUser.id }, data: { password: hashedPassword, name: name || existingUser.name } });
+      userId = existingUser.id;
+    } else {
+      const user = await prisma.user.create({
+        data: { email: key, password: hashedPassword, name: name || undefined },
+      });
+      userId = user.id;
+    }
 
-    const token = createSessionToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.session.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
-    });
-
-    const response = NextResponse.json(
-      {
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name
-        }
-      },
-      { status: 201 }
-    );
-
-    response.cookies.set('auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    });
-
-    return response;
+    // No session yet: the account works once the emailed link is opened.
+    const verifyUrl = await createVerifyEmailLink(userId, process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin, typeof next === 'string' ? next : null);
+    const sent = await sendVerifyEmail({ to: key, name: name || existingUser?.name, verifyUrl });
+    if (!sent.sent) {
+      console.error('Verification email not sent:', sent.error);
+      return NextResponse.json({ error: 'We couldn’t send the confirmation email. Please try again.' }, { status: 502 });
+    }
+    return NextResponse.json({ success: true, verifyEmail: true, email: key }, { status: 201 });
   } catch (error) {
     console.error('Signup error:', error);
     return NextResponse.json(
