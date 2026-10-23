@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { ANONYMOUS_USER_ID, isAdminRequest, removeListing, sbSelect, toAdminListing, toAdminUser } from '@/lib/server/admin';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 
 const SORTS: Record<string, string> = {
   newest: 'created_at.desc',
@@ -84,6 +85,8 @@ export async function DELETE(req: NextRequest) {
     if (removed.length === 0) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
+    // Keep a full copy of each deleted submission in the activity log.
+    await Promise.all(results.map((row) => row && logAdminActivity(req, 'listing.delete', String(row.title ?? row.id), { listing: row })));
     return NextResponse.json({ success: true, removed });
   } catch (error) {
     console.error('Error deleting listing:', error);
@@ -109,6 +112,9 @@ export async function PATCH(req: NextRequest) {
     if (Object.keys(changes).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
+    const { rows: [before] } = await sbSelect<Record<string, unknown>>(
+      `listings?id=eq.${encodeURIComponent(listingId)}&select=${Object.keys(changes).join(',')}`
+    );
     const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(listingId)}`), {
       method: 'PATCH',
       headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
@@ -119,6 +125,7 @@ export async function PATCH(req: NextRequest) {
     if (!row) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
+    await logAdminActivity(req, 'listing.update', String(row.title ?? listingId), { listingId, before: before ?? null, after: changes });
     return NextResponse.json({ success: true, listing: toAdminListing(row) });
   } catch (error) {
     console.error('Error updating listing:', error);

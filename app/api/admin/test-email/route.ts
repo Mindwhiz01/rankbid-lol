@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/server/admin';
 import { sendNewSubmissionEmail } from '@/lib/email';
 import { SITE_URL } from '@/lib/site';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 
 // POST: send a sample "new submission" email to NOTIFICATION_EMAIL, to check delivery.
 export async function POST(req: NextRequest) {
@@ -17,5 +18,6 @@ export async function POST(req: NextRequest) {
     platform: 'website',
     url: SITE_URL,
   });
+  await logAdminActivity(req, 'email.test', result.sent ? result.to : null, { result });
   return NextResponse.json(result, { status: result.sent ? 200 : 502 });
 }

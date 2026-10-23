@@ -356,6 +356,7 @@ function AdminDashboard() {
         {tab === 'votes' && <VotesTab liveVersion={live.snapshot?.generatedAt} toast={toast} />}
         {tab === 'sponsored' && <SponsoredTab toast={toast} />}
         {tab === 'team' && <TeamTab toast={toast} confirmAction={confirmAction} />}
+        {tab === 'activity' && <ActivityTab />}
       </AdminShell>
 
       {dialog}
@@ -434,7 +435,7 @@ function ComingSoonToggle({ toast, confirmAction }: { toast: (m: string, t?: Toa
 // ---- Login ----
 
 function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
-  // Team admins sign in with the email and password the owner gave them; the owner can also use the admin key.
+  // Team admins sign in with their email and the password they set from the invite link; the owner can also use the admin key.
   const [mode, setMode] = useState<'account' | 'key'>('account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -483,7 +484,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       <div className="bg-white rounded-3xl p-8 w-full max-w-md">
         <h1 className="text-3xl font-black text-[#1F2937] mb-2">Admin Access</h1>
         <p className="text-[#1F2937]/60 mb-6">
-          {mode === 'account' ? 'Sign in with the email and password you were given.' : 'Enter the owner’s admin password.'}
+          {mode === 'account' ? 'Sign in with your email and the password you set from your invite.' : 'Enter the owner’s admin password.'}
         </p>
         <form onSubmit={submit} className="space-y-4">
           {mode === 'account' ? (
@@ -519,17 +520,16 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
 
 interface TeamData {
   owners: string[];
-  team: { email: string; name: string | null }[];
+  team: { email: string; name: string | null; pending: boolean }[];
   max: number;
   canManage: boolean;
 }
 
-/** Share the dashboard: the owner adds up to `max` admins by email and password, and can remove them. */
+/** Share the dashboard: the owner invites up to `max` admins by email (they set their own password), and can remove them. */
 function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type']) => void; confirmAction: ConfirmFn }) {
   const [data, setData] = useState<TeamData | null>(null);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -547,18 +547,18 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
       const res = await fetch('/api/admin/team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, name }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not add the admin');
       if (!d.emailSent) {
-        toast(`${d.email} was added, but the invite email failed (${d.emailError}). Share the login yourself.`, 'error');
+        toast(`${d.email} was added, but the invite email failed (${d.emailError}). Try resending it.`, 'error');
       } else {
         toast(d.existingAccount
           ? `Invite sent to ${d.email}. They already had an account, so they keep their own password.`
-          : `Invite sent to ${d.email} with their login details`, 'success');
+          : `Invite sent to ${d.email}. They'll choose their own password from the email.`, 'success');
       }
-      setEmail(''); setName(''); setPassword('');
+      setEmail(''); setName('');
       load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not add the admin', 'error');
@@ -623,13 +623,16 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
               <span className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-black uppercase">{(m.name || m.email)[0]}</span>
               <div className="min-w-0 flex-1">
                 <p className="font-bold truncate">{m.name || m.email}</p>
-                <p className="text-xs text-[#1F2937]/45 truncate">{m.name ? `${m.email} · ` : ''}Admin</p>
+                <p className="text-xs text-[#1F2937]/45 truncate">
+                  {m.name ? `${m.email} · ` : ''}Admin
+                  {m.pending && <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-semibold">Invite pending</span>}
+                </p>
               </div>
               {data.canManage && (
                 <button
                   onClick={() => resend(m.email)}
                   aria-label={`Resend invite to ${m.email}`}
-                  title="Resend invite email"
+                  title={m.pending ? 'Resend invite (sends a new set-password link)' : 'Resend invite email'}
                   className="p-2 rounded-lg text-[#1F2937]/40 hover:text-[#0F3460] hover:bg-[#F4F6FA] transition-colors"
                 >
                   <Mail className="w-4 h-4" />
@@ -656,7 +659,7 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
         <section className="bg-white rounded-3xl p-6">
           <h2 className="text-lg font-black mb-1">Share access</h2>
           <p className="text-sm text-[#1F2937]/55 mb-4">
-            We email them an invite with this login. They sign in at <span className="font-semibold text-[#1F2937]">/admin</span> and get the full dashboard.
+            We email them an invite with a link to set their own password. Then they sign in at <span className="font-semibold text-[#1F2937]">/admin</span> and get the full dashboard.
           </p>
           {full ? (
             <p className="text-sm font-semibold text-amber-700 bg-amber-50 rounded-xl px-3 py-2.5">
@@ -666,8 +669,7 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
             <form onSubmit={add} className="space-y-3">
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={input} required />
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" maxLength={80} className={input} />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (8+ characters)" minLength={8} autoComplete="new-password" className={input} />
-              <p className="text-xs text-[#1F2937]/45">If the email already has a RankBid account, they keep their own password.</p>
+              <p className="text-xs text-[#1F2937]/45">The link expires in 7 days. If the email already has a RankBid account, they keep their own password.</p>
               <button
                 type="submit"
                 disabled={busy}
@@ -682,6 +684,119 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
         <section className="bg-white rounded-3xl p-6 text-sm text-[#1F2937]/55">Only the owner can add or remove admins.</section>
       )}
     </div>
+  );
+}
+
+// ---- Activity log ----
+
+interface ActivityEntry {
+  id: number;
+  actor: string;
+  action: string;
+  target: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+interface ActivityData {
+  entries: ActivityEntry[];
+  actors: string[];
+  labels: Record<string, string>;
+  pagination: Pagination;
+}
+
+const ACTIVITY_TONE: Record<string, string> = {
+  delete: 'bg-red-50 text-red-700',
+  remove: 'bg-red-50 text-red-700',
+  reject: 'bg-red-50 text-red-700',
+  add: 'bg-emerald-50 text-emerald-700',
+  approve: 'bg-emerald-50 text-emerald-700',
+  invite_accepted: 'bg-emerald-50 text-emerald-700',
+};
+
+/** Every change made from the dashboard: who did it, when, and the data (deleted rows are kept in full). Owner only. */
+function ActivityTab() {
+  const [data, setData] = useState<ActivityData | null>(null);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [actor, setActor] = useState('');
+  const [action, setAction] = useState('');
+  const [open, setOpen] = useState<number | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams({ page: String(page), limit: '25' });
+    if (actor) params.set('actor', actor);
+    if (action) params.set('action', action);
+    let cancelled = false;
+    fetch(`/api/admin/activity?${params}`)
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Failed to load the activity log');
+        return d;
+      })
+      .then((d) => { if (!cancelled) { setData(d); setError(''); } })
+      .catch((e) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, [page, actor, action]);
+
+  if (error) return <div className="bg-white rounded-3xl p-6 text-sm text-[#1F2937]/55">{error}</div>;
+  if (!data) return <div className="bg-white rounded-3xl p-6 text-gray-500">Loading…</div>;
+  const select = 'px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#0F3460]';
+  const tone = (a: string) => ACTIVITY_TONE[a.split('.')[1]] ?? 'bg-[#F4F6FA] text-[#0F3460]';
+
+  return (
+    <section className="bg-white rounded-3xl p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-xl font-black">Activity log</h2>
+          <p className="text-sm text-[#1F2937]/55">Every change made from this dashboard, and by whom. Deleted data is kept here in full.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={actor} onChange={(e) => { setActor(e.target.value); setPage(1); }} className={select} aria-label="Filter by admin">
+            <option value="">All admins</option>
+            {data.actors.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className={select} aria-label="Filter by action">
+            <option value="">All actions</option>
+            {Object.entries(data.labels).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {data.entries.length === 0 ? (
+        <p className="text-sm text-[#1F2937]/50">Nothing logged yet.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {data.entries.map((e) => (
+            <li key={e.id} className="py-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${tone(e.action)}`}>{data.labels[e.action] ?? e.action}</span>
+                <span className="font-semibold text-sm truncate min-w-0 max-w-full">{e.target || '—'}</span>
+                <span className="text-xs text-[#1F2937]/50">by <span className="font-semibold text-[#1F2937]/70">{e.actor}</span></span>
+                <span className="ml-auto text-xs text-[#1F2937]/45 tabular-nums" title={new Date(e.created_at).toLocaleString()}>{timeAgo(e.created_at)}</span>
+                {e.details && (
+                  <button
+                    onClick={() => setOpen(open === e.id ? null : e.id)}
+                    className="text-xs font-bold text-[#0F3460] hover:underline flex items-center gap-0.5"
+                    aria-expanded={open === e.id}
+                  >
+                    {open === e.id ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />} Details
+                  </button>
+                )}
+              </div>
+              {open === e.id && e.details && (
+                <pre className="mt-2 p-3 rounded-xl bg-[#F4F6FA] text-xs text-[#1F2937]/80 overflow-x-auto whitespace-pre-wrap break-all">
+                  {JSON.stringify(e.details, null, 2)}
+                </pre>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {data.pagination.pages > 1 && (
+        <PageNav currentPage={page} totalPages={data.pagination.pages} onPageChange={setPage} className="mt-4" />
+      )}
+    </section>
   );
 }
 

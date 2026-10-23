@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BadgeDollarSign, ChevronDown, CreditCard, FileText, Heart, LayoutGrid, LogOut, Search, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { BadgeDollarSign, ChevronDown, CreditCard, FileText, Heart, History, LayoutGrid, LogOut, Search, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /** Dashboard tabs (on /admin, switched with ?tab=) plus the payment approval page. */
 export const ADMIN_TABS = [
@@ -13,6 +13,7 @@ export const ADMIN_TABS = [
   ['votes', 'Votes', Heart],
   ['sponsored', 'Sponsored', BadgeDollarSign],
   ['team', 'Admin team', ShieldCheck],
+  ['activity', 'Activity log', History],
 ] as const;
 
 export type AdminTab = (typeof ADMIN_TABS)[number][0];

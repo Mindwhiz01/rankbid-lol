@@ -1,9 +1,13 @@
 // Server-only: account records for password changes, resets and account deletion (Supabase REST).
+import { createHash, randomBytes } from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
 /** Accounts created with Google sign-in store this instead of a password hash. */
 export const GOOGLE_PLACEHOLDER = 'google_oauth';
+
+/** Accounts created by an admin invite store this until the invitee sets their own password. */
+export const INVITE_PLACEHOLDER = 'admin_invite_pending';
 
 /** Same rule as sign-up. Null when the password is fine. */
 export function passwordProblem(password: unknown): string | null {
@@ -29,7 +33,7 @@ export async function getAccount(where: { id: string } | { email: string }): Pro
 
 /** True when `password` matches the account's (always false for a Google-only account). */
 export async function passwordMatches(account: AccountRow, password: unknown): Promise<boolean> {
-  if (typeof password !== 'string' || !password || account.password === GOOGLE_PLACEHOLDER) return false;
+  if (typeof password !== 'string' || !password || account.password === GOOGLE_PLACEHOLDER || account.password === INVITE_PLACEHOLDER) return false;
   return bcryptjs.compare(password, account.password).catch(() => false);
 }
 
@@ -48,4 +52,29 @@ export async function endSessions(userId: string, keepToken?: string): Promise<v
   const keep = keepToken ? `&token=neq.${encodeURIComponent(keepToken)}` : '';
   const res = await fetch(sbUrl(`sessions?user_id=eq.${encodeURIComponent(userId)}${keep}`), { method: 'DELETE', headers: sbHeaders() });
   if (!res.ok) throw new Error(`Ending sessions failed: ${res.status} ${await res.text()}`);
+}
+
+/**
+ * Saves a one-time "choose a password" token for the account (password_resets table) and returns
+ * the /reset-password link. Only the token's hash is stored; the raw token lives in the link alone.
+ * `replaceUnused` drops the account's earlier unused links first, so only the newest one works.
+ */
+export async function createPasswordLink(
+  userId: string,
+  ttlMs: number,
+  baseUrl: string,
+  opts: { invite?: boolean; replaceUnused?: boolean } = {},
+): Promise<string> {
+  if (opts.replaceUnused) {
+    await fetch(sbUrl(`password_resets?user_id=eq.${encodeURIComponent(userId)}&used_at=is.null`), { method: 'DELETE', headers: sbHeaders() });
+  }
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const res = await fetch(sbUrl('password_resets'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+    body: JSON.stringify({ token_hash: tokenHash, user_id: userId, expires_at: new Date(Date.now() + ttlMs).toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Saving password token failed: ${res.status} ${await res.text()}`);
+  return `${baseUrl.replace(/\/+$/, '')}/reset-password?token=${token}${opts.invite ? '&invite=1' : ''}`;
 }

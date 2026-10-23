@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { isAdminRequest } from '@/lib/server/admin';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 
 // The rankbid.click sending domain in Resend; its DNS records must exist at the DNS host.
 const DOMAIN_ID = process.env.RESEND_DOMAIN_ID || 'a58a1b46-1f82-44c1-97f1-2e09dea78561';
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { error } = await resend.domains.verify(DOMAIN_ID);
   if (error) return NextResponse.json({ error: error.message }, { status: 502 });
+  await logAdminActivity(req, 'email.verify_domain', DOMAIN_ID);
   const { data } = await resend.domains.get(DOMAIN_ID);
   return NextResponse.json({ verifying: true, status: data?.status, records: data?.records });
 }

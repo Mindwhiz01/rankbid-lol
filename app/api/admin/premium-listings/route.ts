@@ -3,6 +3,7 @@ import { isAdminRequest } from '@/lib/server/admin';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { activatePremiumBid, getActiveHolders, getPremiumListing, updatePremiumListing } from '@/lib/server/premium';
 import { getStripe } from '@/lib/server/stripe';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 
 async function stripePaid(ref: unknown): Promise<boolean> {
   const stripe = getStripe();
@@ -113,6 +114,11 @@ export async function PATCH(req: NextRequest) {
 
     // Approval activates the bid for life; it takes its rank among the others by price.
     const result = status === 'approved' ? await activatePremiumBid(premiumListingId) : { status: 'rejected' };
+    await logAdminActivity(req, status === 'approved' ? 'premium.approve' : 'premium.reject', premium.founder_name || premium.listing_id || premiumListingId, {
+      premiumListingId,
+      order: premium,
+      result,
+    });
 
     return NextResponse.json({
       success: true,

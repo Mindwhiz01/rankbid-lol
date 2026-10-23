@@ -43,8 +43,8 @@ export function isValidAdminCookie(value: string | null | undefined): boolean {
 
 // ---- Team admins ----
 // Up to MAX_TEAM_ADMINS extra people the owner shares the dashboard with, stored as an email list
-// in site_settings (key 'admin_team'). Their accounts are created by the owner with a password,
-// so nobody can claim one of these addresses by signing up first.
+// in site_settings (key 'admin_team'). Their accounts are created when the owner invites them (the
+// invitee then sets a password from the emailed link), so nobody can claim one by signing up first.
 
 export const MAX_TEAM_ADMINS = 3;
 const TEAM_KEY = 'admin_team';
@@ -273,8 +273,8 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
   };
 }
 
-/** Removes a submission and every vote cast on it. Returns false when no listing had that id. */
-export async function removeListing(listingId: string): Promise<boolean> {
+/** Removes a submission and every vote cast on it. Returns the deleted row, or null when no listing had that id. */
+export async function removeListing(listingId: string): Promise<Record<string, unknown> | null> {
   const id = encodeURIComponent(listingId);
   const del = (path: string) =>
     fetch(sbUrl(path), { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=representation' }) });
@@ -283,5 +283,5 @@ export async function removeListing(listingId: string): Promise<boolean> {
   const res = await del(`listings?id=eq.${id}`);
   if (!res.ok) throw new Error(`Failed to delete listing: ${await res.text()}`);
   const deleted = await res.json();
-  return Array.isArray(deleted) && deleted.length > 0;
+  return Array.isArray(deleted) && deleted.length > 0 ? deleted[0] : null;
 }

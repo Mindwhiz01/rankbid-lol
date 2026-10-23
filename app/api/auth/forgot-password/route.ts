@@ -1,8 +1,7 @@
-import { createHash, randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAccount } from '@/lib/server/account';
+import { createPasswordLink, getAccount } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
-import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { supabaseConfigured } from '@/lib/server/votes';
 import { sendPasswordResetEmail } from '@/lib/email';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -27,18 +26,7 @@ export async function POST(req: NextRequest) {
     const account = await getAccount({ email: key });
     if (!account) return done;
 
-    // Only the hash is stored; the raw token lives in the email link alone.
-    const token = randomBytes(32).toString('base64url');
-    const tokenHash = createHash('sha256').update(token).digest('hex');
-    const res = await fetch(sbUrl('password_resets'), {
-      method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify({ token_hash: tokenHash, user_id: account.id, expires_at: new Date(Date.now() + RESET_TTL_MS).toISOString() }),
-    });
-    if (!res.ok) throw new Error(`Saving reset token failed: ${res.status} ${await res.text()}`);
-
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-    const resetUrl = `${appUrl.replace(/\/+$/, '')}/reset-password?token=${token}`;
+    const resetUrl = await createPasswordLink(account.id, RESET_TTL_MS, process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin);
     const sent = await sendPasswordResetEmail({ to: account.email, name: account.name, resetUrl });
     if (!sent.sent) console.error('Password reset email not sent:', sent.error);
     return done;

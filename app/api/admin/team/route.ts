@@ -1,39 +1,47 @@
 import { prisma } from '@/lib/prisma';
-import bcryptjs from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   ADMIN_EMAILS, MAX_TEAM_ADMINS, getTeamAdminEmails, isAdminRequest, isOwnerRequest, setTeamAdminEmails,
 } from '@/lib/server/admin';
+import { INVITE_PLACEHOLDER, createPasswordLink } from '@/lib/server/account';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 import { getSessionUser } from '@/lib/server/session';
 import { sendAdminInviteEmail } from '@/lib/email';
 
+/** How long an invite's "set your password" link works. */
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 // GET: the admin team. Any admin can see it; only the owner can change it (canManage).
+// `pending` means the invite hasn't been accepted: they haven't set a password yet.
 export async function GET(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const emails = await getTeamAdminEmails();
   const users = emails.length
-    ? await prisma.user.findMany({ where: { email: { in: emails } }, select: { email: true, name: true } })
+    ? await prisma.user.findMany({ where: { email: { in: emails } }, select: { email: true, name: true, password: true } })
     : [];
-  const names = new Map(users.map((u) => [u.email, u.name]));
+  const byEmail = new Map(users.map((u) => [u.email, u]));
   return NextResponse.json({
     owners: ADMIN_EMAILS,
-    team: emails.map((email) => ({ email, name: names.get(email) ?? null })),
+    team: emails.map((email) => ({
+      email,
+      name: byEmail.get(email)?.name ?? null,
+      pending: byEmail.get(email)?.password === INVITE_PLACEHOLDER,
+    })),
     max: MAX_TEAM_ADMINS,
     canManage: await isOwnerRequest(req),
   });
 }
 
-// POST { email, password, name? }: give someone admin access. Creates their account with that
-// password, or, when the email already has an account, grants access and keeps their password.
+// POST { email, name? }: give someone admin access. A new account is created without a password and
+// the invite email carries a one-time link to choose one; an existing account keeps its password.
 export async function POST(req: NextRequest) {
   if (!(await isOwnerRequest(req))) {
     return NextResponse.json({ error: 'Only the owner can add admins' }, { status: 403 });
   }
   const body = await req.json().catch(() => null);
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const password = typeof body?.password === 'string' ? body.password : '';
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 80) : '';
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 254) {
@@ -52,29 +60,27 @@ export async function POST(req: NextRequest) {
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
-    if (!existing) {
-      if (password.length < 8 || password.length > 200) {
-        return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
-      }
-      await prisma.user.create({
-        data: { email, password: await bcryptjs.hash(password, 10), name: name || undefined },
-      });
-    }
+    const user = existing ?? await prisma.user.create({
+      data: { email, password: INVITE_PLACEHOLDER, name: name || undefined },
+    });
+    const pending = user.password === INVITE_PLACEHOLDER;
     await setTeamAdminEmails([...team, email]);
     const invite = await sendAdminInviteEmail({
       to: email,
-      name: name || existing?.name,
-      password: existing ? undefined : password,
+      name: name || user.name,
+      setPasswordUrl: pending ? await inviteLink(req, user.id) : null,
       invitedBy: await ownerName(req),
     });
-    return NextResponse.json({ email, existingAccount: Boolean(existing), emailSent: invite.sent, emailError: invite.sent ? undefined : invite.error });
+    await logAdminActivity(req, 'team.add', email, { name: name || user.name || null, existingAccount: Boolean(existing), emailSent: invite.sent });
+    return NextResponse.json({ email, existingAccount: !pending, emailSent: invite.sent, emailError: invite.sent ? undefined : invite.error });
   } catch (e) {
     console.error('Add admin failed:', e);
     return NextResponse.json({ error: 'Could not add the admin' }, { status: 500 });
   }
 }
 
-// PATCH { email }: email a team admin their invite again (without a password, which isn't stored).
+// PATCH { email }: email a team admin their invite again. While they haven't set a password yet,
+// this sends a fresh set-password link and the earlier links stop working.
 export async function PATCH(req: NextRequest) {
   if (!(await isOwnerRequest(req))) {
     return NextResponse.json({ error: 'Only the owner can send invites' }, { status: 403 });
@@ -84,12 +90,25 @@ export async function PATCH(req: NextRequest) {
   if (!(await getTeamAdminEmails()).includes(email)) {
     return NextResponse.json({ error: 'Not an admin' }, { status: 404 });
   }
-  const user = await prisma.user.findUnique({ where: { email }, select: { name: true } });
-  const invite = await sendAdminInviteEmail({ to: email, name: user?.name, password: null, invitedBy: await ownerName(req) });
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, password: true } });
+  if (!user) return NextResponse.json({ error: 'That admin has no account' }, { status: 404 });
+  const pending = user.password === INVITE_PLACEHOLDER;
+  const invite = await sendAdminInviteEmail({
+    to: email,
+    name: user.name,
+    setPasswordUrl: pending ? await inviteLink(req, user.id) : null,
+    invitedBy: await ownerName(req),
+  });
   if (!invite.sent) {
     return NextResponse.json({ error: `Email not sent: ${invite.error}` }, { status: 502 });
   }
+  await logAdminActivity(req, 'team.resend_invite', email, { pending });
   return NextResponse.json({ emailSent: true });
+}
+
+/** A fresh one-time link for an invited admin to choose their password; older links stop working. */
+function inviteLink(req: NextRequest, userId: string): Promise<string> {
+  return createPasswordLink(userId, INVITE_TTL_MS, process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin, { invite: true, replaceUnused: true });
 }
 
 /** Who to name as the inviter: the signed-in owner's name or email, else nothing (admin key). */
@@ -111,6 +130,7 @@ export async function DELETE(req: NextRequest) {
   }
   try {
     await setTeamAdminEmails(team.filter((e) => e !== email));
+    await logAdminActivity(req, 'team.remove', email);
     return NextResponse.json({ removed: email });
   } catch (e) {
     console.error('Remove admin failed:', e);

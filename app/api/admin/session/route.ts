@@ -3,6 +3,7 @@ import { isCrossSiteWrite } from '@/lib/server/session';
 import { ADMIN_COOKIE, adminCookieValue, isAdminRequest, isValidAdminKey } from '@/lib/server/admin';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
+import { ADMIN_KEY_ACTOR, logAdminActivity } from '@/lib/server/admin-activity';
 
 // GET: is this browser an admin (admin key cookie, or signed in with an admin email)?
 export async function GET(req: NextRequest) {
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
   if (!isValidAdminKey(key)) {
     return NextResponse.json({ error: 'Invalid admin key' }, { status: 401 });
   }
+  await logAdminActivity(req, 'session.key_sign_in', null, undefined, ADMIN_KEY_ACTOR);
   const res = NextResponse.json({ admin: true });
   res.cookies.set(ADMIN_COOKIE, adminCookieValue()!, {
     httpOnly: true,

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { endSessions, passwordProblem, setPassword } from '@/lib/server/account';
+import { INVITE_PLACEHOLDER, endSessions, getAccount, passwordProblem, setPassword } from '@/lib/server/account';
+import { logAdminActivity } from '@/lib/server/admin-activity';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 
@@ -36,8 +37,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This reset link has expired or was already used. Please request a new one.' }, { status: 400 });
     }
 
+    const account = await getAccount({ id: row.user_id });
     await setPassword(row.user_id, password);
     await endSessions(row.user_id);
+    // An invited admin choosing their first password: their invite is now accepted.
+    if (account?.password === INVITE_PLACEHOLDER) {
+      await logAdminActivity(req, 'team.invite_accepted', account.email, undefined, account.email);
+    }
     const res = NextResponse.json({ success: true });
     res.cookies.delete('auth_token');
     return res;

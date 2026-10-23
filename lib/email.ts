@@ -117,18 +117,19 @@ export async function sendNewSubmissionEmail(listing: SubmissionEmailListing): P
 }
 
 /**
- * Tells someone they've been given access to the admin dashboard. `password` is included only when
- * the owner just created their account with it; existing accounts keep their own password.
+ * Tells someone they've been given access to the admin dashboard. With `setPasswordUrl` (a new account)
+ * they choose their own password from the link; existing accounts sign in with the password they have.
  */
-export async function sendAdminInviteEmail(e: { to: string; name?: string | null; password?: string | null; invitedBy?: string | null }): Promise<EmailResult> {
+export async function sendAdminInviteEmail(e: { to: string; name?: string | null; setPasswordUrl?: string | null; invitedBy?: string | null }): Promise<EmailResult> {
   const hello = e.name ? `Hi ${escapeHtml(e.name)},` : 'Hi,';
   const by = e.invitedBy ? ` by ${escapeHtml(e.invitedBy)}` : '';
-  const credentials = e.password
-    ? `<div style="margin: 16px 0; padding: 14px 16px; background-color: #f3f4f6; border-radius: 6px; font-size: 14px;">
-         <div><span style="color: #6b7280;">Email:</span> <strong>${escapeHtml(e.to)}</strong></div>
-         <div style="margin-top: 6px;"><span style="color: #6b7280;">Password:</span> <strong style="font-family: monospace;">${escapeHtml(e.password)}</strong></div>
-       </div>`
-    : `<p>Sign in with <strong>${escapeHtml(e.to)}</strong> and ${e.password === null ? 'the password you were given' : 'your RankBid password'}.</p>`;
+  const button = (href: string, label: string) =>
+    `<a href="${href}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">${label}</a>`;
+  const credentials = e.setPasswordUrl
+    ? `<p>Your sign-in email is <strong>${escapeHtml(e.to)}</strong>. Click below to choose your password, then sign in at <a href="${SITE_URL}/admin" style="color: #0F3460;">${SITE_URL.replace(/^https?:\/\//, '')}/admin</a>. The link works once and expires in 7 days.</p>
+       ${button(safeHref(e.setPasswordUrl), 'Set your password')}`
+    : `<p>Sign in with <strong>${escapeHtml(e.to)}</strong> and your RankBid password.</p>
+       ${button(`${SITE_URL}/admin`, 'Open the dashboard')}`;
   const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
           <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
@@ -136,9 +137,8 @@ export async function sendAdminInviteEmail(e: { to: string; name?: string | null
             <p>${hello}</p>
             <p>You've been given access to the RankBid admin dashboard${by}.</p>
             ${credentials}
-            <a href="${SITE_URL}/admin" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Open the dashboard</a>
             <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
-              Keep these details private. If you weren't expecting this, you can ignore this email or contact ${SUPPORT_EMAIL}.
+              ${e.setPasswordUrl ? "Don't forward this email: the link lets whoever opens it set the password. " : ''}If you weren't expecting this, you can ignore this email or contact ${SUPPORT_EMAIL}.
             </p>
           </div>
         </div>

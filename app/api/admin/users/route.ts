@@ -3,6 +3,7 @@ import { sbHeaders, sbUrl } from '@/lib/server/votes';
 import { ADMIN_EMAILS, getTeamAdminEmails, isAdminEmail, isAdminRequest, isOwnerRequest, sbSelect, submissionCountsByUser, toAdminUser } from '@/lib/server/admin';
 import { endSessions, getAccount, passwordProblem, setPassword } from '@/lib/server/account';
 import { sendAccountUpdatedEmail } from '@/lib/email';
+import { logAdminActivity, withoutSecrets } from '@/lib/server/admin-activity';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[0-9][0-9 ()-]{6,19}$/;
@@ -65,10 +66,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     const id = encodeURIComponent(userId);
+    // A full copy of the account (minus the password hash) goes into the activity log.
+    const { rows: [row] } = await sbSelect<Record<string, unknown>>(`users?id=eq.${id}&select=*`);
     const del = (path: string) => fetch(sbUrl(path), { method: 'DELETE', headers: sbHeaders() });
     await Promise.all([del(`user_votes?user_id=eq.${id}`), del(`sessions?user_id=eq.${id}`)]);
     const res = await del(`users?id=eq.${id}`);
     if (!res.ok) throw new Error(await res.text());
+    if (row) await logAdminActivity(req, 'user.delete', String(row.email ?? userId), { user: withoutSecrets(row) });
 
     return NextResponse.json({ success: true, message: 'User deleted' });
   } catch (error) {
@@ -137,6 +141,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Nothing to change' }, { status: 400 });
     }
 
+    const { rows: [before] } = Object.keys(changes).length
+      ? await sbSelect<Record<string, unknown>>(`users?id=eq.${encodeURIComponent(target.id)}&select=${Object.keys(changes).join(',')}`)
+      : { rows: [] };
     if (Object.keys(changes).length) {
       const res = await fetch(sbUrl(`users?id=eq.${encodeURIComponent(target.id)}`), {
         method: 'PATCH',
@@ -157,6 +164,13 @@ export async function PATCH(req: NextRequest) {
         .map(to => sendAccountUpdatedEmail({ to, name: changes.name ?? target.name, ...what })));
     }
     console.log('[admin] user updated', target.id, { fields: Object.keys(changes), password: Boolean(newPassword), signedOut });
+    await logAdminActivity(req, 'user.update', target.email, {
+      userId: target.id,
+      before: before ?? null,
+      after: changes,
+      passwordChanged: Boolean(newPassword),
+      signedOut,
+    });
 
     return NextResponse.json({ success: true, signedOut });
   } catch (error) {
