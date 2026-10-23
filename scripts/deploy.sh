@@ -30,8 +30,8 @@ build_and_deploy() { # $1 = production | preview
   local prod=()
   [ "$1" = production ] && prod=(--prod)
   vercel pull --yes --environment="$1" --token "$TOKEN" >&2
-  vercel build "${prod[@]}" --yes --token "$TOKEN" >&2
-  vercel deploy --prebuilt "${prod[@]}" --yes --token "$TOKEN" 2>/dev/null | tail -1
+  vercel build ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" >&2
+  vercel deploy --prebuilt ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" 2>/dev/null | tail -1
 }
 
 if [ "$TARGET" != sandbox ]; then
