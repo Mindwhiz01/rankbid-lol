@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
-import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { verifyTurnstile } from '@/lib/server/turnstile';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Cross-site request refused' }, { status: 403 });
   }
   try {
-    const { email, password, name } = await request.json();
+    const { email, password, name, turnstileToken } = await request.json();
 
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return NextResponse.json(
@@ -31,6 +32,11 @@ export async function POST(request: NextRequest) {
 
     if (name !== undefined && (typeof name !== 'string' || name.length > 80)) {
       return NextResponse.json({ error: 'Name must be 80 characters or fewer' }, { status: 400 });
+    }
+
+    // Bot check (Cloudflare Turnstile); passes automatically while TURNSTILE_SECRET_KEY is unset.
+    if (!(await verifyTurnstile(turnstileToken, clientIp(request)))) {
+      return NextResponse.json({ error: 'The "I am human" check failed. Please try again.' }, { status: 400 });
     }
 
     const ip = ipHash(request);

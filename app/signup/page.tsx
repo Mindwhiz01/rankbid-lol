@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GoogleLogin } from '@react-oauth/google';
 import PasswordInput from '@/components/PasswordInput';
+import Turnstile, { TURNSTILE_SITE_KEY, type TurnstileHandle } from '@/components/Turnstile';
 
 // After sign-up: ?next=/path (same-site only), otherwise straight to the submit form.
 function nextPath(): string {
@@ -20,6 +21,8 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<TurnstileHandle>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +33,13 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError('Please complete the "I am human" check');
       return;
     }
 
@@ -41,13 +49,15 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, turnstileToken: captchaToken }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
         setError(data.error || 'Signup failed');
+        // Each token works once: get a fresh one for the next attempt.
+        captcha.current?.reset();
         return;
       }
 
@@ -168,6 +178,10 @@ export default function SignupPage() {
                 required
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F3460] focus:border-transparent transition-all"
               />
+            </div>
+
+            <div className="mt-6">
+              <Turnstile ref={captcha} onToken={setCaptchaToken} />
             </div>
 
             <button
