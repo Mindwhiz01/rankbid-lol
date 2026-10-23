@@ -557,9 +557,7 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
       if (!d.emailSent) {
         toast(`${d.email} was added, but the invite email failed (${d.emailError}). Try resending it.`, 'error');
       } else {
-        toast(d.existingAccount
-          ? `Invite sent to ${d.email}. They already had an account, so they keep their own password.`
-          : `Invite sent to ${d.email}. They'll choose their own password from the email.`, 'success');
+        toast(`Invite sent to ${d.email}. They'll set their own password from the email.`, 'success');
       }
       setEmail(''); setName('');
       load();
@@ -635,7 +633,7 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
                 <button
                   onClick={() => resend(m.email)}
                   aria-label={`Resend invite to ${m.email}`}
-                  title={m.pending ? 'Resend invite (sends a new set-password link)' : 'Resend invite email'}
+                  title="Resend invite (sends a new set-password link)"
                   className="p-2 rounded-lg text-[#1F2937]/40 hover:text-[#0F3460] hover:bg-[#F4F6FA] transition-colors"
                 >
                   <Mail className="w-4 h-4" />
@@ -672,7 +670,7 @@ function TeamTab({ toast, confirmAction }: { toast: (m: string, t?: Toast['type'
             <form onSubmit={add} className="space-y-3">
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={input} required />
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" maxLength={80} className={input} />
-              <p className="text-xs text-[#1F2937]/45">The link expires in 7 days. If the email already has a RankBid account, they keep their own password.</p>
+              <p className="text-xs text-[#1F2937]/45">The link expires in 7 days. You never see or choose their password.</p>
               <button
                 type="submit"
                 disabled={busy}
@@ -725,6 +723,13 @@ function ActivityTab() {
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
   const [open, setOpen] = useState<number | null>(null);
+  const [refresh, setRefresh] = useState(0);
+
+  // New entries show up on their own: reload every 15 seconds while the tab is open.
+  useEffect(() => {
+    const id = setInterval(() => setRefresh((n) => n + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(page), limit: '25' });
@@ -740,7 +745,7 @@ function ActivityTab() {
       .then((d) => { if (!cancelled) { setData(d); setError(''); } })
       .catch((e) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [page, actor, action]);
+  }, [page, actor, action, refresh]);
 
   if (error) return <div className="bg-white rounded-3xl p-6 text-sm text-[#1F2937]/55">{error}</div>;
   if (!data) return <div className="bg-white rounded-3xl p-6 text-gray-500">Loading…</div>;
@@ -755,6 +760,14 @@ function ActivityTab() {
           <p className="text-sm text-[#1F2937]/55">Every change made from this dashboard, and by whom. Deleted data is kept here in full.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setRefresh((n) => n + 1)}
+            aria-label="Refresh the activity log"
+            title="Refresh"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-[#1F2937]/60 hover:text-[#0F3460] hover:border-[#0F3460]"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <select value={actor} onChange={(e) => { setActor(e.target.value); setPage(1); }} className={select} aria-label="Filter by admin">
             <option value="">All admins</option>
             {data.actors.map((a) => <option key={a} value={a}>{a}</option>)}

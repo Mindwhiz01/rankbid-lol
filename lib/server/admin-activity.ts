@@ -1,7 +1,7 @@
 // Server-only: the admin activity log (supabase/migrations/admin_activity.sql). Every admin write
 // records who did it, what changed and, for deletions, a full copy of what was removed.
 import type { NextRequest } from 'next/server';
-import { ADMIN_COOKIE, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
+import { ADMIN_COOKIE, isAdminEmail, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
@@ -27,6 +27,9 @@ export const ACTIVITY_ACTIONS = {
   'email.verify_domain': 'Re-checked email domain',
   'email.test': 'Sent test email',
   'session.key_sign_in': 'Signed in with admin key',
+  'session.sign_in': 'Admin signed in',
+  'session.sign_out': 'Admin signed out',
+  'team.password_set': 'Admin set their password',
 } as const;
 
 export type ActivityAction = keyof typeof ACTIVITY_ACTIONS;
@@ -74,4 +77,9 @@ export async function logAdminActivity(
 export function withoutSecrets(row: Record<string, unknown>): Record<string, unknown> {
   const { password, ...rest } = row;
   return { ...rest, signIn: password === 'google_oauth' ? 'google' : 'password' };
+}
+
+/** Records an admin (owner or team) signing in with their account; other users aren't logged. */
+export async function logAdminSignIn(req: NextRequest, email: string, method: 'password' | 'google'): Promise<void> {
+  if (await isAdminEmail(email)) await logAdminActivity(req, 'session.sign_in', email, { method }, email);
 }

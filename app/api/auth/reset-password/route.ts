@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { INVITE_PLACEHOLDER, endSessions, getAccount, markEmailVerified, passwordProblem, setPassword } from '@/lib/server/account';
 import { logAdminActivity } from '@/lib/server/admin-activity';
+import { isAdminEmail } from '@/lib/server/admin';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 
@@ -42,9 +43,10 @@ export async function POST(req: NextRequest) {
     // The link was emailed to this address, so opening it confirms the email too.
     await markEmailVerified(row.user_id);
     await endSessions(row.user_id);
-    // An invited admin choosing their first password: their invite is now accepted.
-    if (account?.password === INVITE_PLACEHOLDER) {
-      await logAdminActivity(req, 'team.invite_accepted', account.email, undefined, account.email);
+    // An admin setting their password from an invite (or a reset) is part of the admin activity log.
+    if (account && (await isAdminEmail(account.email))) {
+      const firstTime = account.password === INVITE_PLACEHOLDER;
+      await logAdminActivity(req, firstTime ? 'team.invite_accepted' : 'team.password_set', account.email, undefined, account.email);
     }
     const res = NextResponse.json({ success: true });
     res.cookies.delete('auth_token');

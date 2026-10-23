@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
 // DELETE: sign out of the dashboard: drops the admin key cookie and ends an email sign-in too,
 // since admins who signed in with their account would otherwise still be admins.
 export async function DELETE(req: NextRequest) {
+  if (await isAdminRequest(req)) await logAdminActivity(req, 'session.sign_out', null);
   const token = req.cookies.get('auth_token')?.value;
   if (token) {
     await fetch(sbUrl(`sessions?token=eq.${encodeURIComponent(token)}`), { method: 'DELETE', headers: sbHeaders() }).catch(() => null);

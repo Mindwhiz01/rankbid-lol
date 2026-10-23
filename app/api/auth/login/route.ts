@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
 import { BLOCKED_MESSAGE, isBlocked, isEmailVerified, passwordMatches } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { logAdminSignIn } from '@/lib/server/admin-activity';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
         expiresAt,
       },
     });
+
+    await logAdminSignIn(request, user.email, 'password');
 
     const response = NextResponse.json(
       {

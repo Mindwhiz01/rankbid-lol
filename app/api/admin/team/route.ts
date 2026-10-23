@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST { email, name? }: give someone admin access. A new account is created without a password and
-// the invite email carries a one-time link to choose one; an existing account keeps its password.
+// POST { email, name? }: give someone admin access. The owner never chooses the password: the invite
+// email always carries a one-time link where the admin sets their own (new accounts start without one).
 export async function POST(req: NextRequest) {
   if (!(await isOwnerRequest(req))) {
     return NextResponse.json({ error: 'Only the owner can add admins' }, { status: 403 });
@@ -63,24 +63,23 @@ export async function POST(req: NextRequest) {
     const user = existing ?? await prisma.user.create({
       data: { email, password: INVITE_PLACEHOLDER, name: name || undefined },
     });
-    const pending = user.password === INVITE_PLACEHOLDER;
     await setTeamAdminEmails([...team, email]);
     const invite = await sendAdminInviteEmail({
       to: email,
       name: name || user.name,
-      setPasswordUrl: pending ? await inviteLink(req, user.id) : null,
+      setPasswordUrl: await inviteLink(req, user.id),
       invitedBy: await ownerName(req),
     });
     await logAdminActivity(req, 'team.add', email, { name: name || user.name || null, existingAccount: Boolean(existing), emailSent: invite.sent });
-    return NextResponse.json({ email, existingAccount: !pending, emailSent: invite.sent, emailError: invite.sent ? undefined : invite.error });
+    return NextResponse.json({ email, existingAccount: Boolean(existing), emailSent: invite.sent, emailError: invite.sent ? undefined : invite.error });
   } catch (e) {
     console.error('Add admin failed:', e);
     return NextResponse.json({ error: 'Could not add the admin' }, { status: 500 });
   }
 }
 
-// PATCH { email }: email a team admin their invite again. While they haven't set a password yet,
-// this sends a fresh set-password link and the earlier links stop working.
+// PATCH { email }: email a team admin their invite again with a fresh set-password link (earlier
+// links stop working). Also how an admin who forgot their password gets back in.
 export async function PATCH(req: NextRequest) {
   if (!(await isOwnerRequest(req))) {
     return NextResponse.json({ error: 'Only the owner can send invites' }, { status: 403 });
@@ -96,7 +95,7 @@ export async function PATCH(req: NextRequest) {
   const invite = await sendAdminInviteEmail({
     to: email,
     name: user.name,
-    setPasswordUrl: pending ? await inviteLink(req, user.id) : null,
+    setPasswordUrl: await inviteLink(req, user.id),
     invitedBy: await ownerName(req),
   });
   if (!invite.sent) {

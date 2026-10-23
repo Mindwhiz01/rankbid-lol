@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { logAdminSignIn } from '@/lib/server/admin-activity';
 import { BLOCKED_MESSAGE, GOOGLE_PLACEHOLDER, isBlocked, isEmailVerified, markEmailVerified } from '@/lib/server/account';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
         expiresAt,
       },
     });
+
+    await logAdminSignIn(request, user.email, 'google');
 
     const response = NextResponse.json(
       {
