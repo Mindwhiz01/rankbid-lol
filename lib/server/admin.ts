@@ -134,6 +134,9 @@ export interface AdminUser {
   signIn: 'password' | 'google';
   /** The owner or a team admin: only the owner may edit these accounts. */
   isAdmin: boolean;
+  /** When an admin blocked the account (it can't sign in), else null. */
+  blockedAt: string | null;
+  blockedReason: string | null;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -204,6 +207,8 @@ export function toAdminUser(row: Record<string, unknown>, counts?: { submissions
     bio: text(row.bio),
     signIn: row.password === 'google_oauth' ? 'google' : 'password',
     isAdmin: adminEmails.includes(email.toLowerCase()),
+    blockedAt: text(row.blocked_at),
+    blockedReason: text(row.blocked_reason),
     createdAt: String(row.created_at ?? ''),
     submissions: counts?.submissions ?? 0,
     submissionVotes: counts?.votes ?? 0,

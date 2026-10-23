@@ -78,3 +78,18 @@ export async function createPasswordLink(
   if (!res.ok) throw new Error(`Saving password token failed: ${res.status} ${await res.text()}`);
   return `${baseUrl.replace(/\/+$/, '')}/reset-password?token=${token}${opts.invite ? '&invite=1' : ''}`;
 }
+
+/** Shown when a blocked account tries to sign in. */
+export const BLOCKED_MESSAGE = 'This account has been blocked. If you think this is a mistake, contact support.';
+
+/** True when an admin has blocked the account. False on any lookup error, so sign-in never breaks over it. */
+export async function isBlocked(userId: string): Promise<boolean> {
+  try {
+    const res = await fetch(sbUrl(`users?id=eq.${encodeURIComponent(userId)}&select=*`), { headers: sbHeaders(), cache: 'no-store' });
+    if (!res.ok) return false;
+    const [row] = await res.json();
+    return Boolean(row?.blocked_at);
+  } catch {
+    return false;
+  }
+}

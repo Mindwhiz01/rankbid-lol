@@ -9,8 +9,8 @@ import PageNav, { PAGE_SIZE } from '@/components/Pagination';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import { safeExternalUrl } from '@/lib/utils';
 import {
-  AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
-  Pencil, RefreshCw, Search, Trash2, TrendingUp, Trophy, UserPlus, Users, X, Zap,
+  AlertTriangle, ArrowDown, ArrowUp, Ban, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
+  Pencil, RefreshCw, Search, Trash2, TrendingUp, Trophy, UserCheck, UserPlus, Users, X, Zap,
 } from 'lucide-react';
 
 // ---- Types (mirror lib/server/admin.ts) ----
@@ -42,6 +42,8 @@ interface AdminUser {
   bio: string | null;
   signIn: 'password' | 'google';
   isAdmin: boolean;
+  blockedAt: string | null;
+  blockedReason: string | null;
   createdAt: string;
   submissions: number;
   submissionVotes: number;
@@ -1766,6 +1768,38 @@ function UsersTab({
     }
   };
 
+  const toggleBlock = async (user: AdminUser) => {
+    const block = !user.blockedAt;
+    const ok = await confirmAction(block
+      ? {
+          title: 'Block user?',
+          message: (
+            <>
+              <span className="font-semibold text-[#1F2937]">{user.email}</span> will be signed out everywhere and won’t be able
+              to sign in, vote or submit until you unblock them. Their submissions stay.
+            </>
+          ),
+          confirmLabel: 'Block user',
+        }
+      : {
+          title: 'Unblock user?',
+          message: <><span className="font-semibold text-[#1F2937]">{user.email}</span> will be able to sign in again.</>,
+          confirmLabel: 'Unblock',
+        });
+    if (!ok) return;
+    const res = await fetch('/api/admin/users/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, blocked: block }),
+    });
+    if (res.ok) {
+      toast(block ? `${user.email} is blocked` : `${user.email} is unblocked`, 'success');
+      load();
+    } else {
+      toast((await res.json().catch(() => ({}))).error || 'Failed to update the block', 'error');
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl p-6">
       <div className="relative mb-4">
@@ -1800,6 +1834,7 @@ function UsersTab({
                 onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
                 onDelete={() => deleteUser(u)}
                 onEdit={() => setEditing(u)}
+                onBlock={() => toggleBlock(u)}
               >
                 <SubmissionsTab onRemove={onRemove} liveVersion={liveVersion} toast={toast} userId={u.id} compact />
               </UserRow>
@@ -1842,6 +1877,7 @@ function UserRow({
   onToggle,
   onDelete,
   onEdit,
+  onBlock,
   children,
 }: {
   user: AdminUser;
@@ -1849,11 +1885,12 @@ function UserRow({
   onToggle: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onBlock: () => void;
   children: React.ReactNode;
 }) {
   return (
     <>
-      <tr className={`border-b hover:bg-gray-50 ${open ? 'bg-gray-50' : ''}`}>
+      <tr className={`border-b hover:bg-gray-50 ${open ? 'bg-gray-50' : ''} ${user.blockedAt ? 'text-gray-400' : ''}`}>
         <td className="px-3 py-2.5">
           <button onClick={onToggle} aria-label={open ? 'Hide submissions' : 'Show submissions'} disabled={user.submissions === 0} className="disabled:opacity-30">
             {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1863,6 +1900,14 @@ function UserRow({
           {user.email}
           {user.isAdmin && <span className="ml-2 text-[10px] font-black uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Admin</span>}
           {user.signIn === 'google' && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Google</span>}
+          {user.blockedAt && (
+            <span
+              title={`Blocked ${new Date(user.blockedAt).toLocaleString()}${user.blockedReason ? `: ${user.blockedReason}` : ''}`}
+              className="ml-2 text-[10px] font-black uppercase tracking-wide text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5"
+            >
+              Blocked
+            </span>
+          )}
         </td>
         <td className="px-3 py-2.5">{user.name || '—'}</td>
         <td className="px-3 py-2.5 text-right tabular-nums">
@@ -1877,6 +1922,14 @@ function UserRow({
         <td className="px-3 py-2.5 whitespace-nowrap">
           <button onClick={onEdit} title="Edit user" aria-label={`Edit ${user.email}`} className="p-1.5 text-gray-400 hover:text-[#0F3460] rounded hover:bg-[#0F3460]/5">
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onBlock}
+            title={user.blockedAt ? 'Unblock user' : 'Block user'}
+            aria-label={`${user.blockedAt ? 'Unblock' : 'Block'} ${user.email}`}
+            className={`p-1.5 rounded ${user.blockedAt ? 'text-red-600 hover:text-emerald-700 hover:bg-emerald-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}
+          >
+            {user.blockedAt ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
           </button>
           <button onClick={onDelete} title="Delete user" aria-label={`Delete ${user.email}`} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
             <Trash2 className="w-4 h-4" />

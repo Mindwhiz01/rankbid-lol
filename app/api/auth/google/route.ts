@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { BLOCKED_MESSAGE, isBlocked } from '@/lib/server/account';
 import { NextRequest, NextResponse } from 'next/server';
 
 const client = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
@@ -60,6 +61,10 @@ export async function POST(request: NextRequest) {
           password: 'google_oauth', // Placeholder for OAuth users
         },
       });
+    }
+
+    if (await isBlocked(user.id)) {
+      return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
     }
 
     // Create session

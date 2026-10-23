@@ -47,12 +47,13 @@ export async function getSessionUser(req: NextRequest): Promise<SessionUser | nu
     if (!session || new Date(session.expires_at) < new Date()) return null;
 
     const userRes = await fetch(
-      sbUrl(`users?id=eq.${encodeURIComponent(session.user_id)}&select=id,email,name`),
+      // select=* so this keeps working whether or not block_users.sql has added blocked_at.
+      sbUrl(`users?id=eq.${encodeURIComponent(session.user_id)}&select=*`),
       { headers: sbHeaders(), cache: 'no-store' }
     );
     if (!userRes.ok) return null;
     const [user] = await userRes.json();
-    if (!user) return null;
+    if (!user || user.blocked_at) return null;
     return { id: String(user.id), email: String(user.email).toLowerCase(), name: user.name ?? null };
   } catch {
     return null;

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
-import { passwordMatches } from '@/lib/server/account';
+import { BLOCKED_MESSAGE, isBlocked, passwordMatches } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -45,6 +45,10 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid email or password' },
         { status: 401 }
       );
+    }
+
+    if (await isBlocked(user.id)) {
+      return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
     }
 
     const token = createSessionToken();

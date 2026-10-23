@@ -15,6 +15,8 @@ export const ACTIVITY_ACTIONS = {
   'listing.delete': 'Deleted submission',
   'user.update': 'Edited user',
   'user.delete': 'Deleted user',
+  'user.block': 'Blocked user',
+  'user.unblock': 'Unblocked user',
   'premium.approve': 'Approved payment',
   'premium.reject': 'Rejected payment',
   'settings.coming_soon': 'Changed coming soon page',
