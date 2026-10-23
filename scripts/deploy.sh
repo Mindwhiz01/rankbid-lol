@@ -31,7 +31,7 @@ build_and_deploy() { # $1 = production | preview
   [ "$1" = production ] && prod=(--prod)
   vercel pull --yes --environment="$1" --token "$TOKEN" >&2
   vercel build ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" >&2
-  vercel deploy --prebuilt ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" 2>/dev/null | tail -1
+  vercel deploy --prebuilt ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | tail -1
 }
 
 if [ "$TARGET" != sandbox ]; then
