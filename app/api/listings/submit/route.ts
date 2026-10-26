@@ -14,6 +14,14 @@ import { findDuplicateListing } from '@/lib/server/duplicate-listing';
 import { badgeZip } from '@/lib/server/badges';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
+/** The listings columns the GET below reads. */
+type ListingRow = {
+  id: string; title: string; description: string | null; location: string | null; handle?: string | null;
+  category: string | null; platform: string | null; total_votes: number | null; day_votes: number | null;
+  click_count?: number | null; created_at: string; rank_reached_at: string | null; updated_at: string | null;
+  image_url: string | null;
+};
+
 export async function POST(req: NextRequest) {
   try {
     // Submissions are tied to the signed-in account (never to a user id sent by the browser).
@@ -380,7 +388,9 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '15') || 15));
     const sort = searchParams.get('sort') || 'totalVotes';
     const category = searchParams.get('category') || '';
-    const platforms = searchParams.getAll('platform') || [];
+    // Plain platform names only: the values go inside or=(…), where PostgREST reads commas and dots
+    // as filter syntax even when percent-encoded, so "x,id.neq.0" would add a filter of its own.
+    const platforms = searchParams.getAll('platform').filter(p => /^[a-z]{1,20}$/.test(p));
     const timeFilter = searchParams.get('timeFilter') || '';
     // ?activeToday=1: any listing that got votes today, however old (the /today trending view).
     const activeToday = searchParams.get('activeToday') === '1';
@@ -428,7 +438,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (platforms.length > 0) {
-      const platformFilter = platforms.map(p => `platform.eq.${encodeURIComponent(p)}`).join(',');
+      const platformFilter = platforms.map(p => `platform.eq.${p}`).join(',');
       queryUrl += `&or=(${platformFilter})`;
     }
 
@@ -451,7 +461,7 @@ export async function GET(req: NextRequest) {
 
     const listings = await response.json();
 
-    const mapListing = (item: any) => ({
+    const mapListing = (item: ListingRow) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -503,7 +513,7 @@ export async function GET(req: NextRequest) {
       const premiumRes = await fetch(`${supabaseUrl}/rest/v1/listings?id=in.(${ids})`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
       });
-      const rows: any[] = premiumRes.ok ? await premiumRes.json() : [];
+      const rows: ListingRow[] = premiumRes.ok ? await premiumRes.json() : [];
       premium = holders.flatMap(h => {
         const row = rows.find(r => r.id === h.listingId);
         return row ? [withPremium(mapListing(row), h)] : [];

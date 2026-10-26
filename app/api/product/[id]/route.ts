@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase configuration');
-}
+// Only the columns the product page reads: every listing is sent for its rank and "more in this category".
+const RANK_COLUMNS = 'id,title,description,location,category,platform,total_votes,day_votes,created_at,updated_at,rank_reached_at';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!supabaseConfigured()) {
+    return NextResponse.json({ error: 'Database not configured', product: null }, { status: 500 });
+  }
   try {
     const { id } = await params;
 
@@ -22,15 +23,7 @@ export async function GET(
     }
 
     // Fetch specific product by ID
-    const res = await fetch(
-      `${supabaseUrl}/rest/v1/listings?id=eq.${encodeURIComponent(id)}&select=*`,
-      {
-        headers: {
-          'apikey': supabaseKey as string,
-          'Authorization': `Bearer ${supabaseKey as string}`,
-        } as HeadersInit,
-      }
-    );
+    const res = await fetch(sbUrl(`listings?id=eq.${encodeURIComponent(id)}&select=*`), { headers: sbHeaders() });
 
     if (!res.ok) {
       return NextResponse.json(
@@ -66,15 +59,7 @@ export async function GET(
     };
 
     // Also fetch all listings for ranking and "more in this category".
-    const allRes = await fetch(
-      `${supabaseUrl}/rest/v1/listings?select=*&order=total_votes.desc,rank_reached_at.asc`,
-      {
-        headers: {
-          'apikey': supabaseKey as string,
-          'Authorization': `Bearer ${supabaseKey as string}`,
-        } as HeadersInit,
-      }
-    );
+    const allRes = await fetch(sbUrl(`listings?select=${RANK_COLUMNS}&order=total_votes.desc,rank_reached_at.asc`), { headers: sbHeaders() });
 
     // Map to the same camelCase shape as `product` (the page ranks on totalVotes, then rankReachedAt).
     let allListings: Record<string, unknown>[] = [];

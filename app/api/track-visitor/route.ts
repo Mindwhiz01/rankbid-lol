@@ -1,9 +1,15 @@
 import { trackVisitor } from '@/lib/visitor-tracking';
 import { NextRequest, NextResponse } from 'next/server';
-import { ipHash } from '@/lib/server/rate-limit';
+import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // A script could otherwise post endless made-up session ids, inflating the visitor counts and the table.
+    // Generous, since every page view posts once and offices share one network.
+    if (!(await rateLimit(`track-ip:${ipHash(request)}`, 300, 60 * 60))) {
+      return NextResponse.json({ success: false }, { status: 429 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const sessionId = typeof body.sessionId === 'string' ? body.sessionId.slice(0, 100) : '';
     const pageUrl = typeof body.pageUrl === 'string' ? body.pageUrl.slice(0, 500) : '';

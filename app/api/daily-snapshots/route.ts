@@ -10,6 +10,8 @@ const supabase = createClient(
 export const revalidate = 0; // Don't cache
 
 type SnapshotEntry = { rank: number; listing: { id: string; title: string; url: string }; votes: number };
+type Snapshot = { id: string; date: string; data: SnapshotEntry[]; frozen: boolean };
+type SnapshotRow = { id: string; date: string; snapshot_data: SnapshotEntry[] | null };
 
 /**
  * Saved days keep a copy of that day's rankings, so a listing deleted later would still show.
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const daysBack = Math.min(3650, Math.max(1, parseInt(searchParams.get('daysBack') || '30') || 30));
 
-    let snapshots: any[] = [];
+    let snapshots: Snapshot[] = [];
 
     // Get today's date and start date
     const today = new Date();
@@ -58,9 +60,10 @@ export async function GET(request: NextRequest) {
         .order('date', { ascending: false });
 
       if (!dbError && historicalSnapshots) {
-        const allEntries: SnapshotEntry[] = historicalSnapshots.flatMap((snapshot: any) => snapshot.snapshot_data || []);
+        const rows = historicalSnapshots as SnapshotRow[];
+        const allEntries = rows.flatMap(snapshot => snapshot.snapshot_data || []);
         const existing = await existingListingIds(allEntries.map(e => String(e.listing?.id)));
-        const cleaned = historicalSnapshots.map((snapshot: any) => ({
+        const cleaned = rows.map(snapshot => ({
           id: snapshot.id,
           date: snapshot.date,
           data: withoutDeletedListings(snapshot.snapshot_data || [], existing),
@@ -70,56 +73,37 @@ export async function GET(request: NextRequest) {
         snapshots = cleaned.filter(s => s.data.length > 0);
       }
 
-      // Fetch today's live data
-      const origin = new URL(request.url).origin;
-      const listingsRes = await fetch(
-        `${origin}/api/listings/submit?limit=1000&sort=dayVotes&activeToday=1&fresh=1`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      // Today's live rankings: the top 100 listings by today's votes, ties to whoever got there first.
+      const { data: topListingsToday, error: todayError } = await supabase
+        .from('listings')
+        .select('id, title, location, day_votes')
+        .gt('day_votes', 0)
+        .order('day_votes', { ascending: false })
+        .order('rank_reached_at', { ascending: true })
+        .limit(100);
+      if (todayError) console.error('Error fetching today\'s rankings:', todayError);
 
-      if (listingsRes.ok) {
-        const data = await listingsRes.json();
-        const listings = data.listings || [];
+      if (topListingsToday && topListingsToday.length > 0) {
+        const todaySnapshotData: Snapshot = {
+          id: 'today-live',
+          date: todayStr,
+          data: topListingsToday.map((listing, idx) => ({
+            rank: idx + 1,
+            listing: {
+              id: listing.id,
+              title: listing.title,
+              url: listing.location || `${SITE_URL}/product/${listing.id}`,
+            },
+            votes: listing.day_votes || 0,
+          })),
+          frozen: false,
+        };
 
-        // Filter listings with day_votes > 0 and sort by day_votes descending
-        const topListingsToday = listings
-          .filter((l: any) => (l.dayVotes || 0) > 0)
-          .sort((a: any, b: any) => (b.dayVotes || 0) - (a.dayVotes || 0))
-          .slice(0, 100);
-
-        // If there are listings with votes, create today's snapshot
-        if (topListingsToday && topListingsToday.length > 0) {
-          const todaySnapshotData = {
-            id: 'today-live',
-            date: todayStr,
-            data: topListingsToday.map((listing: any, idx: number) => ({
-              rank: idx + 1,
-              listing: {
-                id: listing.id,
-                title: listing.title,
-                url: listing.url || `${SITE_URL}/product/${listing.id}`,
-              },
-              votes: listing.dayVotes || 0,
-            })),
-            frozen: false,
-          };
-
-          // Check if today's snapshot already exists in DB
-          const todayExists = snapshots.some(s => s.date === todayStr);
-
-          if (!todayExists) {
-            // Add today's live snapshot at the beginning
-            snapshots.unshift(todaySnapshotData);
-          } else {
-            // Replace the stored today's snapshot with fresh data
-            snapshots = snapshots.map(s =>
-              s.date === todayStr ? todaySnapshotData : s
-            );
-          }
+        // Live data replaces a stored copy of today; otherwise it goes first.
+        if (snapshots.some(s => s.date === todayStr)) {
+          snapshots = snapshots.map(s => (s.date === todayStr ? todaySnapshotData : s));
+        } else {
+          snapshots.unshift(todaySnapshotData);
         }
       }
     } catch (error) {

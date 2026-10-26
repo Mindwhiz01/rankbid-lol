@@ -117,14 +117,12 @@ export async function GET(request: Request) {
     console.log(`[FILTERED STATS] ${period}:`, result);
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
+    // Database details stay in the server log; this endpoint is public.
     console.error('[FILTERED STATS] Error:', error);
-    console.error('[FILTERED STATS] Error message:', error?.message);
-    console.error('[FILTERED STATS] Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json(
       {
         error: 'Failed to fetch filtered stats',
-        errorMessage: error?.message || 'Unknown error',
         period: 'unknown',
         visitors: 0,
         pageViews: 0,

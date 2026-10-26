@@ -3,15 +3,15 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import PasswordInput from '@/components/PasswordInput';
 import Turnstile, { TURNSTILE_SITE_KEY, type TurnstileHandle } from '@/components/Turnstile';
 import ResendVerification from '@/components/ResendVerification';
+import { safeNextPath } from '@/lib/safe-next';
 
 // After sign-up: ?next=/path (same-site only), otherwise straight to the submit form.
 function nextPath(): string {
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/#submit';
+  return safeNextPath(new URLSearchParams(window.location.search).get('next'), '/#submit');
 }
 
 export default function SignupPage() {
@@ -66,14 +66,14 @@ export default function SignupPage() {
 
       // The account works once the emailed link is opened.
       setSentTo(data.email || email);
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setError('');
     setLoading(true);
 
@@ -95,7 +95,7 @@ export default function SignupPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
 
       router.push(nextPath());
-    } catch (err) {
+    } catch {
       setError('An error occurred during Google signup');
     } finally {
       setLoading(false);

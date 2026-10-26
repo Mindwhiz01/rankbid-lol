@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AuthShell, { authButton } from '@/components/AuthShell';
+import { safeNextPath } from '@/lib/safe-next';
 
 // After confirming: ?next=/path from the signup (same-site only), otherwise the submit form.
 function nextPath(): string {
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/#submit';
+  return safeNextPath(new URLSearchParams(window.location.search).get('next'), '/#submit');
 }
 
 export default function VerifyEmailPage() {

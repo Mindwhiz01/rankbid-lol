@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import ResendVerification from '@/components/ResendVerification';
+import { safeNextPath } from '@/lib/safe-next';
 
-// Where to go after login: ?next=/some/path (same-site paths only, never //host or full URLs).
+// Where to go after login: ?next=/some/path (same-site paths only, never //host, /\host or full URLs).
 function nextPath(): string {
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  return safeNextPath(new URLSearchParams(window.location.search).get('next'), '/');
 }
 
 export default function LoginPage() {
@@ -45,14 +45,14 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
 
       router.push(nextPath());
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setError('');
     setLoading(true);
 
@@ -74,7 +74,7 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
 
       router.push(nextPath());
-    } catch (err) {
+    } catch {
       setError('An error occurred during Google login');
     } finally {
       setLoading(false);

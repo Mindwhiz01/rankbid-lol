@@ -31,10 +31,17 @@ export async function GET(req: NextRequest) {
     if (!res.ok) {
       throw new Error(`${res.status} ${await res.text()}`);
     }
-    const rows: any[] = await res.json();
+    const rows: (Record<string, unknown> & {
+      id: string;
+      position: number | null;
+      payment_method: string | null;
+      payment_txn_ref: unknown;
+      listing: { title: string; description: string; category: string; total_votes: number; day_votes: number } | null;
+    })[] = await res.json();
     // Active listings show their live rank by price; others keep the rank recorded at checkout/activation.
     const liveRank = new Map((await getActiveHolders()).map(h => [h.id, h.position]));
-    const dashboard = `https://dashboard.stripe.com${process.env.STRIPE_SECRET_KEY?.startsWith('sk_test') ? '/test' : ''}`;
+    // The app only runs on restricted keys (rk_test_ / rk_live_), see lib/server/stripe.ts.
+    const dashboard = `https://dashboard.stripe.com${/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || '') ? '/test' : ''}`;
 
     return NextResponse.json({
       premiumListings: rows.map(({ listing, ...row }) => ({

@@ -2,6 +2,7 @@
 import { createHash, randomBytes } from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
+import { safeNextPath } from '@/lib/safe-next';
 
 /** Accounts created with Google sign-in store this instead of a password hash. */
 export const GOOGLE_PLACEHOLDER = 'google_oauth';
@@ -135,7 +136,8 @@ export async function createVerifyEmailLink(userId: string, baseUrl: string, nex
     body: JSON.stringify({ token_hash: tokenHash, user_id: userId, expires_at: new Date(Date.now() + VERIFY_TTL_MS).toISOString() }),
   });
   if (!res.ok) throw new Error(`Saving verification token failed: ${res.status} ${await res.text()}`);
-  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? `&next=${encodeURIComponent(next)}` : '';
+  const path = safeNextPath(next, '');
+  const safeNext = path ? `&next=${encodeURIComponent(path)}` : '';
   return `${baseUrl.replace(/\/+$/, '')}/verify-email?token=${token}${safeNext}`;
 }
 
