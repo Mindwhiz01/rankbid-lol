@@ -31,7 +31,11 @@ build_and_deploy() { # $1 = production | preview
   [ "$1" = production ] && prod=(--prod)
   vercel pull --yes --environment="$1" --token "$TOKEN" >&2
   vercel build ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" >&2
-  vercel deploy --prebuilt ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | tail -1
+  # The CLI prints the URL on stdout or stderr depending on its mode, so read both and keep the
+  # deployment's own address (rankbid-<id>-mindwhiz1.vercel.app).
+  local out
+  out="$(vercel deploy --prebuilt ${prod[@]+"${prod[@]}"} --yes --token "$TOKEN" 2>&1)"
+  echo "$out" | grep -oE 'https://[a-z0-9-]+-mindwhiz1\.vercel\.app' | tail -1
 }
 
 if [ "$TARGET" != sandbox ]; then
@@ -42,6 +46,10 @@ fi
 if [ "$TARGET" != prod ]; then
   echo "▸ sandbox"
   URL="$(build_and_deploy preview)"
+  if [ -z "$URL" ]; then
+    echo "✗ couldn't read the preview URL; the sandbox alias was NOT moved" >&2
+    exit 1
+  fi
   echo "$URL"
   # `vercel alias set` fails with this project-scoped token, so the alias goes through the API.
   ID="$(curl -sf -H "Authorization: Bearer $TOKEN" "https://api.vercel.com/v13/deployments/${URL#https://}?teamId=$VERCEL_ORG_ID" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')"
