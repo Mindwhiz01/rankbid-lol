@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getCategoryLabel } from '@/lib/categories';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import FounderLinks, { type FounderSocials } from '@/components/FounderLinks';
@@ -52,25 +52,25 @@ function PodiumLogo({ listing, rank }: { listing: PodiumListing; rank: number })
 }
 
 /** The paid #1-#3 spots. Open spots open the claim form (onClaim), or link to the leaderboard without it. */
+/** The live sponsored holders (or the ?preview=sponsored sample), or null when the request fails. */
+async function fetchPodium(): Promise<PodiumListing[] | null> {
+  if (isSponsoredPreview()) return SPONSORED_PREVIEW;
+  try {
+    const res = await fetch('/api/listings/submit?page=1&pageSize=1', { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()).premium || [];
+  } catch {
+    return null;
+  }
+}
+
 export default function LivePodium({ onClaim }: { onClaim?: (position: number) => void }) {
   const [listings, setListings] = useState<PodiumListing[] | null>(null);
 
-  const load = useCallback(async () => {
-    if (isSponsoredPreview()) {
-      setListings(SPONSORED_PREVIEW);
-      return;
-    }
-    try {
-      const res = await fetch('/api/listings/submit?page=1&pageSize=1', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      setListings(data.premium || []);
-    } catch {
-      // Keep showing the last good result; the next tick retries.
-    }
-  }, []);
-
   useEffect(() => {
+    let live = true;
+    // A failed read keeps showing the last good result; the next tick retries.
+    const load = () => fetchPodium().then(rows => { if (live && rows) setListings(rows); });
     load();
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') load();
@@ -80,10 +80,11 @@ export default function LivePodium({ onClaim }: { onClaim?: (position: number) =
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
+      live = false;
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [load]);
+  }, []);
 
   const holderAt = (position: number) => (listings || []).find(l => l.premiumPosition === position);
 

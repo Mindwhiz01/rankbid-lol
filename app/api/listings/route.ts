@@ -14,6 +14,13 @@ function getSupabase() {
   });
 }
 
+/** The listings columns this route returns. */
+type ListingRow = {
+  id: string; title: string; description: string | null; location: string | null; url?: string | null;
+  category: string | null; platform: string | null; total_votes: number | null; day_votes: number | null;
+  click_count: number | null; created_at: string; updated_at: string | null;
+};
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const category = searchParams.get('category') || 'All';
@@ -46,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const rankedListings = (listings || []).map((listing: any, index: number) => ({
+    const rankedListings = ((listings || []) as ListingRow[]).map((listing, index) => ({
       id: listing.id,
       title: listing.title,
       description: listing.description,

@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { categoryPath } from '@/lib/categories';
+import { setStoredUser, useHydrated, useStoredUser } from '@/lib/storedUser';
 import { Search, Menu, X, Grid3x3, Trophy, Sparkles, LineChart, Users, Zap, Palette, Bitcoin, Code2, Compass, Activity, Eye, TrendingUp, LogOut } from 'lucide-react';
 
 // Loaded when first opened (the header is on every page), so it isn't in every page's JavaScript.
@@ -60,9 +61,9 @@ function CategoryBar() {
 export default function Header() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
-  // Stays false until localStorage is read, so signed-in users never see the auth buttons flash.
-  const [authChecked, setAuthChecked] = useState(false);
+  const user = useStoredUser();
+  // False until the browser has read the stored user, so signed-in users never see the auth buttons flash.
+  const authChecked = useHydrated();
   // null until loaded: the server HTML shows dashes, not "0 visitors" (crawlers and AI engines read it on every page).
   const [stats, setStats] = useState<{ live: number; today: number; views: number } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -83,17 +84,6 @@ export default function Header() {
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('theme');
-
-    // Check if user is logged in
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem('user');
-      }
-    }
-    setAuthChecked(true);
   }, []);
 
   // Fetch stats for header display
@@ -136,9 +126,8 @@ export default function Header() {
   const handleLogout = async () => {
     // End the server session first; clearing localStorage alone leaves the auth cookie working.
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
-    localStorage.removeItem('user');
     localStorage.removeItem('auth_token');
-    setUser(null);
+    setStoredUser(null);
     router.push('/');
   };
 

@@ -23,6 +23,16 @@ interface Listing {
   rankReachedAt?: string;
 }
 
+/** Every listing in rank order, or null when the request fails. */
+async function fetchRankings(): Promise<Listing[] | null> {
+  try {
+    const res = await fetch('/api/listings/submit?limit=500&fresh=1', { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()).listings || [];
+  } catch {
+    return null;
+  }
+}
 
 // Server-rendered with the current rankings (see page.tsx) so crawlers see them; refreshed live.
 export default function LeaderboardView({ initialListings }: { initialListings: Listing[] }) {
@@ -30,23 +40,20 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
   const [loading, setLoading] = useState(initialListings.length === 0);
   const [activeTab, setActiveTab] = useState<'alltime' | 'today'>('alltime');
 
+  // Fresh rankings on load and every few seconds; a failed read keeps the last known rankings.
   useEffect(() => {
-    fetchListings();
-  }, []);
-  useLiveRefresh(() => fetchListings());
-
-  const fetchListings = async () => {
-    try {
-      const res = await fetch('/api/listings/submit?limit=500&fresh=1', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      setListings(data.listings || []);
-    } catch {
-      // Keep showing the last known rankings.
-    } finally {
+    let live = true;
+    fetchRankings().then(rows => {
+      if (!live) return;
+      if (rows) setListings(rows);
       setLoading(false);
-    }
-  };
+    });
+    return () => { live = false; };
+  }, []);
+  useLiveRefresh(() => fetchRankings().then(rows => {
+    if (rows) setListings(rows);
+    setLoading(false);
+  }));
 
   // Ranked by community votes (the old totalPaid/dayPaid bidding fields no longer exist).
   const votesFor = (l: Listing) => (activeTab === 'today' ? l.dayVotes : l.totalVotes) || 0;

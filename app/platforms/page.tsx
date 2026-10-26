@@ -5,7 +5,7 @@ import PageHero from '@/components/PageHero';
 import RankingRow from '@/components/RankingRow';
 import Pagination, { PAGE_SIZE } from '@/components/Pagination';
 import PlatformsCta from '@/components/PlatformsCta';
-import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { EmptyStateIcon } from '@/components/PremiumIcons';
 import { openSubmitModal } from '@/components/SubmitProductModal';
 import { normalizePlatform } from '@/lib/platform-url';
@@ -35,78 +35,89 @@ const PLATFORMS = [
 ];
 
 
+interface PlatformPage {
+  listings: Listing[];
+  totalPages: number;
+  page: number;
+}
+
+/** One page of a platform's rankings (an empty page when the request fails). */
+async function fetchPlatformPage(platform: string, page: number): Promise<PlatformPage> {
+  const empty = { listings: [], totalPages: 1, page };
+  try {
+    const params = new URLSearchParams({ sort: 'totalVotes', page: String(page), pageSize: String(PAGE_SIZE) });
+    for (const p of platform === 'twitter' ? ['twitter', 'x'] : [platform]) params.append('platform', p);
+    const res = await fetch(`/api/listings/submit?${params.toString()}`);
+    if (!res.ok) return empty;
+    const text = await res.text();
+    if (!text) return empty;
+    const data = JSON.parse(text);
+    return { listings: data.listings || [], totalPages: data.pagination?.totalPages || 1, page };
+  } catch (error) {
+    console.error('Failed to fetch listings:', error);
+    return empty;
+  }
+}
+
+/** How many listings each platform has, or null when the request fails. */
+async function fetchPlatformCounts(): Promise<Record<string, number> | null> {
+  try {
+    const res = await fetch('/api/listings?limit=1000&offset=0');
+    if (!res.ok) return null;
+    const allListings: { platform?: string }[] = (await res.json()) || [];
+    const counts: Record<string, number> = {};
+    for (const l of allListings) {
+      const key = l.platform === 'x' ? 'twitter' : (l.platform || 'website');
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  } catch (error) {
+    console.error('Failed to fetch all listings for counts:', error);
+    return null;
+  }
+}
+
 export default function PlatformsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedPlatform, setSelectedPlatform] = useState<string>('instagram');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   // Per-platform listing counts for the selector, kept separate from the paged list below.
   const [platformCounts, setPlatformCounts] = useState<Record<string, number>>({});
 
-  const fetchAllListingsForCounts = useCallback(async () => {
-    try {
-      const params = new URLSearchParams();
-      params.append('limit', '1000');
-      params.append('offset', '0');
+  const showPage = (result: PlatformPage) => {
+    setListings(result.listings);
+    setTotalPages(result.totalPages);
+    setCurrentPage(result.page);
+    setLoading(false);
+  };
 
-      const res = await fetch(`/api/listings?${params.toString()}`);
-      if (!res.ok) return;
-
-      const allListings: { platform?: string }[] = (await res.json()) || [];
-      const counts: Record<string, number> = {};
-      for (const l of allListings) {
-        const key = l.platform === 'x' ? 'twitter' : (l.platform || 'website');
-        counts[key] = (counts[key] || 0) + 1;
-      }
-      setPlatformCounts(counts);
-    } catch (error) {
-      console.error('Failed to fetch all listings for counts:', error);
-    }
-  }, []);
-
-  const fetchListings = useCallback(async (page: number = 1) => {
-    setLoading(true);
-    try {
-      const platformFilter = selectedPlatform === 'twitter' ? ['twitter', 'x'] : [selectedPlatform];
-      const params = new URLSearchParams();
-      params.append('sort', 'totalVotes');
-      params.append('page', page.toString());
-      params.append('pageSize', String(PAGE_SIZE));
-      platformFilter.forEach(p => params.append('platform', p));
-
-      const res = await fetch(`/api/listings/submit?${params.toString()}`);
-      if (!res.ok) {
-        setListings([]);
-        return;
-      }
-
-      const text = await res.text();
-      if (!text) {
-        setListings([]);
-        return;
-      }
-
-      const data = JSON.parse(text);
-      setListings(data.listings || []);
-      setTotalPages(data.pagination?.totalPages || 1);
-      setCurrentPage(page);
-    } catch (error) {
-      console.error('Failed to fetch listings:', error);
-      setListings([]);
-    } finally {
-      setLoading(false);
-    }
+  // Always start the newly selected platform from page 1. A slower answer for a platform the visitor
+  // already left is dropped.
+  useEffect(() => {
+    let live = true;
+    fetchPlatformPage(selectedPlatform, 1).then(result => { if (live) showPage(result); });
+    return () => { live = false; };
   }, [selectedPlatform]);
 
-  // Always start the newly selected platform from page 1.
+  // Per-platform counts for the selector.
   useEffect(() => {
-    fetchListings(1);
-  }, [fetchListings]);
+    let live = true;
+    fetchPlatformCounts().then(counts => { if (live && counts) setPlatformCounts(counts); });
+    return () => { live = false; };
+  }, []);
 
-  useEffect(() => {
-    fetchAllListingsForCounts();
-  }, [fetchAllListingsForCounts]);
+  const pickPlatform = (id: string) => {
+    if (id === selectedPlatform) return;
+    setLoading(true);
+    setSelectedPlatform(id);
+  };
+
+  const goToPage = (page: number) => {
+    setLoading(true);
+    fetchPlatformPage(selectedPlatform, page).then(showPage);
+  };
 
   const selectedPlatformInfo = PLATFORMS.find(p => p.id === selectedPlatform);
 
@@ -125,7 +136,7 @@ export default function PlatformsPage() {
               return (
                 <button
                   key={platform.id}
-                  onClick={() => setSelectedPlatform(platform.id)}
+                  onClick={() => pickPlatform(platform.id)}
                   aria-pressed={active}
                   className={`flex flex-col items-center gap-1.5 p-2.5 sm:p-3 rounded-xl border transition-all duration-150 active:scale-95 ${
                     active
@@ -190,7 +201,7 @@ export default function PlatformsPage() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={(page) => {
-                  fetchListings(page);
+                  goToPage(page);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               />

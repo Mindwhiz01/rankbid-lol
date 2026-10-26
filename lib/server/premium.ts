@@ -1,6 +1,35 @@
 // Server-only helpers for sponsored listings, ranked by price (see supabase/migrations/premium_rank_by_price.sql).
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
 
+/** A premium_listings row (supabase/migrations/add_premium_listings.sql and later). */
+export interface PremiumRow {
+  id: string;
+  listing_id: string;
+  position: number | null;
+  payment_status: string;
+  payment_method: string | null;
+  payment_txn_ref: string | null;
+  bid_usd: number | string | null;
+  payment_amount: number | string | null;
+  amount_paid?: number | string | null;
+  activated_at: string | null;
+  expires_at: string | null;
+  payment_verified_at?: string | null;
+  founder_name: string | null;
+  founder_email: string | null;
+  founder_phone: string | null;
+  founder_website: string | null;
+  founder_twitter: string | null;
+  founder_linkedin: string | null;
+  founder_instagram: string | null;
+  founder_facebook: string | null;
+  founder_tiktok: string | null;
+  founder_youtube: string | null;
+  founder_github: string | null;
+  created_at: string;
+  [column: string]: unknown;
+}
+
 export interface PremiumHolder {
   id: string;
   listingId: string;
@@ -8,7 +37,8 @@ export interface PremiumHolder {
   position: number;
   bidUsd: number;
   activatedAt: string | null;
-  expiresAt: string;
+  /** Null for lifetime spots (every spot since premium_lifetime.sql). */
+  expiresAt: string | null;
   founderName: string | null;
   founderEmail: string | null;
   founderPhone: string | null;
@@ -37,7 +67,7 @@ export async function getActiveHolders(revalidate?: number): Promise<PremiumHold
     console.error('Failed to read premium holders:', res.status, await res.text());
     return [];
   }
-  const rows: any[] = await res.json();
+  const rows: PremiumRow[] = await res.json();
   const holders = rows.map(r => ({
     id: r.id,
     listingId: r.listing_id,
@@ -82,7 +112,7 @@ export async function activatePremiumBid(premiumListingId: string): Promise<Acti
   return res.json();
 }
 
-export async function getPremiumListing(id: string): Promise<any | null> {
+export async function getPremiumListing(id: string): Promise<PremiumRow | null> {
   const res = await fetch(sbUrl(`premium_listings?id=eq.${encodeURIComponent(id)}&select=*`), {
     headers: sbHeaders(),
     cache: 'no-store',

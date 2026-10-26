@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, type CSSProperties } from 'react';
+import { readStoredUser, setStoredUser, useHydrated, useStoredUser } from '@/lib/storedUser';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LogOut, ChevronRight, Star, Pencil, Trash2 } from 'lucide-react';
@@ -56,12 +57,51 @@ interface Vote {
 }
 
 
+type RankedRow = { id: string; totalVotes?: number };
+
+/** JSON from a GET, or null when it fails. */
+async function getJson<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url);
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch (error) {
+    console.error('Failed to fetch user data:', url, error);
+    return null;
+  }
+}
+
+/** Everything the profile shows, read in parallel. A part that fails comes back null and the rest still show. */
+async function loadProfileData() {
+  const [submissions, votes, ladder, allListings] = await Promise.all([
+    getJson<{ listings?: Listing[] }>('/api/user/submissions'),
+    getJson<{ votes?: Vote[] }>('/api/user/votes'),
+    // Which of the user's submissions are sponsored right now, and their rank by price.
+    getJson<{ ranked?: { listingId: string; position: number; bidUsd: number; expiresAt: string | null }[] }>('/api/premium-listings/ladder'),
+    // Every listing, to work out each submission's rank.
+    getJson<RankedRow[]>('/api/listings?limit=1000&offset=0'),
+  ]);
+  let premiumSpots: Record<string, HeldSpot> | null = null;
+  if (ladder) {
+    premiumSpots = {};
+    for (const r of ladder.ranked || []) {
+      premiumSpots[r.listingId] = { position: r.position, bidUsd: r.bidUsd, expiresAt: r.expiresAt };
+    }
+  }
+  return {
+    submissions: submissions ? submissions.listings || [] : null,
+    votes: votes ? votes.votes || [] : null,
+    premiumSpots,
+    allListings: allListings ? allListings || [] : null,
+  };
+}
+
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const user = useStoredUser<User>();
+  const hydrated = useHydrated();
   const [submissions, setSubmissions] = useState<Listing[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
-  const [allListings, setAllListings] = useState<any[]>([]);
+  const [allListings, setAllListings] = useState<RankedRow[]>([]);
   const [activeTab, setActiveTab] = useState<'submissions' | 'votes' | 'settings'>('submissions');
   const [loading, setLoading] = useState(true);
   const [premiumSpots, setPremiumSpots] = useState<Record<string, HeldSpot>>({});
@@ -73,65 +113,32 @@ export default function ProfilePage() {
   const submissionsPage = usePaged(submissions);
   const votesPage = usePaged(votes);
 
+  // Signed out: off to the login page and back. Checked once the browser can read the stored user, and
+  // only then (not on every change), so signing out here goes home instead of to the login page.
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (!savedUser) {
+    if (!hydrated) return;
+    if (!readStoredUser()) {
       router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
-
-    try {
-      const userData = JSON.parse(savedUser);
-      setUser(userData);
-      fetchUserData();
-    } catch {
-      localStorage.removeItem('user');
-      router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
-    }
-  }, [router]);
-
-  const fetchUserData = async () => {
-    try {
-      const submissionsRes = await fetch('/api/user/submissions');
-      if (submissionsRes.ok) {
-        const data = await submissionsRes.json();
-        setSubmissions(data.listings || []);
+    let live = true;
+    loadProfileData().then(data => {
+      if (!live) return;
+      if (data.submissions) {
+        setSubmissions(data.submissions);
         // Older outbid emails link here with ?raise=<listingId>: send them to the sponsor checkout page.
         const raiseId = new URLSearchParams(window.location.search).get('raise');
-        if (raiseId && (data.listings || []).some((l: Listing) => l.id === raiseId)) {
+        if (raiseId && data.submissions.some(l => l.id === raiseId)) {
           router.replace(`/sponsor?listing=${encodeURIComponent(raiseId)}`);
         }
       }
-
-      const votesRes = await fetch('/api/user/votes');
-      if (votesRes.ok) {
-        const data = await votesRes.json();
-        setVotes(data.votes || []);
-      }
-
-      // Which of the user's submissions are sponsored right now, and their rank by price
-      const ladderRes = await fetch('/api/premium-listings/ladder');
-      if (ladderRes.ok) {
-        const data = await ladderRes.json();
-        const held: Record<string, HeldSpot> = {};
-        for (const r of data.ranked || []) {
-          held[r.listingId] = { position: r.position, bidUsd: r.bidUsd, expiresAt: r.expiresAt };
-        }
-        setPremiumSpots(held);
-      }
-
-      // Fetch all listings to calculate rankings
-      const allListingsRes = await fetch(`/api/listings?limit=1000&offset=0`);
-      if (allListingsRes.ok) {
-        const listings = await allListingsRes.json();
-        setAllListings(listings || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch user data:', error);
-    } finally {
+      if (data.votes) setVotes(data.votes);
+      if (data.premiumSpots) setPremiumSpots(data.premiumSpots);
+      if (data.allListings) setAllListings(data.allListings);
       setLoading(false);
-    }
-  };
+    });
+    return () => { live = false; };
+  }, [hydrated, router]);
 
   const calculateRank = (totalVotes: number): number => {
     return allListings.filter(l => (l.totalVotes || 0) > totalVotes).length + 1;
@@ -169,9 +176,8 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     // End the server session first; clearing localStorage alone leaves the auth cookie working.
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
-    localStorage.removeItem('user');
     localStorage.removeItem('auth_token');
-    setUser(null);
+    setStoredUser(null);
     router.push('/');
   };
 
@@ -443,10 +449,10 @@ export default function ProfilePage() {
 
                 <AccountSettings
                   user={user}
-                  onUserChange={setUser}
+                  onUserChange={setStoredUser}
                   onDeleted={() => {
-                    localStorage.removeItem('user');
                     localStorage.removeItem('auth_token');
+                    setStoredUser(null);
                     router.push('/?account=deleted');
                   }}
                 />

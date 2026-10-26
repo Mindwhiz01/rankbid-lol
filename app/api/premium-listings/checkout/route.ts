@@ -313,7 +313,7 @@ export async function POST(req: NextRequest) {
       totalBidUsd: totalUsd,
       itemCount: 1,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Checkout error:', error);
     return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
   }

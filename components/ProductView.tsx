@@ -38,6 +38,22 @@ interface Listing {
 
 // The server renders this with the listing already loaded (so crawlers see the content);
 // it only fetches on the client when the server didn't find it yet (a just-submitted product).
+/** A product and every listing (for its ranks), or null. A just-submitted product can take a moment
+ * to appear (replication lag), so a 404 is retried once. */
+async function fetchProductData(id: string): Promise<{ product: Listing; allListings?: Listing[] } | null> {
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(`/api/product/${id}`);
+      if (res.ok) return await res.json();
+      if (res.status !== 404) return null;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  } catch (error) {
+    console.error('Failed to fetch product:', error);
+  }
+  return null;
+}
+
 export default function ProductView({ id, initialProduct, initialAllListings, founder = null }: {
   id: string;
   initialProduct: Listing | null;
@@ -52,9 +68,20 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   const [showStatusCard, setShowStatusCard] = useState(false);
   const { voted, extraVotes, message: voteMessage, vote } = useVote(id, product?.totalVotes);
 
+  // Rendered without the product (not found at build time): read it here.
   useEffect(() => {
-    if (!initialProduct) fetchProduct();
-  }, [id]);
+    if (initialProduct) return;
+    let live = true;
+    fetchProductData(id).then(data => {
+      if (!live) return;
+      if (data) {
+        setProduct(data.product);
+        setAllListings(data.allListings || []);
+      }
+      setLoading(false);
+    });
+    return () => { live = false; };
+  }, [id, initialProduct]);
 
   // Other people's votes show up here without a reload.
   useLiveRefresh(async () => {
@@ -87,27 +114,6 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
       .catch(() => {});
     return () => { live = false; };
   }, [id]);
-
-  const fetchProduct = async () => {
-    try {
-      // A just-submitted product can take a moment to appear (replication lag), so retry once on 404.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const res = await fetch(`/api/product/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProduct(data.product);
-          setAllListings(data.allListings || []);
-          return;
-        }
-        if (res.status !== 404) return;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    } catch (error) {
-      console.error('Failed to fetch product:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getVisitUrl = () => {
     if (!product) return '#';

@@ -9,6 +9,7 @@ import { HOME_SPONSORED, MIN_BID_USD } from '@/lib/premiumSpots';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
+import { useHydrated } from '@/lib/storedUser';
 
 type Ranked = SponsoredListing & { premiumPosition?: number | null; premiumActivatedAt?: string | null };
 
@@ -17,22 +18,22 @@ type Ranked = SponsoredListing & { premiumPosition?: number | null; premiumActiv
  * /sponsored?today=1 (the homepage's "Today's ranking" card) shows only the spots bought since midnight.
  */
 export default function SponsoredPage() {
-  const [listings, setListings] = useState<Ranked[] | null>(null);
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [fetched, setFetched] = useState<Ranked[] | null>(null);
+  // The tab clicked here, else ?today=1 from the link that opened the page (read once the browser has it).
+  const [pickedToday, setTodayOnly] = useState<boolean | null>(null);
+  const hydrated = useHydrated();
+  const todayOnly = pickedToday ?? (hydrated && new URLSearchParams(window.location.search).get('today') === '1');
+  const preview = hydrated && isSponsoredPreview();
+  const listings: Ranked[] | null = preview ? SPONSORED_PREVIEW : fetched;
 
   useEffect(() => {
-    setTodayOnly(new URLSearchParams(window.location.search).get('today') === '1');
-  }, []);
-
-  useEffect(() => {
-    if (isSponsoredPreview()) {
-      setListings(SPONSORED_PREVIEW);
-      return;
-    }
+    if (isSponsoredPreview()) return;
+    let live = true;
     fetch('/api/listings/submit?page=1&pageSize=1', { cache: 'no-store' })
       .then(res => (res.ok ? res.json() : null))
-      .then(data => setListings(data?.premium || []))
-      .catch(() => setListings([]));
+      .then(data => { if (live) setFetched(data?.premium || []); })
+      .catch(() => { if (live) setFetched([]); });
+    return () => { live = false; };
   }, []);
 
   const ranked = (listings || []).slice().sort((a, b) => (a.premiumPosition || 0) - (b.premiumPosition || 0));

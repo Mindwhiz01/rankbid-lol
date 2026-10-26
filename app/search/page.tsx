@@ -32,17 +32,21 @@ function SearchContent() {
   const [loading, setLoading] = useState(!!query);
   const paged = usePaged(results, query);
 
-  useEffect(() => {
+  // A new ?q= (typed here, or back/forward): show it in the box and start over. Adjusted during render
+  // (React's pattern for state that follows a prop), so there's no extra render with the old results.
+  const [shownQuery, setShownQuery] = useState(query);
+  if (query !== shownQuery) {
+    setShownQuery(query);
     setInput(query);
-    if (!query) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
+    setResults([]);
+    setLoading(!!query);
+  }
+
+  useEffect(() => {
+    if (!query) return;
 
     let cancelled = false;
     const searchProducts = async () => {
-      setLoading(true);
       try {
         const res = await fetch('/api/listings/submit?limit=1000&sort=totalVotes');
         const data = res.ok ? await res.json() : { listings: [] };

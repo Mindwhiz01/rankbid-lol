@@ -294,9 +294,9 @@ export default function PremiumListingModal({
         setLinkRows(defaultRows(null));
         onClose();
       }, 1500);
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Premium submission error:', err);
-      const errorMessage = err.message || 'Failed to submit premium listing request';
+      const errorMessage = (err instanceof Error && err.message) || 'Failed to submit premium listing request';
       setError(`❌ Error: ${errorMessage}`);
       setLoading(false);
     }

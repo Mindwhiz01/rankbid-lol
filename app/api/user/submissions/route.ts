@@ -21,6 +21,11 @@ function platformOf(url: string): string {
   return 'website';
 }
 
+type SubmissionRow = {
+  id: string; title: string; description: string | null; location: string | null; handle?: string | null;
+  platform: string | null; total_votes: number | null; day_votes: number | null; category: string | null; created_at: string;
+};
+
 /** True if the listing exists and belongs to the signed-in user. */
 async function ownsListing(user: SessionUser, listingId: string): Promise<boolean> {
   const res = await fetch(
@@ -185,48 +190,14 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = encodeURIComponent(user.id);
+    const res = await fetch(
+      sbUrl(`listings?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc`),
+      { headers: sbHeaders(), cache: 'no-store' }
+    );
+    if (!res.ok) throw new Error(`Submissions lookup failed: ${res.status} ${await res.text()}`);
+    const listings: SubmissionRow[] = await res.json();
 
-    // Query Supabase listings table for user's submissions
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Try to fetch with user_id filter - if the column doesn't exist, fall back to all listings
-    let listings: any[] = [];
-
-    try {
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/listings?user_id=eq.${userId}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        listings = await response.json();
-      } else if (response.status === 400) {
-        // user_id column might not exist yet (migration not applied)
-        // For now, return empty array with helpful message
-        console.log('Note: user_id column may not exist yet. Please apply database migration.');
-        listings = [];
-      }
-    } catch (err) {
-      console.error('Error fetching submissions:', err);
-      listings = [];
-    }
-
-    // Transform Supabase response to match expected format
-    const transformedListings = listings.map((listing: any) => ({
+    const transformedListings = listings.map(listing => ({
       id: listing.id,
       title: listing.title,
       description: listing.description,

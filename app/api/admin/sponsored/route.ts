@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/server/admin';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-import { getActiveHolders } from '@/lib/server/premium';
+import { getActiveHolders, type PremiumRow } from '@/lib/server/premium';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ const EARNED = new Set(['active', 'outbid', 'replaced']);
 const REFUND = new Set(['needs_refund', 'rejected']);
 
 // Money this order took: payment_amount (a raise charges only the added part; bid_usd is the spot's total).
-const amountOf = (r: any) => Number(r.payment_amount ?? r.bid_usd ?? 0) || 0;
+const amountOf = (r: Pick<PremiumRow, 'payment_amount' | 'bid_usd'>) => Number(r.payment_amount ?? r.bid_usd ?? 0) || 0;
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       { headers: sbHeaders(), cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-    const rows: any[] = await res.json();
+    const rows: (PremiumRow & { listing: { title: string; location: string | null; user_id: string | null } | null })[] = await res.json();
 
     // Account (name/email) behind each product.
     const userIds = [...new Set(rows.map(r => r.listing?.user_id).filter(Boolean).map(String))];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, X, AlertCircle } from 'lucide-react';
 
 interface PremiumListing {
@@ -58,8 +58,10 @@ export default function AdminPayments({ title = 'Sponsor orders' }: { title?: st
   const premiumListings = allListings.filter(l => inFilter(current, l));
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: string }>>([]);
 
+  // Toast ids only need to be unique here; a counter also keeps two toasts in one millisecond apart.
+  const toastSeq = useRef(0);
   const showToast = (message: string, type = 'info') => {
-    const id = Date.now().toString();
+    const id = String(++toastSeq.current);
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));

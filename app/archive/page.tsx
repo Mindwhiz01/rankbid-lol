@@ -36,23 +36,14 @@ export default function ArchivePage() {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   useEffect(() => {
-    fetchArchives();
+    let live = true;
+    fetch(`/api/daily-snapshots?daysBack=${daysSinceStart()}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (live && data) setSnapshots(data.snapshots || []); })
+      .catch(error => console.error('Error fetching archives:', error))
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
   }, []);
-
-  const fetchArchives = async () => {
-    try {
-      const res = await fetch(`/api/daily-snapshots?daysBack=${daysSinceStart()}`);
-      if (res.ok) {
-        const data = await res.json();
-        const fetchedSnapshots = data.snapshots || [];
-        setSnapshots(fetchedSnapshots);
-      }
-    } catch (error) {
-      console.error('Error fetching archives:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (dateStr: string | Date) => {
     let date: Date;

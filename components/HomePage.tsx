@@ -29,6 +29,7 @@ const slideDelay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
 
 import { getPlatformIcon } from '@/lib/platformIcons';
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { readStoredUser, useStoredUser } from '@/lib/storedUser';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
@@ -161,9 +162,39 @@ const PHOTO_FADE = 'linear-gradient(to right, transparent, black 18%)';
 
 // initialListings: the server-rendered first page (see app/page.tsx) so crawlers see the rankings
 // without running JavaScript; the client refetches on mount and keeps it live.
+/** A page of rankings, or why there's none: 'empty' (no answer) or 'error' (the request failed). */
+type RankingsPage = { page: number; listings: Listing[]; premium: Listing[]; totalPages: number } | 'empty' | 'error';
+
+/** Ids of the signed-in visitor's own listings (they get the Premium button), or null. */
+async function fetchOwnListingIds(): Promise<Set<string> | null> {
+  // Signed-out visitors have no listings; skipping the request keeps a 401 out of their console.
+  if (!readStoredUser()) return null;
+  try {
+    const res = await fetch('/api/user/submissions');
+    if (!res.ok) return null; // signed out
+    const data = await res.json();
+    return new Set((data.listings || []).map((l: { id: string }) => l.id));
+  } catch {
+    return null; // No Premium buttons is the safe fallback.
+  }
+}
+
+/** Every listing in rank order, for rank numbers, or null when the request fails. */
+async function fetchAllRanked(): Promise<Listing[] | null> {
+  try {
+    const res = await fetch('/api/listings/submit?limit=1000&sort=totalVotes');
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text ? JSON.parse(text).listings || [] : null;
+  } catch (error) {
+    console.error('Failed to fetch all listings:', error);
+    return null;
+  }
+}
+
 export default function Home({ initialListings = [] }: { initialListings?: Listing[] }) {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; email: string; name?: string } | null>(null);
+  const user = useStoredUser();
   const [listings, setListings] = useState<Listing[]>(() => initialListings.slice(0, PAGE_SIZE));
   const [premiumListings, setPremiumListings] = useState<Listing[]>([]);
   const [todayVoted, setTodayVoted] = useState<Listing[] | null>(null);
@@ -194,13 +225,13 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   const [copied, setCopied] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info', ms = 3000) => {
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info', ms = 3000) => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, ms);
-  };
+  }, []);
 
   // One-off notices passed in the URL (back from a cancelled Stripe checkout, or after deleting
   // an account): show them, then tidy the URL.
@@ -220,52 +251,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
   }, []);
 
-  const loadOwnListingIds = async () => {
-    // Signed-out visitors have no listings; skipping the request keeps a 401 out of their console.
-    if (!localStorage.getItem('user')) return;
-    try {
-      const res = await fetch('/api/user/submissions');
-      if (!res.ok) return; // signed out
-      const data = await res.json();
-      const own: { id: string; title: string }[] = (data.listings || []).map((l: { id: string; title: string }) => ({ id: l.id, title: l.title }));
-      setOwnListingIds(new Set(own.map(l => l.id)));
-    } catch {
-      // No Premium buttons is the safe fallback.
-    }
-  };
-
-  useEffect(() => {
-    // Check if user is logged in
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem('user');
-      }
-    }
-
-    setCurrentPage(1);
-    fetchListings(1);
-    loadOwnListingIds();
-
-    // Fetch all listings for rank calculation
-    const fetchAllListings = async () => {
-      try {
-        const res = await fetch('/api/listings/submit?limit=1000&sort=totalVotes');
-        if (res.ok) {
-          const text = await res.text();
-          if (text) {
-            const data = JSON.parse(text);
-            setAllListings(data.listings || []);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch all listings:', error);
-      }
-    };
-    fetchAllListings();
-  }, [activeTimeFilter, selectedCategory]);
+  const loadOwnListingIds = () => fetchOwnListingIds().then(ids => { if (ids) setOwnListingIds(ids); });
 
   const handleVote = useCallback(async (listingId: string) => {
     if (!user) {
@@ -330,35 +316,52 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     }
   }, [activeTimeFilter, selectedCategory, user]);
 
-  // fresh: bypass the few-second CDN cache (right after the visitor changed the rankings).
-  const fetchListings = useCallback(async (page: number = 1, fresh = false) => {
-    setLoading(true);
+  // One page of the rankings. fresh: bypass the few-second CDN cache (right after the visitor changed them).
+  const loadPage = useCallback(async (page: number, fresh = false): Promise<RankingsPage> => {
     try {
       const sort = activeTimeFilter === 'today' ? 'dayVotes' : 'totalVotes';
       const categoryParam = selectedCategory === 'All' ? '' : `&category=${encodeURIComponent(selectedCategory)}`;
       const timeParam = activeTimeFilter === 'today' ? '&timeFilter=today' : '';
       const res = await fetch(`/api/listings/submit?sort=${sort}&page=${page}&pageSize=${PAGE_SIZE}${categoryParam}${timeParam}${fresh ? '&fresh=1' : ''}`);
-      if (!res.ok) {
-        setListings([]);
-        return;
-      }
+      if (!res.ok) return 'empty';
       const text = await res.text();
-      if (!text) {
-        setListings([]);
-        return;
-      }
+      if (!text) return 'empty';
       const data = JSON.parse(text);
-      setListings(data.listings || []);
-      setPremiumListings(isSponsoredPreview() ? SPONSORED_PREVIEW : data.premium || []);
-      setTotalPages(data.pagination?.totalPages || 1);
-      setCurrentPage(page);
-    } catch (error) {
-      setListings([]);
-      addToast('Failed to load rankings', 'error');
-    } finally {
-      setLoading(false);
+      return {
+        page,
+        listings: data.listings || [],
+        premium: isSponsoredPreview() ? SPONSORED_PREVIEW : data.premium || [],
+        totalPages: data.pagination?.totalPages || 1,
+      };
+    } catch {
+      return 'error';
     }
   }, [activeTimeFilter, selectedCategory]);
+
+  const showPage = useCallback((result: RankingsPage) => {
+    if (typeof result === 'string') {
+      setListings([]);
+      if (result === 'error') addToast('Failed to load rankings', 'error');
+    } else {
+      setListings(result.listings);
+      setPremiumListings(result.premium);
+      setTotalPages(result.totalPages);
+      setCurrentPage(result.page);
+    }
+    setLoading(false);
+  }, [addToast]);
+
+  // Callers that should show the loading state set it first (the first load keeps the server-rendered list).
+  const fetchListings = (page: number = 1, fresh = false) => loadPage(page, fresh).then(showPage);
+
+  // First load: page 1 of the rankings, the visitor's own listings, and every listing for rank numbers.
+  useEffect(() => {
+    let live = true;
+    loadPage(1).then(result => { if (live) showPage(result); });
+    fetchOwnListingIds().then(ids => { if (live && ids) setOwnListingIds(ids); });
+    fetchAllRanked().then(rows => { if (live && rows) setAllListings(rows); });
+    return () => { live = false; };
+  }, [loadPage, showPage]);
 
   // Other people's votes show up without a reload: re-read the page being viewed (no spinner).
   useLiveRefresh(async () => {
@@ -387,6 +390,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
     addToast(`🎉 ${displayName} is live! Community voting starts now.`, 'success');
     setLastSubmittedProduct({ id, title: displayName });
     setCurrentPage(1);
+    setLoading(true);
     fetchListings(1, true);
     loadOwnListingIds();
   };
@@ -792,6 +796,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={(page) => {
+                  setLoading(true);
                   fetchListings(page);
                   document.getElementById('leaderboard')?.scrollIntoView({ behavior: 'smooth' });
                 }}

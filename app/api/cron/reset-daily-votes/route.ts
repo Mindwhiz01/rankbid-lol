@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
 
       if (allListings && allListings.length > 0) {
         const snapshotData = allListings
-          .filter((l: any) => (l.day_votes || 0) > 0)
-          .map((listing: any, idx: number) => ({
+          .filter(l => (l.day_votes || 0) > 0)
+          .map((listing, idx) => ({
             rank: idx + 1,
             listing: {
               id: listing.id,

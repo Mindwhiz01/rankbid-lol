@@ -28,6 +28,18 @@ interface CountdownTime {
 }
 
 
+/** Today's top 50 by today's votes, or null when the request fails. */
+async function fetchTodayRankings(): Promise<Listing[] | null> {
+  try {
+    const res = await fetch('/api/listings/submit?sort=dayVotes&limit=100&timeFilter=today&fresh=1', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.listings || []).sort((a: Listing, b: Listing) => b.dayVotes - a.dayVotes).slice(0, 50);
+  } catch {
+    return null;
+  }
+}
+
 // Server-rendered with today's launches (see page.tsx) so crawlers see them; refreshed live.
 export default function DailyView({ initialListings }: { initialListings: Listing[] }) {
   const [listings, setListings] = useState<Listing[]>(initialListings);
@@ -35,8 +47,19 @@ export default function DailyView({ initialListings }: { initialListings: Listin
   const [countdown, setCountdown] = useState<CountdownTime>({ hours: 0, minutes: 0, seconds: 0 });
   const paged = usePaged(listings);
 
+  // Today's rankings, freshly read; a failed read keeps the last known ones.
+  const refresh = () => fetchTodayRankings().then(rows => {
+    if (rows) setListings(rows);
+    setLoading(false);
+  });
+
   useEffect(() => {
-    fetchListings();
+    let live = true;
+    fetchTodayRankings().then(rows => {
+      if (!live) return;
+      if (rows) setListings(rows);
+      setLoading(false);
+    });
 
     const calculateCountdown = () => {
       // Time until the next UTC midnight (timestamps are already UTC; no timezone shifting needed).
@@ -51,29 +74,21 @@ export default function DailyView({ initialListings }: { initialListings: Listin
 
       // Refresh listings when countdown reaches 0 (day changed)
       if (diff <= 0) {
-        fetchListings();
+        fetchTodayRankings().then(rows => { if (live && rows) setListings(rows); });
       }
     };
 
-    calculateCountdown();
+    // First tick right away (in a callback, not the effect body), then every second.
+    const first = setTimeout(calculateCountdown, 0);
     const timer = setInterval(calculateCountdown, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      live = false;
+      clearTimeout(first);
+      clearInterval(timer);
+    };
   }, []);
-  useLiveRefresh(() => fetchListings());
-
-  const fetchListings = async () => {
-    try {
-      const res = await fetch('/api/listings/submit?sort=dayVotes&limit=100&timeFilter=today&fresh=1', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      setListings((data.listings || []).sort((a: Listing, b: Listing) => b.dayVotes - a.dayVotes).slice(0, 50));
-    } catch {
-      // Keep showing the last known rankings.
-    } finally {
-      setLoading(false);
-    }
-  };
+  useLiveRefresh(refresh);
 
   return (
     <>
