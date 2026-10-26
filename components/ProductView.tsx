@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import PlatformIcon from '@/components/PlatformIcon';
@@ -7,7 +8,6 @@ import { IconTile, PremiumIcons } from '@/components/PremiumIcons';
 import FounderLinks, { FounderLinksCard, type FounderSocials } from '@/components/FounderLinks';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { ArrowUpRight, Share2, Copy, Check } from 'lucide-react';
-import StatusCardModal from '@/components/StatusCardModal';
 import RankingRow from '@/components/RankingRow';
 import { categoryPath, getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
@@ -17,6 +17,9 @@ import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import { logoUrl } from '@/lib/logo';
+
+// Loaded when first opened, so it isn't in every page's JavaScript.
+const StatusCardModal = dynamic(() => import('@/components/StatusCardModal'), { ssr: false });
 
 interface Listing {
   id: string;
@@ -406,7 +409,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
       </div>
 
       {/* Status Card Modal */}
-      {product && (
+      {product && showStatusCard && (
         <StatusCardModal
           isOpen={showStatusCard}
           onClose={() => setShowStatusCard(false)}

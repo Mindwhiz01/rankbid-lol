@@ -37,24 +37,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing listingId' }, { status: 400 });
     }
 
-    // Slows down scripted voting from many accounts on one network.
-    if (!(await rateLimit(`vote-ip:${ipHash(req)}`, 30, 60 * 60)) || !(await rateLimit(`vote-user:${user.id}`, 60, 60 * 60))) {
+    // Slows down scripted voting from many accounts on one network. The checks are independent, so they
+    // run together (each is one database call), as do the three reads below.
+    const [ipOk, userOk, toggleOk] = await Promise.all([
+      rateLimit(`vote-ip:${ipHash(req)}`, 30, 60 * 60),
+      rateLimit(`vote-user:${user.id}`, 60, 60 * 60),
+      toggleAllowed(user.id, listingId),
+    ]);
+    if (!ipOk || !userOk) {
       return NextResponse.json({ error: 'Too many votes. Please try again later.' }, { status: 429 });
     }
-    if (!(await toggleAllowed(user.id, listingId))) {
+    if (!toggleOk) {
       return NextResponse.json({ error: TOGGLE_MESSAGE }, { status: 429 });
     }
 
-    const listing = await getListing(listingId);
+    const [listing, alreadyVoted, before] = await Promise.all([
+      getListing(listingId),
+      hasUserVote(user.id, listingId),
+      snapshotListing(listingId),
+    ]);
     if (!listing) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    if (await hasUserVote(user.id, listing.id)) {
+    if (alreadyVoted) {
       return NextResponse.json({ error: 'Already voted', voted: true }, { status: 400 });
     }
 
-    const before = await snapshotListing(listing.id);
     const result = await recordVote(listing.id, `user:${user.id}`);
     if (result.status === 'duplicate') {
       return NextResponse.json({ error: 'Already voted', voted: true }, { status: 400 });
@@ -106,23 +115,29 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Shares the vote limit, so voting and unvoting can't be looped to churn the rankings.
-    if (!(await rateLimit(`vote-user:${user.id}`, 60, 60 * 60))) {
+    const [userOk, toggleOk, listing] = await Promise.all([
+      rateLimit(`vote-user:${user.id}`, 60, 60 * 60),
+      toggleAllowed(user.id, listingId),
+      getListing(listingId),
+    ]);
+    if (!userOk) {
       return NextResponse.json({ error: 'Too many changes. Please try again later.' }, { status: 429 });
     }
-    if (!(await toggleAllowed(user.id, listingId))) {
+    if (!toggleOk) {
       return NextResponse.json({ error: TOGGLE_MESSAGE }, { status: 429 });
     }
 
-    const listing = await getListing(listingId);
     if (!listing) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    await fetch(
-      sbUrl(`user_votes?user_id=eq.${encodeURIComponent(user.id)}&listing_id=eq.${encodeURIComponent(listing.id)}`),
-      { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
-    );
-    const counts = await removeVote(listing.id, `user:${user.id}`);
+    const [, counts] = await Promise.all([
+      fetch(
+        sbUrl(`user_votes?user_id=eq.${encodeURIComponent(user.id)}&listing_id=eq.${encodeURIComponent(listing.id)}`),
+        { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
+      ),
+      removeVote(listing.id, `user:${user.id}`),
+    ]);
 
     return NextResponse.json({ success: true, voted: false, ...counts });
   } catch (error) {

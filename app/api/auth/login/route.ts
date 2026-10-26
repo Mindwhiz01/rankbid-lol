@@ -1,6 +1,5 @@
-import { prisma } from '@/lib/prisma';
-import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
-import { BLOCKED_MESSAGE, isBlocked, isEmailVerified, passwordMatches } from '@/lib/server/account';
+import { createSession, isCrossSiteWrite, setSessionCookie } from '@/lib/server/session';
+import { BLOCKED_MESSAGE, getAccount, isBlocked, isEmailVerified, passwordMatches } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { logAdminSignIn } from '@/lib/server/admin-activity';
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,16 +20,18 @@ export async function POST(request: NextRequest) {
 
     const ip = ipHash(request);
     const emailKey = email.toLowerCase().slice(0, 254);
-    if (!(await rateLimit(`login-ip:${ip}`, 20, 15 * 60)) || !(await rateLimit(`login-email:${emailKey}`, 10, 15 * 60))) {
+    const [ipOk, emailOk] = await Promise.all([
+      rateLimit(`login-ip:${ip}`, 20, 15 * 60),
+      rateLimit(`login-email:${emailKey}`, 10, 15 * 60),
+    ]);
+    if (!ipOk || !emailOk) {
       return NextResponse.json(
         { error: 'Too many login attempts. Please wait 15 minutes and try again.' },
         { status: 429 }
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const user = await getAccount({ email });
 
     if (!user) {
       return NextResponse.json(
@@ -48,28 +49,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (await isBlocked(user.id)) {
+    const [blocked, verified] = await Promise.all([isBlocked(user.id), isEmailVerified(user.id)]);
+    if (blocked) {
       return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
     }
 
-    if (!(await isEmailVerified(user.id))) {
+    if (!verified) {
       return NextResponse.json(
         { error: 'Please confirm your email first. Check your inbox for the link we sent.', unverified: true },
         { status: 403 }
       );
     }
 
-    const token = createSessionToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.session.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
-    });
-
+    const token = await createSession(user.id);
     await logAdminSignIn(request, user.email, 'password');
 
     const response = NextResponse.json(
@@ -83,15 +75,7 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
-
-    response.cookies.set('auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    });
-
+    setSessionCookie(response, token);
     return response;
   } catch (error) {
     console.error('Login error:', error);

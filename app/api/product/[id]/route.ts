@@ -85,10 +85,12 @@ export async function GET(
       console.error('Failed to fetch listings for ranking:', allRes.status, await allRes.text());
     }
 
-    return NextResponse.json({
-      product: mappedProduct,
-      allListings: allListings,
-    });
+    // Every open product page polls this every 15s: the CDN answers repeats for a few seconds, so all
+    // viewers of one product cost about one function run each time (same policy as the listings API).
+    return NextResponse.json(
+      { product: mappedProduct, allListings },
+      { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=30' } }
+    );
   } catch (error) {
     console.error('Error fetching product:', error);
     return NextResponse.json(

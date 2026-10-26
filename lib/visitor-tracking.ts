@@ -5,136 +5,78 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function trackVisitor(
-  sessionId: string,
-  userAgent: string,
-  ipAddress: string,
-  pageUrl: string
-) {
+/**
+ * Records one page view: refreshes (or starts) the visitor session and bumps today's counts.
+ * One database call through track_visit (supabase/migrations/perf_rpc_indexes.sql).
+ */
+export async function trackVisitor(sessionId: string, userAgent: string, ipAddress: string, pageUrl: string) {
+  const { error } = await supabase.rpc('track_visit', {
+    p_session_id: sessionId,
+    p_user_agent: userAgent,
+    p_ip: ipAddress,
+    p_page_url: pageUrl,
+  });
+  if (!error) return { success: true };
+  // PGRST202: the function isn't installed yet.
+  if (error.code !== 'PGRST202') {
+    console.error('track_visit failed:', error);
+    return { success: false, error };
+  }
+  return trackVisitorLegacy(sessionId, userAgent, ipAddress, pageUrl);
+}
+
+/** The same counts in four requests, for a database without track_visit. */
+async function trackVisitorLegacy(sessionId: string, userAgent: string, ipAddress: string, pageUrl: string) {
   try {
     const now = new Date().toISOString();
     const today = now.split('T')[0];
-    let isNewSession = false;
 
-    // Check if session exists
-    const { data: existingSession, error: checkError } = await supabase
+    const { data: existingSession } = await supabase
       .from('visitor_sessions')
       .select('id')
       .eq('session_id', sessionId)
-      .single();
+      .maybeSingle();
 
-    if (existingSession) {
-      // Update last activity
-      const { error: updateError } = await supabase
-        .from('visitor_sessions')
-        .update({
-          last_activity: now,
-          page_url: pageUrl,
-          is_active: true,
-        })
-        .eq('session_id', sessionId);
-
-      if (updateError) {
-        console.error('Error updating session:', updateError);
-      }
-    } else {
-      // Create new session
-      isNewSession = true;
-      const { error: insertError } = await supabase
-        .from('visitor_sessions')
-        .insert({
+    const isNewSession = !existingSession;
+    const { error: sessionError } = isNewSession
+      ? await supabase.from('visitor_sessions').insert({
           session_id: sessionId,
           user_agent: userAgent,
           ip_address: ipAddress,
           page_url: pageUrl,
           last_activity: now,
           is_active: true,
+        })
+      : await supabase.from('visitor_sessions').update({ last_activity: now, page_url: pageUrl, is_active: true }).eq('session_id', sessionId);
+    if (sessionError) console.error('Error saving visitor session:', sessionError);
+
+    const { data: existing, error: getError } = await supabase
+      .from('visitor_analytics')
+      .select('total_visitors, page_views')
+      .eq('date', today)
+      .maybeSingle();
+    if (getError) throw getError;
+
+    // No updated_at here: the production visitor_analytics table doesn't have that column (PGRST204).
+    const { error: countError } = existing
+      ? await supabase
+          .from('visitor_analytics')
+          .update({
+            page_views: existing.page_views + 1,
+            ...(isNewSession ? { total_visitors: existing.total_visitors + 1 } : {}),
+          })
+          .eq('date', today)
+      : await supabase.from('visitor_analytics').insert({
+          date: today,
+          total_visitors: isNewSession ? 1 : 0,
+          unique_visitors: isNewSession ? 1 : 0,
+          page_views: 1,
         });
+    if (countError) console.error('Error saving visitor analytics:', countError);
 
-      if (insertError) {
-        console.error('Error creating session:', insertError);
-      }
-    }
-
-    // Update daily analytics - increment page_views for every hit, total_visitors only for new sessions
-    try {
-      // First, try to get existing record
-      const { data: existing, error: getError } = await supabase
-        .from('visitor_analytics')
-        .select('total_visitors, page_views')
-        .eq('date', today)
-        .maybeSingle();
-
-      if (getError && getError.code !== 'PGRST116') {
-        throw getError;
-      }
-
-      if (existing) {
-        // Record exists - increment page_views on every hit, total_visitors only for new sessions
-        console.log('[TRACKING] Found existing analytics, incrementing...');
-        // No updated_at here: the production visitor_analytics table doesn't have that
-        // column, and sending it makes every increment fail (PGRST204).
-        const updateData: any = {
-          page_views: existing.page_views + 1,
-        };
-
-        if (isNewSession) {
-          updateData.total_visitors = existing.total_visitors + 1;
-        }
-
-        const { error: updateError } = await supabase
-          .from('visitor_analytics')
-          .update(updateData)
-          .eq('date', today);
-
-        if (updateError) {
-          console.error('[TRACKING] Error incrementing:', updateError);
-        } else {
-          console.log('[TRACKING] Incremented page_views to', existing.page_views + 1);
-        }
-      } else {
-        // Record doesn't exist - create it
-        console.log('[TRACKING] Creating new analytics record...');
-        const { error: createError } = await supabase
-          .from('visitor_analytics')
-          .insert({
-            date: today,
-            total_visitors: isNewSession ? 1 : 0,
-            unique_visitors: isNewSession ? 1 : 0,
-            page_views: 1,
-          });
-
-        if (createError) {
-          console.error('[TRACKING] Error creating analytics:', createError);
-        } else {
-          console.log('[TRACKING] Created new analytics record');
-        }
-      }
-    } catch (analyticsError) {
-      console.error('[TRACKING] Analytics tracking error:', analyticsError);
-    }
-
-    console.log('[TRACKING] Session:', sessionId, 'New:', isNewSession, 'Date:', today);
     return { success: true };
   } catch (error) {
     console.error('Visitor tracking error:', error);
-    return { success: false, error };
-  }
-}
-
-export async function cleanupInactiveSessions() {
-  try {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-
-    const { error } = await supabase
-      .from('visitor_sessions')
-      .update({ is_active: false })
-      .lt('last_activity', thirtyMinutesAgo);
-
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Cleanup error:', error);
     return { success: false, error };
   }
 }

@@ -82,6 +82,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
       <span className="w-7 sm:w-9 flex-shrink-0 pt-4 sm:pt-0 text-sm sm:text-lg font-black text-amber-700 tabular-nums">#{position}</span>
 
       <img
+        decoding="async"
         src={logo}
         alt={`${listing.title} logo`}
         width={64}

@@ -1,9 +1,8 @@
-import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  ADMIN_EMAILS, MAX_TEAM_ADMINS, getTeamAdminEmails, isAdminRequest, isOwnerRequest, setTeamAdminEmails,
+  ADMIN_EMAILS, MAX_TEAM_ADMINS, getTeamAdminEmails, isAdminRequest, isOwnerRequest, sbSelect, setTeamAdminEmails,
 } from '@/lib/server/admin';
-import { INVITE_PLACEHOLDER, createPasswordLink } from '@/lib/server/account';
+import { INVITE_PLACEHOLDER, createAccount, createPasswordLink, getAccount } from '@/lib/server/account';
 import { logAdminActivity } from '@/lib/server/admin-activity';
 import { getSessionUser } from '@/lib/server/session';
 import { sendAdminInviteEmail } from '@/lib/email';
@@ -19,7 +18,9 @@ export async function GET(req: NextRequest) {
   }
   const emails = await getTeamAdminEmails();
   const users = emails.length
-    ? await prisma.user.findMany({ where: { email: { in: emails } }, select: { email: true, name: true, password: true } })
+    ? (await sbSelect<{ email: string; name: string | null; password: string }>(
+        `users?select=email,name,password&email=in.(${encodeURIComponent(emails.map(e => `"${e.replace(/"/g, '')}"`).join(','))})`
+      )).rows
     : [];
   const byEmail = new Map(users.map((u) => [u.email, u]));
   return NextResponse.json({
@@ -59,10 +60,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    const user = existing ?? await prisma.user.create({
-      data: { email, password: INVITE_PLACEHOLDER, name: name || undefined },
-    });
+    const existing = await getAccount({ email });
+    const user = existing ?? await createAccount({ email, password: INVITE_PLACEHOLDER, name });
     await setTeamAdminEmails([...team, email]);
     const invite = await sendAdminInviteEmail({
       to: email,
@@ -89,7 +88,7 @@ export async function PATCH(req: NextRequest) {
   if (!(await getTeamAdminEmails()).includes(email)) {
     return NextResponse.json({ error: 'Not an admin' }, { status: 404 });
   }
-  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, password: true } });
+  const user = await getAccount({ email });
   if (!user) return NextResponse.json({ error: 'That admin has no account' }, { status: 404 });
   const pending = user.password === INVITE_PLACEHOLDER;
   const invite = await sendAdminInviteEmail({

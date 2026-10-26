@@ -6,12 +6,15 @@ import Link from 'next/link';
 import { LogOut, ChevronRight, Star, Pencil, Trash2 } from 'lucide-react';
 import Header from '@/components/Header';
 import RankingRow from '@/components/RankingRow';
-import SubmissionEditModal from '@/components/SubmissionEditModal';
+import dynamic from 'next/dynamic';
 import AccountSettings from '@/components/AccountSettings';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
 import { logoUrl } from '@/lib/logo';
+
+// Loaded when first opened, so it isn't in every page's JavaScript.
+const SubmissionEditModal = dynamic(() => import('@/components/SubmissionEditModal'), { ssr: false });
 
 interface User {
   id: string;

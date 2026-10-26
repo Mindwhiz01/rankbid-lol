@@ -1,7 +1,6 @@
-import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { isCrossSiteWrite } from '@/lib/server/session';
-import { GOOGLE_PLACEHOLDER, INVITE_PLACEHOLDER, createVerifyEmailLink, isEmailVerified } from '@/lib/server/account';
+import { GOOGLE_PLACEHOLDER, INVITE_PLACEHOLDER, createAccount, createVerifyEmailLink, getAccount, isEmailVerified, updateAccount } from '@/lib/server/account';
 import { sendVerifyEmail } from '@/lib/email';
 import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { verifyTurnstile } from '@/lib/server/turnstile';
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = ipHash(request);
-    if (!(await rateLimit(`signup-ip:${ip}`, 5, 60 * 60)) || !(await rateLimit(`signup-ip-day:${ip}`, 15, 24 * 60 * 60))) {
+    if ((await Promise.all([rateLimit(`signup-ip:${ip}`, 5, 60 * 60), rateLimit(`signup-ip-day:${ip}`, 15, 24 * 60 * 60)])).includes(false)) {
       return NextResponse.json(
         { error: 'Too many accounts created from this network. Please try again later.' },
         { status: 429 }
@@ -50,8 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const key = email.toLowerCase();
-    const existingUser = await prisma.user.findUnique({ where: { email: key } });
-    const hashedPassword = await bcryptjs.hash(password, 10);
+    const [existingUser, hashedPassword] = await Promise.all([getAccount({ email: key }), bcryptjs.hash(password, 10)]);
 
     // An account that never confirmed its email proves nothing about who made it, so signing up
     // again replaces its password; only whoever can open the confirmation email gets in.
@@ -62,12 +60,10 @@ export async function POST(request: NextRequest) {
       if (!pending) {
         return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
       }
-      await prisma.user.update({ where: { id: existingUser.id }, data: { password: hashedPassword, name: name || existingUser.name } });
+      await updateAccount(existingUser.id, { password: hashedPassword, name: name || existingUser.name });
       userId = existingUser.id;
     } else {
-      const user = await prisma.user.create({
-        data: { email: key, password: hashedPassword, name: name || undefined },
-      });
+      const user = await createAccount({ email: key, password: hashedPassword, name });
       userId = user.id;
     }
 

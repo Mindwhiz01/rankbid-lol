@@ -32,6 +32,30 @@ export async function getAccount(where: { id: string } | { email: string }): Pro
   return row ?? null;
 }
 
+/** Creates an account; `password` is a bcrypt hash or a placeholder. Emails are stored lowercase. */
+export async function createAccount(fields: { email: string; password: string; name?: string | null }): Promise<AccountRow> {
+  const res = await fetch(sbUrl('users?select=id,email,name,password'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+    body: JSON.stringify({ email: fields.email.toLowerCase(), password: fields.password, name: fields.name || null }),
+  });
+  if (!res.ok) throw new Error(`Account create failed: ${res.status} ${await res.text()}`);
+  const [row] = await res.json();
+  return row;
+}
+
+/** Updates an account's columns and returns the saved row (null when no account has that id). */
+export async function updateAccount(userId: string, fields: Record<string, unknown>): Promise<AccountRow | null> {
+  const res = await fetch(sbUrl(`users?id=eq.${encodeURIComponent(userId)}&select=id,email,name,password`), {
+    method: 'PATCH',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+    body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Account update failed: ${res.status} ${await res.text()}`);
+  const [row] = await res.json();
+  return row ?? null;
+}
+
 /** True when `password` matches the account's (always false for a Google-only account). */
 export async function passwordMatches(account: AccountRow, password: unknown): Promise<boolean> {
   if (typeof password !== 'string' || !password || account.password === GOOGLE_PLACEHOLDER || account.password === INVITE_PLACEHOLDER) return false;

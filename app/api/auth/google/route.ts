@@ -1,9 +1,8 @@
-import { prisma } from '@/lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
-import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
+import { createSession, isCrossSiteWrite, setSessionCookie } from '@/lib/server/session';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 import { logAdminSignIn } from '@/lib/server/admin-activity';
-import { BLOCKED_MESSAGE, GOOGLE_PLACEHOLDER, isBlocked, isEmailVerified, markEmailVerified } from '@/lib/server/account';
+import { BLOCKED_MESSAGE, GOOGLE_PLACEHOLDER, createAccount, getAccount, isBlocked, isEmailVerified, markEmailVerified } from '@/lib/server/account';
 import { NextRequest, NextResponse } from 'next/server';
 
 const client = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
@@ -48,21 +47,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find or create user
-    let user = await prisma.user.findUnique({
-      where: { email: payload.email.toLowerCase() },
-    });
-
-    if (!user) {
-      // Create new user with Google profile info
-      user = await prisma.user.create({
-        data: {
-          email: payload.email.toLowerCase(),
-          name: payload.name || undefined,
-          password: 'google_oauth', // Placeholder for OAuth users
-        },
-      });
-    }
+    // Find or create the account (Google-only accounts store a placeholder instead of a password hash).
+    const user = (await getAccount({ email: payload.email }))
+      ?? (await createAccount({ email: payload.email, name: payload.name, password: GOOGLE_PLACEHOLDER }));
 
     // Google has verified this address. An unconfirmed email signup for it may have been made by
     // someone else, so its password is dropped: from now on it signs in with Google (or a reset).
@@ -74,18 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
     }
 
-    // Create session
-    const sessionToken = createSessionToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.session.create({
-      data: {
-        token: sessionToken,
-        userId: user.id,
-        expiresAt,
-      },
-    });
-
+    const sessionToken = await createSession(user.id);
     await logAdminSignIn(request, user.email, 'google');
 
     const response = NextResponse.json(
@@ -100,16 +76,9 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
 
-    response.cookies.set('auth_token', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    });
-
+    setSessionCookie(response, sessionToken);
     return response;
-  } catch (error: any) {
+  } catch (error) {
     console.error('Google OAuth error:', error);
     return NextResponse.json(
       { error: 'Google authentication failed' },

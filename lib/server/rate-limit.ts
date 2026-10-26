@@ -66,8 +66,22 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
   const [kind, subject] = key.split(':');
   if (ACCOUNT_ACTIVITY.has(kind) && (await exemptUserIds()).has(subject)) return true;
   try {
-    // Record the hit first, then count it with the rest. Counting first let a burst of parallel
-    // requests all see the same count and all get through.
+    // One round trip: rate_limit_hit (supabase/migrations/perf_rpc_indexes.sql) records, counts and,
+    // when over the limit, takes the hit back, locked per key.
+    const rpc = await fetch(sbUrl('rpc/rate_limit_hit'), {
+      method: 'POST',
+      headers: sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_key: key, p_limit: limit, p_window_sec: windowSec }),
+      cache: 'no-store',
+    });
+    if (rpc.ok) return (await rpc.json()) !== false;
+    if (rpc.status !== 404) {
+      console.error('rate_limit_hit failed:', rpc.status, await rpc.text());
+      return true;
+    }
+
+    // The function isn't installed yet. Record the hit first, then count it with the rest: counting
+    // first let a burst of parallel requests all see the same count and all get through.
     const since = new Date(Date.now() - windowSec * 1000).toISOString();
     const insertRes = await fetch(sbUrl('rate_limits?select=id'), {
       method: 'POST',

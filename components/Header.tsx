@@ -2,11 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { categoryPath } from '@/lib/categories';
-import SearchDialog from '@/components/SearchDialog';
 import { Search, Menu, X, Grid3x3, Trophy, Sparkles, LineChart, Users, Zap, Palette, Bitcoin, Code2, Compass, Activity, Eye, TrendingUp, LogOut } from 'lucide-react';
+
+// Loaded when first opened (the header is on every page), so it isn't in every page's JavaScript.
+const SearchDialog = dynamic(() => import('@/components/SearchDialog'), { ssr: false });
 
 // `category` must match the stored listing category values (see CATEGORIES in app/page.tsx).
 // Tabs without one link to their own page instead.
@@ -290,7 +293,7 @@ export default function Header() {
         </div>
       </header>
 
-      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {searchOpen && <SearchDialog open onClose={() => setSearchOpen(false)} />}
 
       {/* Category Filter - Professional (hidden on mobile) */}
       <div className="hidden md:block bg-gray-50 text-[#1F2937] border-b border-gray-200 sticky top-12 sm:top-14 md:top-16 z-30 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

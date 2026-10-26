@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Header from '@/components/Header';
 import FAQ from '@/components/FAQ';
@@ -11,7 +12,6 @@ import SponsoredRow from '@/components/SponsoredRow';
 import VerifiedListingCard from '@/components/VerifiedListingCard';
 import { useRouter } from 'next/navigation';
 import LoginModal from '@/components/LoginModal';
-import StatusCardModal from '@/components/StatusCardModal';
 import { EmptyStateIcon, IconTile, PremiumIcons } from '@/components/PremiumIcons';
 import RankingRow from '@/components/RankingRow';
 import SubmitProductForm, { type SubmittedProduct } from '@/components/SubmitProductForm';
@@ -34,6 +34,9 @@ import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import TodayRankingCard, { type TodayRankingItem } from '@/components/TodayRankingCard';
+
+// Loaded when first opened, so it isn't in every page's JavaScript.
+const StatusCardModal = dynamic(() => import('@/components/StatusCardModal'), { ssr: false });
 
 /** Rows in each "Today's ranking" side card. */
 const TODAY_CARD_SIZE = 4;

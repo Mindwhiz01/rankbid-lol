@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     if (!supabaseConfigured()) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
 
     const key = email.trim().toLowerCase();
-    if (!(await rateLimit(`reset-ip:${ipHash(req)}`, 10, 60 * 60)) || !(await rateLimit(`reset-email:${key}`, 3, 60 * 60))) {
+    if ((await Promise.all([rateLimit(`reset-ip:${ipHash(req)}`, 10, 60 * 60), rateLimit(`reset-email:${key}`, 3, 60 * 60)])).includes(false)) {
       return NextResponse.json({ error: 'Too many reset requests. Please wait an hour and try again.' }, { status: 429 });
     }
 

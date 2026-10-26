@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest) {
       const unchanged = (() => { try { return new URL(current.location).href === next; } catch { return false; } })();
       if (!unchanged) {
         // Link changes fetch the new site, so keep them occasional.
-        if (!(await rateLimit(`link-edit:${user.id}`, 10, 60 * 60)) || !(await rateLimit(`link-edit-ip:${ipHash(request)}`, 20, 60 * 60))) {
+        if ((await Promise.all([rateLimit(`link-edit:${user.id}`, 10, 60 * 60), rateLimit(`link-edit-ip:${ipHash(request)}`, 20, 60 * 60)])).includes(false)) {
           return NextResponse.json({ error: 'Too many link changes. Please try again later.' }, { status: 429 });
         }
         const problem = staticUrlProblem(next);

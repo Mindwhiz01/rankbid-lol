@@ -31,15 +31,7 @@ export type RecordVoteResult =
 
 /** Records one vote for `voterId` on a listing (one per voter) and refreshes the listing's counts. */
 export async function recordVote(listingId: string, voterId: string): Promise<RecordVoteResult> {
-  const id = encodeURIComponent(listingId);
-  const voter = encodeURIComponent(voterId);
-
-  const checkRes = await fetch(sbUrl(`votes?listing_id=eq.${id}&voter_id=eq.${voter}&select=id`), { headers: sbHeaders() });
-  const existing = await checkRes.json();
-  if (Array.isArray(existing) && existing.length > 0) {
-    return { status: 'duplicate' };
-  }
-
+  // No lookup first: the unique index on (listing_id, voter_id) refuses a second vote with 409.
   const insertRes = await fetch(sbUrl('votes'), {
     method: 'POST',
     headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
@@ -50,7 +42,7 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
       voted_at: new Date().toISOString(),
     }),
   });
-  // 409: a concurrent request already recorded this voter (unique index on listing_id, voter_id).
+  // 409: this voter already voted on it (unique index on listing_id, voter_id).
   if (insertRes.status === 409) {
     return { status: 'duplicate' };
   }

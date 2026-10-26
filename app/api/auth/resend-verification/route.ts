@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
     }
     const key = email.trim().toLowerCase();
-    if (!(await rateLimit(`verify-resend-ip:${ipHash(req)}`, 10, 60 * 60)) || !(await rateLimit(`verify-resend:${key}`, 3, 60 * 60))) {
+    if ((await Promise.all([rateLimit(`verify-resend-ip:${ipHash(req)}`, 10, 60 * 60), rateLimit(`verify-resend:${key}`, 3, 60 * 60)])).includes(false)) {
       return NextResponse.json({ error: 'Too many emails sent. Please wait an hour and try again.' }, { status: 429 });
     }
 

@@ -1,15 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
-import SubmitProductForm from '@/components/SubmitProductForm';
 import { getCategoryLabel } from '@/lib/categories';
 import { MIN_BID_USD } from '@/lib/premiumSpots';
 import type { SubmitPlatform } from '@/lib/platform-url';
 
 type Plan = 'free' | 'sponsored';
+
+// The form loads when the modal first opens: the host is in the root layout, so a static import
+// would put the whole form (and Turnstile) in every page's JavaScript.
+const SubmitProductForm = dynamic(() => import('@/components/SubmitProductForm'), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse rounded-xl bg-slate-100" aria-busy="true" />,
+});
 
 export interface SubmitModalOptions {
   /** Stored category value to preselect, e.g. "AIMedia". */

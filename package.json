@@ -11,7 +11,10 @@
     "db:migrate": "prisma migrate dev && node prisma/seed.js",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
-    "indexnow": "node scripts/indexnow.mjs"
+    "indexnow": "node scripts/indexnow.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "vitest run tests/live"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -21,8 +24,6 @@
     "@react-oauth/google": "^0.13.5",
     "@supabase/supabase-js": "^2.116.0",
     "bcryptjs": "^3.0.3",
-    "clsx": "^2.1.1",
-    "dotenv-cli": "^11.0.0",
     "fflate": "^0.8.2",
     "google-auth-library": "^11.1.0",
     "html-to-image": "^1.11.13",
@@ -42,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

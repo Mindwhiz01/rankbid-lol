@@ -33,6 +33,7 @@ function Logo({ item }: { item: TodayRankingItem }) {
   const [src, setSrc] = useState(() => faviconFor(item.url));
   return (
     <img
+      decoding="async"
       src={src}
       alt=""
       width={40}

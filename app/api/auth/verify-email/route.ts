@@ -1,6 +1,5 @@
-import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, isCrossSiteWrite } from '@/lib/server/session';
+import { createSession, isCrossSiteWrite, setSessionCookie } from '@/lib/server/session';
 import { BLOCKED_MESSAGE, claimVerifyEmailToken, getAccount, isBlocked, markEmailVerified } from '@/lib/server/account';
 import { ipHash, rateLimit } from '@/lib/server/rate-limit';
 
@@ -28,18 +27,9 @@ export async function POST(req: NextRequest) {
     if (!account) return NextResponse.json({ error: 'This account no longer exists.' }, { status: 404 });
     if (await isBlocked(userId)) return NextResponse.json({ error: BLOCKED_MESSAGE }, { status: 403 });
 
-    const session = createSessionToken();
-    await prisma.session.create({
-      data: { token: session, userId, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
-    });
+    const session = await createSession(userId);
     const res = NextResponse.json({ success: true, user: { id: account.id, email: account.email, name: account.name } });
-    res.cookies.set('auth_token', session, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    });
+    setSessionCookie(res, session);
     return res;
   } catch (error) {
     console.error('Verify email error:', error);

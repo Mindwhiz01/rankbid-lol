@@ -175,7 +175,7 @@ export default function ArchivePage() {
                                   <div className={`w-8 h-8 ${item.rank === 1 ? 'bg-gradient-to-br from-amber-400 to-amber-500' : item.rank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-400' : item.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-500' : 'bg-[#0F3460]'} text-white font-black text-xs rounded-lg flex items-center justify-center flex-shrink-0`}>
                                     #{item.rank}
                                   </div>
-                                  <img src={faviconUrl} alt="favicon" className="w-5 h-5 rounded flex-shrink-0" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'; }} />
+                                  <img src={faviconUrl} alt="favicon" loading="lazy" decoding="async" className="w-5 h-5 rounded flex-shrink-0" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'; }} />
                                   <p className="text-xs font-semibold text-[#1F2937] truncate group-hover:text-[#0F3460] transition-colors flex-1 min-w-0">
                                     {item.listing.title}
                                   </p>

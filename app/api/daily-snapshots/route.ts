@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const revalidate = 0; // Don't cache
+export const dynamic = 'force-dynamic'; // Rendered per request; the CDN caches it (see Cache-Control below).
 
 type SnapshotEntry = { rank: number; listing: { id: string; title: string; url: string }; votes: number };
 type Snapshot = { id: string; date: string; data: SnapshotEntry[]; frozen: boolean };
@@ -110,10 +110,11 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching snapshots:', error);
     }
 
-    return NextResponse.json({
-      snapshots: snapshots,
-      totalDays: snapshots.length,
-    });
+    // Past days are frozen and today's counts move slowly, so the CDN can answer the archive for a minute.
+    return NextResponse.json(
+      { snapshots, totalDays: snapshots.length },
+      { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch (error) {
     console.error('Error fetching daily snapshots:', error);
     return NextResponse.json(

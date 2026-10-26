@@ -1,16 +1,19 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import PlatformIcon from '@/components/PlatformIcon';
-import StatusCardModal from '@/components/StatusCardModal';
 import { getCategoryLabel } from '@/lib/categories';
 import { useVote } from '@/lib/useVote';
 import { supportUrl } from '@/lib/site';
 import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
 import { logoUrl } from '@/lib/logo';
+
+// Loaded when first opened, so it isn't in every page's JavaScript.
+const StatusCardModal = dynamic(() => import('@/components/StatusCardModal'), { ssr: false });
 
 export interface RankingListing {
   id: string;
@@ -87,6 +90,8 @@ export default function RankingRow({
 
         {/* Logo */}
         <img
+          loading="lazy"
+          decoding="async"
           src={faviconFor(listing.url)}
           alt={`${listing.title} logo`}
           className="max-[379px]:hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg border border-gray-100 bg-white p-1 flex-shrink-0 object-contain"
