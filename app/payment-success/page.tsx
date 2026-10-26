@@ -56,7 +56,7 @@ function PaymentSuccess() {
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/premium-listings/status?id=${encodeURIComponent(premiumId)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/premium-listings/status?id=${encodeURIComponent(premiumId)}&txn=${encodeURIComponent(sessionRef ?? '')}`, { cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
         if (stopped) return;
         if (!res.ok) {
@@ -79,7 +79,7 @@ function PaymentSuccess() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [premiumId]);
+  }, [premiumId, sessionRef]);
 
   const status = bid?.status;
   const confirming = !error && (!bid || status === 'pending') && !timedOut;
@@ -296,7 +296,7 @@ function Live({ bid }: { bid: BidStatus }) {
         {bid.reference && (
           <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F6F7FB] ring-1 ring-[#0F3460]/10 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1F2937]/45">Payment reference</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1F2937]/70">Payment reference</p>
               <p className="mt-0.5 font-mono text-xs sm:text-sm text-[#1F2937] truncate">{bid.reference}</p>
             </div>
             <button
@@ -310,7 +310,7 @@ function Live({ bid }: { bid: BidStatus }) {
         )}
 
         <div>
-          <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1F2937]/45 mb-3">Good to know</h2>
+          <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1F2937]/70 mb-3">Good to know</h2>
           <ul className="grid sm:grid-cols-2 gap-3">
             {PERKS.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-start gap-3 rounded-xl ring-1 ring-[#0F3460]/10 p-3.5">
@@ -332,7 +332,7 @@ function Live({ bid }: { bid: BidStatus }) {
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl bg-[#F6F7FB] ring-1 ring-[#0F3460]/10 px-3 py-3 sm:px-4">
-      <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1F2937]/45">{label}</dt>
+      <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1F2937]/70">{label}</dt>
       <dd className="mt-1 text-sm sm:text-base font-black text-[#1F2937] leading-snug">{children}</dd>
     </div>
   );

@@ -155,7 +155,7 @@ export default function AccountSettings({ user, onUserChange, onDeleted }: {
               ? <>Forgot it? <Link href="/forgot-password" className="underline">Reset it by email</Link>.</>
               : 'You sign in with Google. Set a password to also sign in with your email.'}
           </p>
-          <form onSubmit={savePassword} className="space-y-3 max-w-md">
+          <form onSubmit={savePassword} onChange={() => setPwMsg(null)} className="space-y-3 max-w-md">
             {hasPassword && (
               <label className="block">
                 <span className={label}>Current password</span>

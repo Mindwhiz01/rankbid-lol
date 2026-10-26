@@ -37,7 +37,7 @@ function StatCard({ icon, tone, label, value }: { icon: ReactNode; tone: 'navy' 
     <div className="px-4 sm:px-6 py-4 sm:py-5">
       <div className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${tone === 'green' ? 'text-[#059669]' : 'text-[#0F3460]'}`}>
         <span className="[&>svg]:w-4 [&>svg]:h-4">{icon}</span>
-        <span className="text-[#1F2937]/55">{label}</span>
+        <span className="text-[#1F2937]/70">{label}</span>
       </div>
       <p className="text-2xl sm:text-3xl font-black text-[#1F2937] leading-tight tabular-nums">{value}</p>
     </div>
@@ -49,7 +49,7 @@ function BarList({ title, rows, total, renderLabel }: { title: string; rows: { n
     <div>
       <h2 className="text-base sm:text-lg font-black text-[#1F2937] mb-4 sm:mb-5">{title}</h2>
       {rows.length === 0 ? (
-        <p className="text-xs sm:text-sm text-[#1F2937]/50">No data yet</p>
+        <p className="text-xs sm:text-sm text-[#1F2937]/70">No data yet</p>
       ) : (
         <div className="space-y-3">
           {rows.map(row => {
@@ -58,7 +58,7 @@ function BarList({ title, rows, total, renderLabel }: { title: string; rows: { n
               <div key={row.name}>
                 <div className="flex justify-between items-center mb-1.5 text-xs sm:text-sm">
                   <span className="font-semibold text-[#1F2937] flex items-center gap-2">{renderLabel(row.name)}</span>
-                  <span className="text-[#1F2937]/60 font-semibold">{row.count} · {pct}%</span>
+                  <span className="text-[#1F2937]/70 font-semibold">{row.count} · {pct}%</span>
                 </div>
                 <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
                   <div className="h-full rounded-full bg-gradient-to-r from-[#0F3460] to-[#1a5490] transition-all duration-700" style={{ width: `${pct}%` }} />

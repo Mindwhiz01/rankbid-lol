@@ -16,6 +16,7 @@ import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
+import { logoUrl } from '@/lib/logo';
 
 interface Listing {
   id: string;
@@ -72,6 +73,8 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
   // The person who submitted this product gets a Sponsor button (the checkout checks ownership too).
   const [isOwner, setIsOwner] = useState(false);
   useEffect(() => {
+    // Signed out (no cached user): nothing to own, and no 401 in the console.
+    if (!localStorage.getItem('user')) return;
     let live = true;
     fetch('/api/user/submissions', { cache: 'no-store' })
       .then(res => (res.ok ? res.json() : null))
@@ -180,7 +183,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               <PremiumIcons.Compass className="w-7 h-7" />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-[#1F2937] mb-2">Product not found</h1>
-            <p className="text-sm text-[#1F2937]/60 mb-5">It may have been removed or the link is incorrect.</p>
+            <p className="text-sm text-[#1F2937]/70 mb-5">It may have been removed or the link is incorrect.</p>
             <Link href="/" className="inline-block px-5 py-2.5 bg-[#0F3460] text-white font-black rounded-lg hover:bg-[#0D2A50] transition-colors text-sm">
               Back to Rankings
             </Link>
@@ -217,7 +220,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
 
   let favicon: string | null = null;
   try {
-    favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(getVisitUrl()).hostname)}&sz=128`;
+    favicon = logoUrl(new URL(getVisitUrl()).hostname, 128);
   } catch {}
 
   const shareLink = supportUrl(product.id);
@@ -258,7 +261,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                     <PlatformIcon platform={product.platform} size={12} /> {platformName}
                   </span>
                   {isRanked && allTimeRank <= 3 && (
-                    <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-400 text-[#0B2545]">Top {allTimeRank} overall</span>
+                    <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-400 text-[#0B2545]">#{allTimeRank} overall</span>
                   )}
                 </div>
                 <h1 className="slide-up text-2xl sm:text-4xl md:text-5xl font-black leading-tight mb-2 sm:mb-3 break-words" style={{ '--d': '200ms' } as CSSProperties}>{product.title}</h1>
@@ -319,21 +322,21 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
               <h2 className="text-base sm:text-lg font-black text-[#1F2937] mb-4">Ranking stats</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 -mx-4 sm:-mx-6 border-y border-gray-100 divide-x divide-gray-100 [&>*:nth-child(3)]:border-l-0 sm:[&>*:nth-child(3)]:border-l [&>*:nth-child(n+3)]:border-t sm:[&>*:nth-child(n+3)]:border-t-0">
                 <div className="px-4 sm:px-6 py-4">
-                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50">Overall rank</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/70">Overall rank</p>
                   <p className="text-2xl sm:text-3xl font-black text-[#0F3460] mt-1 tabular-nums">#{allTimeRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {totalProducts}</span></p>
                 </div>
                 <div className="px-4 sm:px-6 py-4">
-                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50 truncate">In {getCategoryLabel(product.category)}</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/70 truncate">In {getCategoryLabel(product.category)}</p>
                   <p className="text-2xl sm:text-3xl font-black text-[#0F3460] mt-1 tabular-nums">
                     #{categoryRank}<span className="text-xs sm:text-sm font-semibold text-[#1F2937]/35"> / {categoryPool.length}</span>
                   </p>
                 </div>
                 <div className="px-4 sm:px-6 py-4">
-                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50">Total votes</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/70">Total votes</p>
                   <p className="text-2xl sm:text-3xl font-black text-[#1F2937] mt-1 tabular-nums">{votes}</p>
                 </div>
                 <div className="px-4 sm:px-6 py-4">
-                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/50">Votes today</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-[#1F2937]/70">Votes today</p>
                   <p className="text-2xl sm:text-3xl font-black text-[#059669] mt-1 tabular-nums">{(product.dayVotes || 0) + extraVotes}</p>
                 </div>
               </div>
@@ -343,8 +346,8 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                 </p>
               )}
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm">
-                <span className="text-[#1F2937]/55">Listed <span className="font-bold text-[#1F2937]">{listedOn}</span></span>
-                <span className="text-[#1F2937]/55">Platform <span className="font-bold text-[#1F2937]">{platformName}</span></span>
+                <span className="text-[#1F2937]/70">Listed <span className="font-bold text-[#1F2937]">{listedOn}</span></span>
+                <span className="text-[#1F2937]/70">Platform <span className="font-bold text-[#1F2937]">{platformName}</span></span>
               </div>
             </div>
 
@@ -374,7 +377,7 @@ export default function ProductView({ id, initialProduct, initialAllListings, fo
                 <IconTile tone="green"><PremiumIcons.Share /></IconTile>
                 <div>
                   <h2 className="text-sm sm:text-base font-black text-[#1F2937]">Share &amp; collect votes</h2>
-                  <p className="text-xs text-[#1F2937]/55">Anyone can vote with name + email</p>
+                  <p className="text-xs text-[#1F2937]/70">Anyone can vote with name + email</p>
                 </div>
               </div>
 

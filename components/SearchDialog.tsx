@@ -127,10 +127,10 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
               <X className="w-4 h-4" />
             </button>
           ) : null}
-          <button type="button" onClick={close} className="hidden sm:inline-flex px-2 py-1 rounded-md border border-gray-200 text-[11px] font-bold text-[#1F2937]/50 hover:bg-gray-50">
+          <button type="button" onClick={close} className="hidden sm:inline-flex px-2 py-1 rounded-md border border-gray-200 text-[11px] font-bold text-[#1F2937]/70 hover:bg-gray-50">
             Esc
           </button>
-          <button type="button" onClick={close} aria-label="Close search" className="sm:hidden p-1.5 -mr-1.5 rounded-lg text-[#1F2937]/60 hover:bg-gray-100">
+          <button type="button" onClick={close} aria-label="Close search" className="sm:hidden p-1.5 -mr-1.5 rounded-lg text-[#1F2937]/70 hover:bg-gray-100">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -164,11 +164,11 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
             )}
 
             {listings === null ? (
-              <p className="px-3 py-6 text-sm text-center text-[#1F2937]/50">Loading products…</p>
+              <p className="px-3 py-6 text-sm text-center text-[#1F2937]/70">Loading products…</p>
             ) : q && results.length === 0 ? (
               <div className="px-3 py-8 text-center">
                 <p className="text-sm font-semibold text-[#0B2545]">No products match “{query.trim()}”</p>
-                <p className="mt-1 text-xs text-[#1F2937]/50">Try a product name, a category or a website.</p>
+                <p className="mt-1 text-xs text-[#1F2937]/70">Try a product name, a category or a website.</p>
               </div>
             ) : (
               <ul role="listbox" aria-label="Search results">
@@ -185,7 +185,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-[#0B2545] truncate">{l.title}</span>
-                        <span className="block text-xs text-[#1F2937]/50 truncate">{getCategoryLabel(l.category)}</span>
+                        <span className="block text-xs text-[#1F2937]/70 truncate">{getCategoryLabel(l.category)}</span>
                       </span>
                       <span className="flex-shrink-0 text-xs font-bold text-[#059669] tabular-nums">{(l.totalVotes || 0).toLocaleString('en-US')} {l.totalVotes === 1 ? 'vote' : 'votes'}</span>
                     </Link>
@@ -198,7 +198,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/70">
-          <span className="hidden sm:flex items-center gap-3 text-[11px] text-[#1F2937]/45">
+          <span className="hidden sm:flex items-center gap-3 text-[11px] text-[#1F2937]/70">
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-gray-200 bg-white font-sans">↑</kbd><kbd className="px-1.5 py-0.5 rounded border border-gray-200 bg-white font-sans">↓</kbd> to navigate</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-gray-200 bg-white font-sans"><CornerDownLeft className="w-3 h-3" /></kbd> to open</span>
           </span>

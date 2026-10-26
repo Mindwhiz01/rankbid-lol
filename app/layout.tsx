@@ -10,7 +10,7 @@ import ScrollToTop from '@/components/ScrollToTop';
 import ScrollButtons from '@/components/ScrollButtons';
 import { SubmitModalHost } from '@/components/SubmitProductModal';
 import { INDEXABLE, SITE_URL, X_HANDLE } from '@/lib/site';
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, organizationSchema, websiteSchema } from '@/lib/seo';
+import { DEFAULT_SHARE_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, organizationSchema, websiteSchema } from '@/lib/seo';
 
 // One typeface for the whole site (body and headings), exposed as --font-inter for globals.css.
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -30,12 +30,14 @@ export const metadata: Metadata = {
     title: `${SITE_NAME}: ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
     locale: 'en_US',
+    images: [DEFAULT_SHARE_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
     site: `@${X_HANDLE}`,
     title: `${SITE_NAME}: ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
+    images: [DEFAULT_SHARE_IMAGE],
   },
   verification: {
     google: '4u0doH_kugyrRATClwIvUKSma-VzuponDehpctakbvw',

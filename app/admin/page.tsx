@@ -12,6 +12,7 @@ import {
   AlertTriangle, ArrowDown, ArrowUp, Ban, ChevronDown, ChevronRight, ExternalLink, Eye, FileText, Mail, Minus,
   Pencil, RefreshCw, Search, Trash2, TrendingUp, Trophy, UserCheck, UserPlus, Users, X, Zap,
 } from 'lucide-react';
+import { logoUrl } from '@/lib/logo';
 
 // ---- Types (mirror lib/server/admin.ts) ----
 
@@ -70,7 +71,8 @@ interface Pagination { total: number; page: number; limit: number; pages: number
 type Tab = AdminTab;
 type ConnState = 'connecting' | 'live' | 'reconnecting';
 type Toast = { id: number; message: string; type: 'success' | 'error' | 'info' };
-type ConfirmOptions = { title: string; message: React.ReactNode; confirmLabel: string };
+/** typeToConfirm: a word the admin must type before the confirm button works (for actions that can't be taken back quietly). */
+type ConfirmOptions = { title: string; message: React.ReactNode; confirmLabel: string; typeToConfirm?: string };
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
 // ---- Helpers ----
@@ -203,8 +205,10 @@ function useConfirm() {
   return { confirmAction, dialog };
 }
 
-function ConfirmDialog({ title, message, confirmLabel, onClose }: ConfirmOptions & { onClose: (ok: boolean) => void }) {
+function ConfirmDialog({ title, message, confirmLabel, typeToConfirm, onClose }: ConfirmOptions & { onClose: (ok: boolean) => void }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [typed, setTyped] = useState('');
+  const confirmable = !typeToConfirm || typed.trim() === typeToConfirm;
 
   useEffect(() => {
     // Focus Cancel, so pressing Enter by reflex never deletes anything.
@@ -231,6 +235,17 @@ function ConfirmDialog({ title, message, confirmLabel, onClose }: ConfirmOptions
           <div className="min-w-0">
             <h2 id="confirm-title" className="text-lg font-black text-[#1F2937]">{title}</h2>
             <div id="confirm-message" className="mt-1.5 text-sm text-gray-600 break-words">{message}</div>
+            {typeToConfirm && (
+              <label className="mt-3 block text-sm font-semibold text-[#1F2937]">
+                Type <span className="font-mono font-black">{typeToConfirm}</span> to confirm
+                <input
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  autoComplete="off"
+                  className="mt-1 w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#0F3460] font-mono"
+                />
+              </label>
+            )}
           </div>
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
@@ -243,7 +258,8 @@ function ConfirmDialog({ title, message, confirmLabel, onClose }: ConfirmOptions
           </button>
           <button
             onClick={() => onClose(true)}
-            className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-red-600/40"
+            disabled={!confirmable}
+            className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-red-600/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" /> {confirmLabel}
           </button>
@@ -266,7 +282,7 @@ export default function AdminPage() {
 
 function AdminDashboard() {
   const params = useSearchParams();
-  const [authState, setAuthState] = useState<'checking' | 'signed-out' | 'admin'>('checking');
+  const [authState, setAuthState] = useState<'checking' | 'signed-out' | 'needs-code' | 'admin'>('checking');
   // Links from /admin/premium open a specific tab (?tab=sponsored), optionally with a search (&q=).
   const [tab, setTab] = useState<Tab>(() => ADMIN_TABS.find(([key]) => key === params.get('tab'))?.[0] ?? 'live');
   // Search from the top bar; changing it remounts the Submissions tab with that search.
@@ -283,7 +299,7 @@ function AdminDashboard() {
   useEffect(() => {
     fetch('/api/admin/session')
       .then((r) => r.json())
-      .then((d) => setAuthState(d.admin ? 'admin' : 'signed-out'))
+      .then((d) => setAuthState(d.admin ? 'admin' : d.needsCode ? 'needs-code' : 'signed-out'))
       .catch(() => setAuthState('signed-out'));
   }, []);
 
@@ -322,8 +338,8 @@ function AdminDashboard() {
     return <div className="min-h-screen bg-[#0B2545] flex items-center justify-center text-white/60">Checking access…</div>;
   }
 
-  if (authState === 'signed-out') {
-    return <AdminLogin onSuccess={() => setAuthState('admin')} />;
+  if (authState === 'signed-out' || authState === 'needs-code') {
+    return <AdminLogin signedIn={authState === 'needs-code'} onSuccess={() => setAuthState('admin')} />;
   }
 
   return (
@@ -356,7 +372,7 @@ function AdminDashboard() {
         {tab === 'users' && (
           <UsersTab onRemove={handleRemove} liveVersion={live.snapshot?.generatedAt} toast={toast} confirmAction={confirmAction} />
         )}
-        {tab === 'votes' && <VotesTab liveVersion={live.snapshot?.generatedAt} toast={toast} />}
+        {tab === 'votes' && <VotesTab liveVersion={live.snapshot?.generatedAt} toast={toast} confirmAction={confirmAction} />}
         {tab === 'sponsored' && <SponsoredTab toast={toast} />}
         {tab === 'team' && <TeamTab toast={toast} confirmAction={confirmAction} />}
         {tab === 'activity' && <ActivityTab />}
@@ -384,33 +400,46 @@ function AdminDashboard() {
 
 function ComingSoonToggle({ toast, confirmAction }: { toast: (m: string, t?: Toast['type']) => void; confirmAction: ConfirmFn }) {
   const [on, setOn] = useState<boolean | null>(null);
+  const [site, setSite] = useState('rankbid.click');
+  // Only the owner, on the live domain's admin, may flip it (the sandbox shares the live database).
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin/site-settings')
       .then((r) => r.json())
-      .then((d) => setOn(typeof d.comingSoon === 'boolean' ? d.comingSoon : null))
+      .then((d) => {
+        setOn(typeof d.comingSoon === 'boolean' ? d.comingSoon : null);
+        if (d.site) setSite(d.site);
+        setLockedReason(d.canChange === false ? d.lockedReason || 'You can’t change this here.' : null);
+      })
       .catch(() => setOn(null));
   }, []);
 
   const flip = async () => {
     if (on === null) return;
+    if (lockedReason) return toast(lockedReason, 'info');
     const next = !on;
     const ok = await confirmAction(next
-      ? { title: 'Turn on the coming soon page?', message: 'Every visitor to rankbid.click except admins will be sent to the coming soon page. The vercel.app domain always shows the full site.', confirmLabel: 'Turn on' }
-      : { title: 'Open the site?', message: 'The coming soon page goes away on rankbid.click and everyone can use RankBid.', confirmLabel: 'Open site' });
+      ? { title: `Turn on the coming soon page for ${site}?`, message: `Every visitor to ${site} except admins will be sent to the coming soon page.`, confirmLabel: 'Turn on' }
+      : {
+          title: `Launch ${site} to the public?`,
+          message: `The coming soon page goes away on ${site} and everyone can use RankBid. Check the go-live list first: Stripe live keys, test data wiped, support email working.`,
+          confirmLabel: 'Launch',
+          typeToConfirm: 'LAUNCH',
+        });
     if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch('/api/admin/site-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comingSoon: next }),
+        body: JSON.stringify({ comingSoon: next, ...(next ? {} : { confirm: 'LAUNCH' }) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
       setOn(data.comingSoon);
-      toast(data.comingSoon ? 'Coming soon page is on for rankbid.click' : 'rankbid.click is open to everyone', 'success');
+      toast(data.comingSoon ? `Coming soon page is on for ${site}` : `${site} is open to everyone`, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to save', 'error');
     } finally {
@@ -424,41 +453,67 @@ function ComingSoonToggle({ toast, confirmAction }: { toast: (m: string, t?: Toa
       disabled={on === null || busy}
       role="switch"
       aria-checked={on ?? false}
-      className="w-full px-3 py-2 rounded-xl text-sm font-bold whitespace-nowrap hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60"
+      aria-disabled={Boolean(lockedReason)}
+      title={lockedReason ?? undefined}
+      className={`w-full px-3 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60 ${lockedReason ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
-      <span className={`relative inline-block w-9 h-5 rounded-full transition-colors ${on ? 'bg-amber-400' : 'bg-green-500'}`}>
+      <span className={`shrink-0 relative inline-block w-9 h-5 rounded-full transition-colors ${on ? 'bg-amber-400' : 'bg-green-500'}`}>
         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
       </span>
-      {on === null ? 'Coming soon: …' : on ? 'Coming soon: ON' : 'Coming soon: OFF'}
-      <span className="ml-auto text-xs font-semibold text-[#1F2937]/45">rankbid.click only</span>
+      <span className="text-left leading-tight">
+        Live site {site}
+        <span className="block text-xs font-semibold text-[#1F2937]/60">
+          {on === null ? 'Loading…' : on ? 'Showing: Coming soon (waitlist)' : 'Showing: full site (public)'}
+          {lockedReason && ' · view only'}
+        </span>
+      </span>
     </button>
   );
 }
 
 // ---- Login ----
 
-function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
-  // Team admins sign in with their email and the password they set from the invite link; the owner can also use the admin key.
-  const [mode, setMode] = useState<'account' | 'key'>('account');
+function AdminLogin({ signedIn, onSuccess }: { signedIn: boolean; onSuccess: () => void }) {
+  // Admins sign in with their own email and password, then enter a code emailed to them. There is no shared admin password.
+  const [step, setStep] = useState<'account' | 'code'>(signedIn ? 'code' : 'account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [key, setKey] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const sendCode = useCallback(async () => {
+    setError('');
+    const res = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setCodeSentTo(data.email);
+    else setError(data.error || 'Could not send the code');
+  }, []);
+
+  // Already signed in with an admin account (e.g. from the site's login): go straight to the code.
+  // Only once: each new code replaces the last, so a second send would void the first email.
+  const autoSent = useRef(false);
+  useEffect(() => {
+    if (signedIn && !autoSent.current) {
+      autoSent.current = true;
+      sendCode();
+    }
+  }, [signedIn, sendCode]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      if (mode === 'key') {
+      if (step === 'code') {
         const res = await fetch('/api/admin/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key }),
+          body: JSON.stringify({ code }),
         });
         if (res.ok) onSuccess();
-        else setError('Wrong admin password.');
+        else setError((await res.json().catch(() => ({}))).error || 'That code is wrong');
         return;
       }
       const res = await fetch('/api/auth/login', {
@@ -471,8 +526,12 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
         return;
       }
       const session = await fetch('/api/admin/session').then((r) => r.json());
-      if (session.admin) onSuccess();
-      else setError('This account doesn’t have admin access. Ask the owner to add you.');
+      if (!session.needsCode && !session.admin) {
+        setError('This account doesn’t have admin access. Ask the owner to add you.');
+        return;
+      }
+      setStep('code');
+      await sendCode();
     } catch {
       setError('Something went wrong. Try again.');
     } finally {
@@ -487,16 +546,28 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       <div className="bg-white rounded-3xl p-8 w-full max-w-md">
         <h1 className="text-3xl font-black text-[#1F2937] mb-2">Admin Access</h1>
         <p className="text-[#1F2937]/60 mb-6">
-          {mode === 'account' ? 'Sign in with your email and the password you set from your invite.' : 'Enter the owner’s admin password.'}
+          {step === 'account'
+            ? 'Sign in with your email and the password you set from your invite.'
+            : codeSentTo ? `We emailed a 6-digit code to ${codeSentTo}. It expires in 10 minutes.` : 'Sending your sign-in code…'}
         </p>
         <form onSubmit={submit} className="space-y-4">
-          {mode === 'account' ? (
+          {step === 'account' ? (
             <>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="username" className={input} required autoFocus />
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" className={input} required />
             </>
           ) : (
-            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Admin password" className={input} required autoFocus />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="6-digit code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="\d{6}"
+              className={`${input} tracking-[0.4em] font-mono text-center text-xl`}
+              required
+              autoFocus
+            />
           )}
           {error && <p className="text-sm text-red-600 font-semibold">{error}</p>}
           <button
@@ -507,13 +578,15 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
             {busy ? 'Checking…' : 'Sign in'}
           </button>
         </form>
-        <button
-          type="button"
-          onClick={() => { setMode(mode === 'account' ? 'key' : 'account'); setError(''); }}
-          className="mt-4 w-full text-center text-sm font-semibold text-[#1F2937]/55 hover:text-[#0F3460]"
-        >
-          {mode === 'account' ? 'Use the admin password instead' : 'Sign in with email instead'}
-        </button>
+        {step === 'code' && (
+          <button
+            type="button"
+            onClick={() => { setCode(''); sendCode(); }}
+            className="mt-4 w-full text-center text-sm font-semibold text-[#1F2937]/70 hover:text-[#0F3460]"
+          >
+            Send a new code
+          </button>
+        )}
       </div>
     </div>
   );
@@ -891,7 +964,7 @@ const NAVY = '#0F3460';
 function faviconFor(url: string | null): string | null {
   if (!url) return null;
   try {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(url).hostname)}&sz=64`;
+    return logoUrl(new URL(url).hostname, 64);
   } catch {
     return null;
   }
@@ -904,7 +977,7 @@ function salePill(status: string): { label: string; cls: string; dot: string } {
   if (status === 'active') return { label: 'Live', cls: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
   if (['outbid', 'replaced'].includes(status)) return { label: 'Ended', cls: 'bg-[#E3EAF5] text-[#0F3460]', dot: 'bg-[#0F3460]' };
   if (status === 'pending') return { label: 'Process', cls: 'bg-[#EEF2F7] text-[#1F2937]/60', dot: 'bg-[#1F2937]/40' };
-  return { label: status === 'needs_refund' ? 'Refund' : 'Failed', cls: 'bg-[#FADADD] text-[#C2414B]', dot: 'bg-[#C2414B]' };
+  return { label: status === 'needs_refund' ? 'Refund' : status === 'failed' ? 'Abandoned' : 'Failed', cls: 'bg-[#FADADD] text-[#C2414B]', dot: 'bg-[#C2414B]' };
 }
 
 /** Product logo, falling back to the payer's initials. */
@@ -1625,13 +1698,30 @@ function VotersPanel({
   );
 }
 
-/** One row per vote. With showSubmission, also says which submission each vote went to. */
-function VotesTable({ voters, showSubmission = false }: { voters: AdminVoter[]; showSubmission?: boolean }) {
+/** One row per vote. With showSubmission, also says which submission each vote went to. With selected, rows can be ticked. */
+function VotesTable({
+  voters,
+  showSubmission = false,
+  selected,
+  onToggle,
+}: {
+  voters: AdminVoter[];
+  showSubmission?: boolean;
+  selected?: Set<string>;
+  onToggle?: (voteIds: string[], on: boolean) => void;
+}) {
+  const selectable = Boolean(selected && onToggle);
+  const allOn = selectable && voters.length > 0 && voters.every((v) => selected!.has(v.voteId));
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-gray-500 border-b">
           <tr>
+            {selectable && (
+              <th className="px-2 py-1.5 w-6">
+                <input type="checkbox" aria-label="Select all votes on this page" checked={allOn} onChange={(e) => onToggle!(voters.map((v) => v.voteId), e.target.checked)} />
+              </th>
+            )}
             <th className="px-2 py-1.5 font-semibold">Voter</th>
             <th className="px-2 py-1.5 font-semibold">Email</th>
             <th className="px-2 py-1.5 font-semibold">Type</th>
@@ -1642,6 +1732,11 @@ function VotesTable({ voters, showSubmission = false }: { voters: AdminVoter[]; 
         <tbody>
           {voters.map((v) => (
             <tr key={v.voteId} className="border-b last:border-0 hover:bg-gray-50">
+              {selectable && (
+                <td className="px-2 py-1.5">
+                  <input type="checkbox" aria-label={`Select vote by ${v.email || v.name || 'unknown voter'}`} checked={selected!.has(v.voteId)} onChange={(e) => onToggle!([v.voteId], e.target.checked)} />
+                </td>
+              )}
               <td className="px-2 py-1.5 font-medium">{v.name || <span className="text-gray-400 italic">Unknown</span>}</td>
               <td className="px-2 py-1.5 text-gray-600">
                 {v.email || <span className="text-gray-400 italic">{v.kind === 'user' ? 'Deleted account' : '—'}</span>}
@@ -1675,11 +1770,49 @@ function VotesTable({ voters, showSubmission = false }: { voters: AdminVoter[]; 
 
 // ---- Votes tab ----
 
-/** Every vote on the site, newest first: who voted and which submission they voted for. */
-function VotesTab({ liveVersion, toast }: { liveVersion: string | undefined; toast: (m: string, t?: Toast['type']) => void }) {
+const VOTE_REMOVAL_REASONS = ['Fake or disposable email', 'Vote ring / coordinated voting', 'Bot activity', 'Self-vote', 'Other rule break'];
+
+/** Every vote on the site, newest first: who voted and which submission they voted for. Fraudulent votes can be removed. */
+function VotesTab({ liveVersion, toast, confirmAction }: { liveVersion: string | undefined; toast: (m: string, t?: Toast['type']) => void; confirmAction: ConfirmFn }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [reason, setReason] = useState(VOTE_REMOVAL_REASONS[0]);
+  const [removing, setRemoving] = useState(false);
   const debouncedSearch = useDebounced(search);
+
+  const toggle = (ids: string[], on: boolean) => setSelected((prev) => {
+    const next = new Set(prev);
+    ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+    return next;
+  });
+
+  const removeSelected = async () => {
+    const ids = [...selected];
+    const ok = await confirmAction({
+      title: ids.length === 1 ? 'Remove this vote?' : `Remove ${ids.length} votes?`,
+      message: <>Each listing’s total and rank are recounted at once. Reason logged: <span className="font-semibold text-[#1F2937]">{reason}</span>.</>,
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
+    setRemoving(true);
+    try {
+      const res = await fetch('/api/admin/votes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voteIds: ids, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to remove votes');
+      toast(data.removed.length === 1 ? 'Vote removed' : `${data.removed.length} votes removed`, 'success');
+      setSelected(new Set());
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to remove votes', 'error');
+    } finally {
+      setRemoving(false);
+    }
+  };
 
   const params = new URLSearchParams({ page: String(page), limit: '50' });
   if (debouncedSearch) params.set('search', debouncedSearch);
@@ -1708,7 +1841,20 @@ function VotesTab({ liveVersion, toast }: { liveVersion: string | undefined; toa
         </button>
       </div>
 
-      {voters.length > 0 && <VotesTable voters={voters} showSubmission />}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 p-3 rounded-xl bg-red-50 border border-red-100 text-sm">
+          <span className="font-bold text-red-800">{selected.size} selected</span>
+          <select value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason for removal" className="px-2 py-1.5 border border-gray-300 rounded-lg bg-white">
+            {VOTE_REMOVAL_REASONS.map((r) => <option key={r}>{r}</option>)}
+          </select>
+          <button onClick={removeSelected} disabled={removing} className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-60">
+            {removing ? 'Removing…' : 'Remove selected'}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white font-semibold">Clear</button>
+          <span className="text-xs text-gray-600">Tip: search an email to select every vote from it.</span>
+        </div>
+      )}
+      {voters.length > 0 && <VotesTable voters={voters} showSubmission selected={selected} onToggle={toggle} />}
       {!loading && voters.length === 0 && <p className="text-center text-gray-500 py-8">No votes found</p>}
       {loading && voters.length === 0 && <p className="text-center text-gray-500 py-8">Loading…</p>}
 
@@ -2130,7 +2276,7 @@ const ORDER_STATUS: Record<string, { label: string; style: string }> = {
   pending: { label: 'Unpaid / pending', style: 'bg-yellow-100 text-yellow-700' },
   needs_refund: { label: 'Needs refund', style: 'bg-orange-100 text-orange-700' },
   rejected: { label: 'Refunded / rejected', style: 'bg-red-100 text-red-700' },
-  failed: { label: 'Failed', style: 'bg-red-50 text-red-600' },
+  failed: { label: 'Abandoned / expired', style: 'bg-gray-100 text-gray-600' },
 };
 
 type SponsoredFilter = 'paid' | 'active' | 'pending' | 'refunds' | 'all';
@@ -2197,7 +2343,7 @@ function SponsoredTab({ toast }: { toast: (m: string, t?: Toast['type']) => void
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
           <Link href="/admin/premium" className="px-3 py-1.5 rounded-lg text-sm font-bold bg-gray-100 hover:bg-gray-200">
-            Approve payments →
+            Sponsor orders →
           </Link>
         </div>
 

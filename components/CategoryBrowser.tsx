@@ -76,7 +76,7 @@ export default function CategoryBrowser({ selected, listings, counts, intro, cus
               <h2 className="text-xl sm:text-2xl font-black text-[#1F2937] mb-1">
                 {selected ? `${label} rankings` : 'Top products across all categories'}
               </h2>
-              <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold">
+              <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold">
                 {listings.length} product{listings.length !== 1 ? 's' : ''} ranked by community votes
               </p>
             </div>
@@ -89,7 +89,7 @@ export default function CategoryBrowser({ selected, listings, counts, intro, cus
                   label="Submit a product"
                   className="inline-block px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all"
                 />
-                <p className="mt-3 text-xs text-[#1F2937]/50">Free, or sponsored from ${MIN_BID_USD}.</p>
+                <p className="mt-3 text-xs text-[#1F2937]/70">Free, or sponsored from ${MIN_BID_USD}.</p>
               </div>
             ) : (
               <>

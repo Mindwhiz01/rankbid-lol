@@ -137,7 +137,7 @@ export default function PlatformsPage() {
                     <img src={platform.icon} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   </span>
                   <span className="text-[11px] sm:text-xs font-black">{platform.label}</span>
-                  <span className={`text-[10px] sm:text-[11px] font-semibold ${active ? 'text-[#1F2937]/55' : 'text-white/60'}`}>
+                  <span className={`text-[10px] sm:text-[11px] font-semibold ${active ? 'text-[#1F2937]/70' : 'text-white/60'}`}>
                     {platformCounts[platform.id] || 0} listed
                   </span>
                 </button>
@@ -156,20 +156,20 @@ export default function PlatformsPage() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg sm:text-2xl font-black text-[#1F2937]">Top on {selectedPlatformInfo.label}</h2>
-                  <p className="text-xs sm:text-sm text-[#1F2937]/60">{selectedPlatformInfo.description}</p>
+                  <p className="text-xs sm:text-sm text-[#1F2937]/70">{selectedPlatformInfo.description}</p>
                 </div>
               </div>
             )}
             {loading ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin text-4xl">⏳</div>
-                <p className="text-[#1F2937]/60 font-semibold mt-2">Loading listings...</p>
+                <p className="text-[#1F2937]/70 font-semibold mt-2">Loading listings...</p>
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
                 <div className="mb-4"><EmptyStateIcon /></div>
                 <p className="text-base sm:text-lg font-black text-[#1F2937] mb-1">No listings yet</p>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4 sm:mb-6">Be the first to submit a {selectedPlatformInfo?.label.toLowerCase()}!</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 mb-4 sm:mb-6">Be the first to submit a {selectedPlatformInfo?.label.toLowerCase()}!</p>
                 <button
                   onClick={() => openSubmitModal({ platform: normalizePlatform(selectedPlatform) })}
                   className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all shadow-lg"

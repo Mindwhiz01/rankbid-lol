@@ -7,6 +7,7 @@ import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
 import { OUTBID_STEP_USD } from '@/lib/premiumSpots';
 import FounderLinks, { type FounderSocials } from '@/components/FounderLinks';
+import { logoUrl } from '@/lib/logo';
 
 export interface SponsoredListing extends FounderSocials {
   id: string;
@@ -34,7 +35,7 @@ function hostOf(url: string): string {
 
 function logoFor(url: string): string {
   const host = hostOf(url);
-  return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : FALLBACK_ICON;
+  return host ? logoUrl(host, 128) : FALLBACK_ICON;
 }
 
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -64,7 +65,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
   const visitHref = preview ? safeExternalUrl(listing.url) ?? '#' : `/api/click?id=${encodeURIComponent(listing.id)}`;
   const host = hostOf(listing.url);
   const ago = timeAgo(listing.createdAt);
-  const meta = 'text-[#1F2937]/50 font-semibold';
+  const meta = 'text-[#1F2937]/70 font-semibold';
   // Taking this rank means beating its holder by the outbid step; the pill links to checkout aimed at this rank.
   const claimUsd = listing.premiumBidUsd != null ? Math.floor(Number(listing.premiumBidUsd)) + OUTBID_STEP_USD : null;
 
@@ -78,7 +79,7 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
           claim this rank for ${claimUsd.toLocaleString('en-US')}
         </Link>
       )}
-      <span className="w-7 sm:w-9 flex-shrink-0 pt-4 sm:pt-0 text-sm sm:text-lg font-black text-amber-600 tabular-nums">#{position}</span>
+      <span className="w-7 sm:w-9 flex-shrink-0 pt-4 sm:pt-0 text-sm sm:text-lg font-black text-amber-700 tabular-nums">#{position}</span>
 
       <img
         src={logo}
@@ -99,14 +100,14 @@ export default function SponsoredRow({ listing }: { listing: SponsoredListing })
             {listing.title}
           </Link>
           {listing.premiumBidUsd != null && (
-            <span className="flex-shrink-0 text-sm sm:text-lg font-black text-amber-600 tabular-nums">
+            <span className="flex-shrink-0 text-sm sm:text-lg font-black text-amber-700 tabular-nums">
               ${Number(listing.premiumBidUsd).toLocaleString('en-US')}
             </span>
           )}
         </div>
 
         {listing.description && (
-          <p className="text-xs sm:text-sm text-[#1F2937]/55 truncate mt-0.5">{listing.description}</p>
+          <p className="text-xs sm:text-sm text-[#1F2937]/70 truncate mt-0.5">{listing.description}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1 text-[11px] sm:text-xs">

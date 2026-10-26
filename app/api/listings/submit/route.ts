@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { selfHostedImage } from '@/lib/logo';
 import { extractMetadata } from '@/lib/metadata';
 import { extractSocialHandle, formatSocialMediaUrl, isSocialMediaUrl } from '@/lib/social-utils';
 import { sendNewSubmissionEmail, sendSubmissionConfirmation } from '@/lib/email';
@@ -31,13 +32,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { url, handle, description, customCategory } = body;
+    const { url, handle, customCategory } = body;
     let { category, platform } = body;
 
     if (
       (url !== undefined && typeof url !== 'string') ||
       (handle !== undefined && typeof handle !== 'string') ||
-      (description !== undefined && typeof description !== 'string') ||
       (platform !== undefined && typeof platform !== 'string') ||
       (customCategory !== undefined && typeof customCategory !== 'string')
     ) {
@@ -87,8 +87,8 @@ export async function POST(req: NextRequest) {
     if ((url || '').length > 500) {
       return NextResponse.json({ error: 'Link is too long (500 characters max)', listings: [] }, { status: 400 });
     }
-    if ((description || '').length > 500 || (handle || '').length > 200) {
-      return NextResponse.json({ error: 'Description is too long (500 characters max)', listings: [] }, { status: 400 });
+    if ((handle || '').length > 200) {
+      return NextResponse.json({ error: 'Handle is too long (200 characters max)', listings: [] }, { status: 400 });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -150,7 +150,8 @@ export async function POST(req: NextRequest) {
 
     let imageUrl: string | null = null;
     let metaTitle = normalizedUrl;
-    let metaDescription = description || normalizedUrl;
+    // Always from the site itself (or the URL): a description sent by the browser is ignored.
+    let metaDescription = normalizedUrl;
     let metaPlatform = platform || 'website';
 
     try {
@@ -464,7 +465,7 @@ export async function GET(req: NextRequest) {
       createdAt: item.created_at,
       rankReachedAt: item.rank_reached_at || item.created_at,
       updatedAt: item.updated_at || item.created_at,
-      imageUrl: item.image_url || null,
+      imageUrl: selfHostedImage(item.image_url),
       isPremium: false,
       premiumPosition: null as number | null,
     });

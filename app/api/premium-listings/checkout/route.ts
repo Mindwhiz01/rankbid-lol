@@ -22,6 +22,17 @@ const HANDLE_HOSTS: Record<(typeof HANDLE_FIELDS)[number], RegExp> = {
   founderGithub: /^(www\.)?github\.com\//i,
 };
 
+/** Hosts each social URL field must point at. */
+const URL_HOSTS: Partial<Record<(typeof URL_FIELDS)[number], RegExp>> = {
+  founderLinkedin: /(^|\.)linkedin\.com$/i,
+  founderFacebook: /(^|\.)(facebook|fb)\.com$/i,
+  founderYoutube: /(^|\.)(youtube\.com|youtu\.be)$/i,
+};
+const SOCIAL_HOST = /(^|\.)(linkedin|facebook|fb|x|twitter|instagram|tiktok|youtube|github)\.com$/i;
+/** Site pages that aren't anyone's profile ("linkedin.com/feed/", "x.com/home"). */
+const GENERIC_PATHS = new Set(['', 'feed', 'home', 'explore', 'login', 'signup', 'search', 'notifications', 'messages', 'settings', 'i', 'intent', 'share', 'watch', 'hashtag', 'mynetwork', 'jobs']);
+const firstSegment = (path: string) => path.split('/').filter(Boolean)[0]?.toLowerCase() ?? '';
+
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
 /** Validated founder fields, or an error message. Links shown on the homepage must be safe http(s) URLs. */
@@ -38,6 +49,12 @@ function validateFounder(item: CartItem): { error: string } | { links: Record<st
     if (!raw) { links[field] = null; continue; }
     const url = httpUrlOrNull(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`, 300);
     if (!url || staticUrlProblem(url)) return { error: `That ${field.replace('founder', '')} link isn't allowed` };
+    const { hostname, pathname } = new URL(url);
+    const label = field.replace('founder', '');
+    if (URL_HOSTS[field] && !URL_HOSTS[field]!.test(hostname)) return { error: `Enter a ${label} profile link` };
+    if (SOCIAL_HOST.test(hostname) && GENERIC_PATHS.has(firstSegment(pathname))) {
+      return { error: `Link to your own ${label === 'Website' ? 'site or profile' : `${label} profile`}, not a ${hostname.replace(/^www\./, '')} home or feed page` };
+    }
     links[field] = url;
   }
   for (const field of HANDLE_FIELDS) {
@@ -46,7 +63,9 @@ function validateFounder(item: CartItem): { error: string } | { links: Record<st
       .replace(HANDLE_HOSTS[field], '').replace(/^@/, '');
     if (!raw) { links[field] = null; continue; }
     // A bare domain or another site's link ("linkedin.com/feed") is not a username.
-    if (!HANDLE_RE.test(raw) || /\.(com|net|org|io|co)$/i.test(raw)) return { error: `Enter just the ${field.replace('founder', '')} username, e.g. @handle` };
+    if (!HANDLE_RE.test(raw) || /\.(com|net|org|io|co)$/i.test(raw) || GENERIC_PATHS.has(raw.toLowerCase())) {
+      return { error: `Enter just the ${field.replace('founder', '')} username, e.g. @handle` };
+    }
     links[field] = raw;
   }
   return { links };
@@ -241,8 +260,9 @@ export async function POST(req: NextRequest) {
       mode: 'payment',
       // Charge and show the price in USD, as on the site. Adaptive Pricing would show the buyer's local currency (e.g. PKR).
       adaptive_pricing: { enabled: false },
-      // Stripe picks the eligible methods, minus buy-now-pay-later: the listing goes live on payment.
-      excluded_payment_method_types: ['klarna', 'afterpay_clearpay', 'affirm', 'zip', 'sunbit', 'scalapay', 'alma', 'billie'],
+      // Cards only, as the sponsor form says: they settle at once, so the listing goes live on payment.
+      // (Bank debits and buy-now-pay-later clear days later or not at all.)
+      payment_method_types: ['card'],
       line_items: [{
         quantity: 1,
         price_data: {
@@ -271,7 +291,8 @@ export async function POST(req: NextRequest) {
         submit: { message: 'Sponsored listings are ranked by price: a higher bid later can move you down. One payment, no end date: your listing stays live for life and is non-refundable once active.' },
       },
       success_url: successUrl,
-      cancel_url: `${appUrl}/?premium=cancelled`,
+      // Back to the sponsor form, which refills what the buyer typed.
+      cancel_url: `${appUrl}/sponsor?listing=${encodeURIComponent(item.listingId)}&cancelled=1`,
       // Short-lived so an abandoned checkout doesn't promise a stale rank.
       // Stripe's minimum is 30 minutes; a little extra absorbs clock skew.
       expires_at: Math.floor(Date.now() / 1000) + 35 * 60,

@@ -112,7 +112,7 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-[#1F2937]/50 hover:text-[#1F2937] hover:bg-gray-100 transition"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-[#1F2937]/70 hover:text-[#1F2937] hover:bg-gray-100 transition"
         >
           <X className="w-5 h-5" />
         </button>
@@ -121,7 +121,7 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
           <h2 id="submit-modal-title" className="pr-10 text-xl sm:text-2xl font-black text-[#0B2545]">
             {categoryLabel ? `Launch in ${categoryLabel}` : 'Submit your product'}
           </h2>
-          <p className="mt-1 text-sm text-[#1F2937]/60">List it for free, or sponsor it to sit above the community rankings.</p>
+          <p className="mt-1 text-sm text-[#1F2937]/70">List it for free, or sponsor it to sit above the community rankings.</p>
 
           {done ? (
             <div className="mt-6 rounded-2xl bg-[#059669]/5 border border-[#059669]/25 p-5">
@@ -137,11 +137,11 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
               </div>
             </div>
           ) : signedIn === null ? (
-            <p className="mt-6 text-sm text-[#1F2937]/50">Loading…</p>
+            <p className="mt-6 text-sm text-[#1F2937]/70">Loading…</p>
           ) : !signedIn ? (
             <div className="mt-6 rounded-2xl bg-[#F4F6FA] p-5">
               <p className="font-bold text-[#1F2937]">Sign in to submit your product</p>
-              <p className="mt-1 text-sm text-[#1F2937]/60">A free account lets you submit, vote and track your rank.</p>
+              <p className="mt-1 text-sm text-[#1F2937]/70">A free account lets you submit, vote and track your rank.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link href={`/signup?next=${next}`} className="px-4 py-2.5 rounded-xl bg-[#0F3460] text-white text-sm font-black hover:bg-[#0D2A50] transition-colors">
                   Create free account
@@ -179,7 +179,7 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
                           <span className="ml-auto text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Paid</span>
                         )}
                       </span>
-                      <span className="block mt-1.5 text-xs text-[#1F2937]/60">{text}</span>
+                      <span className="block mt-1.5 text-xs text-[#1F2937]/70">{text}</span>
                     </button>
                   );
                 })}
@@ -194,7 +194,7 @@ function SubmitDialog({ category, initialPlatform = 'website', onClose }: { cate
                 beforeSubmit={
                   <>
                     {plan === 'sponsored' && (
-                      <p className="text-xs text-[#1F2937]/55">
+                      <p className="text-xs text-[#1F2937]/70">
                         Your product is listed first (free, same checks), then you choose your rank and pay on the next page.
                       </p>
                     )}

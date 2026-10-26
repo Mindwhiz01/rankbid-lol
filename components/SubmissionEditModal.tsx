@@ -78,7 +78,7 @@ export default function SubmissionEditModal({ submission, onClose, onSaved }: {
       >
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-100">
           <h2 id="edit-submission-title" className="text-base sm:text-lg font-black text-[#1F2937]">Edit submission</h2>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg text-[#1F2937]/50 hover:bg-gray-100 hover:text-[#1F2937] transition-colors">
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg text-[#1F2937]/70 hover:bg-gray-100 hover:text-[#1F2937] transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -98,7 +98,7 @@ export default function SubmissionEditModal({ submission, onClose, onSaved }: {
                 placeholder="https://yourproduct.com"
                 className={inputClass}
               />
-              <p className="text-[11px] text-[#1F2937]/50 mt-1">
+              <p className="text-[11px] text-[#1F2937]/70 mt-1">
                 Your votes and clicks stay with this submission. A new link is checked the same way as a new submission.
               </p>
             </div>
@@ -112,7 +112,7 @@ export default function SubmissionEditModal({ submission, onClose, onSaved }: {
           <div>
             <label htmlFor="edit-description" className="block text-xs font-bold text-[#1F2937]/70 mb-1.5">Description</label>
             <textarea id="edit-description" value={description} onChange={e => setDescription(e.target.value)} maxLength={500} rows={4} className={`${inputClass} resize-none`} />
-            <p className="text-[11px] text-[#1F2937]/50 mt-1 text-right tabular-nums">{description.length}/500</p>
+            <p className="text-[11px] text-[#1F2937]/70 mt-1 text-right tabular-nums">{description.length}/500</p>
           </div>
 
           <div>

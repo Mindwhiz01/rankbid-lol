@@ -94,6 +94,11 @@ function SponsorCheckout() {
 
   return (
     <SponsorShell>
+      {params.get('cancelled') && (
+        <p role="status" className="max-w-5xl mx-auto mb-4 rounded-2xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm font-semibold text-blue-900">
+          Payment cancelled. You were not charged; your details are still filled in below.
+        </p>
+      )}
       <PremiumListingModal
         variant="page"
         isOpen

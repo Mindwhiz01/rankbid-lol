@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getCategoryLabel } from '@/lib/categories';
 import { isSponsoredPreview, SPONSORED_PREVIEW } from '@/lib/sponsoredPreview';
 import FounderLinks, { type FounderSocials } from '@/components/FounderLinks';
+import { logoUrl } from '@/lib/logo';
 
 interface PodiumListing extends FounderSocials {
   id: string;
@@ -23,7 +24,7 @@ const FALLBACK_ICON =
 
 function logoFor(l: PodiumListing): string {
   try {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(l.url || '').hostname)}&sz=128`;
+    return logoUrl(new URL(l.url || '').hostname, 128);
   } catch {
     return l.imageUrl || FALLBACK_ICON;
   }
@@ -92,7 +93,7 @@ export default function LivePodium({ onClaim }: { onClaim?: (position: number) =
   return (
     <div>
       <div className="flex justify-center mb-8 sm:mb-12">
-        <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F2937]/55">
+        <span className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F2937]/70">
           <span className="relative flex w-2 h-2">
             <span className="absolute inset-0 rounded-full bg-[#059669] animate-ping opacity-60" />
             <span className="relative w-2 h-2 rounded-full bg-[#059669]" />
@@ -131,9 +132,9 @@ export default function LivePodium({ onClaim }: { onClaim?: (position: number) =
                   }}
                   className={`${card} border-2 border-dashed border-amber-200 bg-white/60 hover:border-amber-400 hover:bg-amber-50/60 ${first ? 'p-6 sm:p-8' : 'p-5 sm:p-6'}`}
                 >
-                  <p className={`font-black text-amber-600/70 tabular-nums ${first ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}>#{rank + 1}</p>
+                  <p className={`font-black text-amber-700 tabular-nums ${first ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}>#{rank + 1}</p>
                   <p className="mt-2 text-[11px] font-black uppercase tracking-wider text-amber-700">Open</p>
-                  <p className="mt-1 text-xs font-semibold text-[#1F2937]/50">Feature your product here</p>
+                  <p className="mt-1 text-xs font-semibold text-[#1F2937]/70">Feature your product here</p>
                   <p className="mt-3 text-xs sm:text-sm font-black text-amber-700">Claim this spot →</p>
                 </a>
               );
@@ -156,15 +157,15 @@ export default function LivePodium({ onClaim }: { onClaim?: (position: number) =
                     {l.title}
                   </a>
                 </h3>
-                <p className={`text-xs mb-3 sm:mb-4 ${first ? 'text-white/70' : 'text-[#1F2937]/60'}`}>{getCategoryLabel(l.category)}</p>
+                <p className={`text-xs mb-3 sm:mb-4 ${first ? 'text-white/70' : 'text-[#1F2937]/70'}`}>{getCategoryLabel(l.category)}</p>
                 {/* Sponsored rank (by price) */}
-                <p className={`font-black tabular-nums ${first ? 'text-3xl sm:text-4xl text-amber-300' : 'text-2xl sm:text-3xl text-amber-600'}`}>
+                <p className={`font-black tabular-nums ${first ? 'text-3xl sm:text-4xl text-amber-300' : 'text-2xl sm:text-3xl text-amber-700'}`}>
                   #{rank + 1}
                 </p>
-                <p className={`text-xs font-semibold ${first ? 'text-white/70' : 'text-[#1F2937]/60'}`}>
+                <p className={`text-xs font-semibold ${first ? 'text-white/70' : 'text-[#1F2937]/70'}`}>
                   {clicks.toLocaleString('en-US')} {clicks === 1 ? 'click' : 'clicks'}
                   {l.premiumBidUsd != null && (
-                    <span className={first ? 'text-amber-300' : 'text-amber-600'}> · ${Number(l.premiumBidUsd).toLocaleString('en-US')} bid</span>
+                    <span className={first ? 'text-amber-300' : 'text-amber-700'}> · ${Number(l.premiumBidUsd).toLocaleString('en-US')} bid</span>
                   )}
                 </p>
                 {/* The link row keeps its height even when empty, so #2 and #3 line up with or without links */}

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -149,12 +150,15 @@ export default function Header() {
             <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4 flex-shrink-0">
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileOpen}
                 className="lg:hidden p-2 -ml-1 text-[#1F2937] rounded-lg flex-shrink-0 hover:bg-gray-100"
               >
                 {mobileOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />}
               </button>
               <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-                <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-7 sm:h-8 md:h-9 w-auto" />
+                {/* The largest element in the first paint on phones: preloaded and served as a small WebP/AVIF. */}
+                <Image src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} preload sizes="160px" className="h-7 sm:h-8 md:h-9 w-auto" />
               </Link>
             </div>
 

@@ -1,7 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { getListing, recordVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
 import { notifyVote, snapshotListing } from '@/lib/server/vote-notify';
-import { clientIp, ipHash, rateLimit } from '@/lib/server/rate-limit';
+import { clientIp, ipHash, rateLimitedUntil, recordHit } from '@/lib/server/rate-limit';
 import { canonicalEmail, domainAcceptsMail, isDisposableEmail } from '@/lib/server/guest-email';
 import { verifyTurnstile } from '@/lib/server/turnstile';
 
@@ -42,15 +42,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please complete the "I am human" check and try again', retryCaptcha: true }, { status: 400 });
     }
 
-    // Emails aren't verified, so cap how many guest votes one network can cast: a few per product
-    // (households and offices share an IP) and a modest total per hour and per day.
+    // Flood guard per network. Turnstile and one vote per inbox are the real protection, and offices and
+    // mobile carriers put many people behind one IP, so the caps are generous and only counted votes count
+    // towards them: typos and refused emails never block the next person on the network.
     const ip = ipHash(req);
-    if (
-      !(await rateLimit(`support-ip-listing:${ip}:${listingId}`, 3, 24 * 60 * 60)) ||
-      !(await rateLimit(`support-ip:${ip}`, 10, 60 * 60)) ||
-      !(await rateLimit(`support-ip-day:${ip}`, 20, 24 * 60 * 60))
-    ) {
-      return NextResponse.json({ error: 'Too many votes from your network. Please try again later.' }, { status: 429 });
+    const limits = [
+      { key: `support-ip-listing:${ip}:${listingId}`, limit: 15, windowSec: 24 * 60 * 60 },
+      { key: `support-ip:${ip}`, limit: 30, windowSec: 60 * 60 },
+      { key: `support-ip-day:${ip}`, limit: 100, windowSec: 24 * 60 * 60 },
+    ];
+    const blockedUntil = (await Promise.all(limits.map(l => rateLimitedUntil(l.key, l.limit, l.windowSec))))
+      .reduce<Date | null>((latest, d) => (d && (!latest || d > latest) ? d : latest), null);
+    if (blockedUntil) {
+      return NextResponse.json(
+        { error: 'Too many votes from your network. Please try again later.', retryAt: blockedUntil.toISOString() },
+        { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil((blockedUntil.getTime() - Date.now()) / 1000))) } }
+      );
     }
 
     // A made-up domain can't receive mail, so it can't be a real voter.
@@ -68,6 +75,7 @@ export async function POST(req: NextRequest) {
     if (result.status === 'duplicate') {
       return NextResponse.json({ error: 'This email has already voted for this product', alreadyVoted: true }, { status: 409 });
     }
+    await Promise.all(limits.map(l => recordHit(l.key)));
     if (before) after(() => notifyVote(before, result.totalVotes, voter));
 
     // Supporter details are best-effort: the vote above already counts even if this table is missing.

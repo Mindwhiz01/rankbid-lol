@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import PageHero from '@/components/PageHero';
 import ArchiveCta from '@/components/ArchiveCta';
 import { useState, useEffect } from 'react';
+import { logoUrl } from '@/lib/logo';
 
 interface SnapshotListing {
   rank: number;
@@ -126,7 +127,7 @@ export default function ArchivePage() {
             {loading ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mt-2">Loading archives...</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold mt-2">Loading archives...</p>
               </div>
             ) : monthSnapshots.length === 0 ? (
               <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
@@ -149,7 +150,7 @@ export default function ArchivePage() {
                     {/* Rankings List */}
                     <div className="bg-white">
                       {!snapshot.data || snapshot.data.length === 0 ? (
-                        <div className="p-6 text-center text-xs sm:text-sm text-[#1F2937]/50">
+                        <div className="p-6 text-center text-xs sm:text-sm text-[#1F2937]/70">
                           <p>No submissions for this date</p>
                         </div>
                       ) : (
@@ -158,7 +159,7 @@ export default function ArchivePage() {
                             let faviconUrl = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
                             try {
                               const urlObj = new URL(item.listing.url);
-                              faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(urlObj.hostname)}&sz=32`;
+                              faviconUrl = logoUrl(urlObj.hostname, 32);
                             } catch {
                               // If URL parsing fails, use placeholder
                             }
@@ -183,7 +184,7 @@ export default function ArchivePage() {
                                 {/* Right: Votes */}
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <p className="text-xs sm:text-sm font-black text-[#0F3460] min-w-[2rem] text-right whitespace-nowrap">
-                                    {item.votes} <span className="font-semibold text-[#1F2937]/50">{item.votes === 1 ? 'vote' : 'votes'}</span>
+                                    {item.votes} <span className="font-semibold text-[#1F2937]/70">{item.votes === 1 ? 'vote' : 'votes'}</span>
                                   </p>
                                 </div>
                               </Link>

@@ -27,7 +27,7 @@ export default function FaqPage() {
         />
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-          <p className="text-xs text-[#1F2937]/50 mb-8">
+          <p className="text-xs text-[#1F2937]/70 mb-8">
             Last updated <time dateTime={LAST_UPDATED}>{new Date(LAST_UPDATED).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</time>
           </p>
 

@@ -92,14 +92,14 @@ function SearchContent() {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
-            <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mt-2">Searching products...</p>
+            <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold mt-2">Searching products...</p>
           </div>
         ) : results.length === 0 ? (
           <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
             <h2 className="text-base sm:text-lg font-black text-[#1F2937] mb-1">
               {query ? 'No products found' : 'Start searching'}
             </h2>
-            <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4 sm:mb-6">
+            <p className="text-xs sm:text-sm text-[#1F2937]/70 mb-4 sm:mb-6">
               {query ? `Nothing matches “${query}”. Try a different word or browse categories.` : 'Type a product name, category or website above.'}
             </p>
             <Link
@@ -111,7 +111,7 @@ function SearchContent() {
           </div>
         ) : (
           <div id={paged.anchorId} className="scroll-mt-24">
-            <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mb-4">
+            <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold mb-4">
               Found <span className="font-black text-[#1F2937]">{results.length}</span> product{results.length !== 1 ? 's' : ''}
             </p>
             <div className="curve-list space-y-2.5 sm:space-y-3">

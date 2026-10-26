@@ -150,7 +150,7 @@ export default function SubmitProductForm({
               </p>
             ) : (
               picked !== 'website' && (
-                <p className="text-xs text-[#1F2937]/60 font-semibold mt-1">e.g., {platformExample(picked)}</p>
+                <p className="text-xs text-[#1F2937]/70 font-semibold mt-1">e.g., {platformExample(picked)}</p>
               )
             )}
           </div>
@@ -163,7 +163,7 @@ export default function SubmitProductForm({
             />
             {categoryError && <p className="text-xs text-red-600 font-bold mt-1 slide-in">{categoryError}</p>}
             {category.category === 'Other' && category.addCustom && !categoryError && (
-              <p className="text-xs text-[#1F2937]/55 font-semibold mt-1">It&apos;s saved, so others can pick it too.</p>
+              <p className="text-xs text-[#1F2937]/70 font-semibold mt-1">It&apos;s saved, so others can pick it too.</p>
             )}
           </div>
         </div>

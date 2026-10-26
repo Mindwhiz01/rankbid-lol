@@ -34,6 +34,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
   }
 
+  // The success link's txn (the Checkout Session id) must belong to this bid. Once paid, the bid stores the
+  // PaymentIntent id instead, so a different value is checked with Stripe.
+  const txn = req.nextUrl.searchParams.get('txn') || '';
+  if (txn !== premium.payment_txn_ref) {
+    const stripe = getStripe();
+    const session = stripe && /^cs_[A-Za-z0-9_]+$/.test(txn)
+      ? await stripe.checkout.sessions.retrieve(txn).catch(() => null)
+      : null;
+    if ((session?.metadata?.premiumListingId || session?.client_reference_id) !== premium.id) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+  }
+
   // Webhook late or missing: ask Stripe about the Checkout Session and activate the bid if it's paid.
   // ('failed' too: a newer checkout may have closed this one just as it was paid.)
   if ((premium.payment_status === 'pending' || premium.payment_status === 'failed') &&

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -91,19 +92,25 @@ export default function HomeCta() {
           {hasPhoto && (
             <>
               {/* Desktop: photo fills the right of the panel */}
-              <img
+              <Image
                 ref={imgRef}
                 src={PHOTO_SRC}
                 alt=""
+                width={1600}
+                height={814}
+                sizes="(min-width: 768px) 40vw, 1px"
                 aria-hidden="true"
                 onError={() => setHasPhoto(false)}
                 className="absolute inset-y-0 right-0 hidden md:block h-full w-[58%] object-cover object-[45%_center]"
                 style={{ maskImage: FADE_LEFT, WebkitMaskImage: FADE_LEFT }}
               />
               {/* Mobile: photo as a banner above the copy */}
-              <img
+              <Image
                 src={PHOTO_SRC}
                 alt=""
+                width={1600}
+                height={814}
+                sizes="(min-width: 768px) 1px, 100vw"
                 aria-hidden="true"
                 className="md:hidden h-56 w-full object-cover object-[50%_35%]"
                 style={{ maskImage: FADE_BOTTOM, WebkitMaskImage: FADE_BOTTOM }}

@@ -65,7 +65,7 @@ export function FounderLinksCard({ listing, title }: { listing: FounderSocials; 
   return (
     <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-4 sm:p-6">
       <h2 className="text-sm sm:text-base font-black text-[#1F2937]">Connect with the founder</h2>
-      {listing.founderName && <p className="text-xs text-[#1F2937]/55 mt-0.5">{listing.founderName}</p>}
+      {listing.founderName && <p className="text-xs text-[#1F2937]/70 mt-0.5">{listing.founderName}</p>}
       <div className="grid grid-cols-2 gap-2 mt-3">
         {links.map(s => (
           <a

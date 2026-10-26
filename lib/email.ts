@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site';
+import { APP_URL, SUPPORT_EMAIL } from '@/lib/site';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 
 export type SubmissionEmailListing = {
@@ -29,7 +29,7 @@ const safeHref = (url: string) => (/^https?:\/\//i.test(url) ? escapeHtml(url) :
 function submissionHtml(listing: SubmissionEmailListing): string {
   const title = escapeHtml(listing.title);
   const description = escapeHtml(listing.description);
-  const productUrl = `${SITE_URL}/product/${encodeURIComponent(listing.id)}`;
+  const productUrl = `${APP_URL}/product/${encodeURIComponent(listing.id)}`;
   return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
           <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -65,7 +65,7 @@ function submissionHtml(listing: SubmissionEmailListing): string {
               <a href="${productUrl}" style="display: inline-block; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
                 View on RankBid
               </a>
-              <a href="${SITE_URL}/admin" style="display: inline-block; margin-left: 8px; padding: 10px 20px; background-color: #e5e7eb; color: #1F2937; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+              <a href="${APP_URL}/admin" style="display: inline-block; margin-left: 8px; padding: 10px 20px; background-color: #e5e7eb; color: #1F2937; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
                 Open admin
               </a>
             </div>
@@ -126,10 +126,10 @@ export async function sendAdminInviteEmail(e: { to: string; name?: string | null
   const button = (href: string, label: string) =>
     `<a href="${href}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">${label}</a>`;
   const credentials = e.setPasswordUrl
-    ? `<p>Your sign-in email is <strong>${escapeHtml(e.to)}</strong>. Click below to set your password for the admin panel, then sign in at <a href="${SITE_URL}/admin" style="color: #0F3460;">${SITE_URL.replace(/^https?:\/\//, '')}/admin</a>. The link works once and expires in 7 days.</p>
+    ? `<p>Your sign-in email is <strong>${escapeHtml(e.to)}</strong>. Click below to set your password for the admin panel, then sign in at <a href="${APP_URL}/admin" style="color: #0F3460;">${APP_URL.replace(/^https?:\/\//, '')}/admin</a>. The link works once and expires in 7 days.</p>
        ${button(safeHref(e.setPasswordUrl), 'Set your password')}`
     : `<p>Sign in with <strong>${escapeHtml(e.to)}</strong> and your RankBid password.</p>
-       ${button(`${SITE_URL}/admin`, 'Open the dashboard')}`;
+       ${button(`${APP_URL}/admin`, 'Open the dashboard')}`;
   const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
           <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
@@ -158,7 +158,7 @@ function premiumHtml(heading: string, body: string, button?: { href: string; lab
             ${body}
             ${cta}
             <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
-              Sponsored listings follow the <a href="${SITE_URL}/tos" style="color: #9ca3af;">RankBid Terms</a>. Questions? Email ${SUPPORT_EMAIL}.
+              Sponsored listings follow the <a href="${APP_URL}/tos" style="color: #9ca3af;">RankBid Terms</a>. Questions? Email ${SUPPORT_EMAIL}.
             </p>
           </div>
         </div>
@@ -186,7 +186,7 @@ export async function sendPremiumReceipt(e: PremiumEmail & { paidUsd?: number; e
       : `<p>Payment received: <strong>${usd(e.bidUsd)}</strong>.</p>`}
     ${badges}
     <p>Sponsored listings are ranked by price. Yours stays live${until}; a higher bid can move you down, and we'll email you every time someone outbids you. Payments for active listings are not refundable.</p>`;
-  const product = `${SITE_URL}/product/${encodeURIComponent(e.listingId)}`;
+  const product = `${APP_URL}/product/${encodeURIComponent(e.listingId)}`;
   return send(
     e.to,
     `🎉 Congratulations, you're #${e.position} on RankBid`,
@@ -212,7 +212,7 @@ function voteHtml(heading: string, body: string, button: { href: string; label: 
       `;
 }
 
-const productLink = (listingId: string) => `${SITE_URL}/product/${encodeURIComponent(listingId)}`;
+const productLink = (listingId: string) => `${APP_URL}/product/${encodeURIComponent(listingId)}`;
 const votes = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'vote' : 'votes'}`;
 
 /**
@@ -258,7 +258,7 @@ export async function sendPremiumRefundNotice(e: PremiumEmail & { requiredUsd?: 
   const body = `
     <p>Your payment of <strong>${usd(e.bidUsd)}</strong> for <strong>${title}</strong> couldn't be used for a sponsored listing.${needed}</p>
     <p>Your payment will be refunded in full to your card. You can bid again any time.</p>`;
-  const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
+  const raise = `${APP_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
   return send(e.to, `Your RankBid payment will be refunded`, premiumHtml('Your sponsored listing could not start', body, { href: raise, label: 'Bid again' }), 'Premium refund notice');
 }
 
@@ -272,15 +272,20 @@ export async function sendPremiumOutbidAlert(e: PremiumEmail & { newPosition: nu
     ? ' and is no longer on the RankBid homepage'
     : offHome ? '' : ', and it is still on the RankBid homepage';
   const next = offHome
-    ? `It's still sponsored and listed on <a href="${SITE_URL}/sponsored">the sponsored page</a> for good. Raise your bid to get back into the top 10.`
+    ? `It's still sponsored and listed on <a href="${APP_URL}/sponsored">the sponsored page</a> for good. Raise your bid to get back into the top 10.`
     : `Raise your bid to take #${e.position} back.`;
-  const body = `
-    <p>Someone outbid you. <strong>${title}</strong> ${where}${status}.</p>
-    <p>${next}</p>`;
-  const raise = `${SITE_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
-  const subject = e.newPosition ? `You've been outbid: now #${e.newPosition} on RankBid` : `You've been outbid on RankBid`;
-  const heading = leftHome ? 'You dropped off the homepage' : 'Someone outbid you';
-  return send(e.to, subject, premiumHtml(heading, body, { href: raise, label: 'Raise your bid' }), `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
+  const raise = `${APP_URL}/sponsor?listing=${encodeURIComponent(e.listingId)}`;
+  // A plain account notice (no card, button or sales wording), so Gmail files it in Primary, not Promotions.
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; color: #1F2937; font-size: 15px; line-height: 1.5;">
+          <p>Hi,</p>
+          <p>A higher sponsored bid was placed, so your listing <strong>${title}</strong> ${where}${status}.</p>
+          <p>${next} You can do that here: <a href="${raise}" style="color: #0F3460;">${APP_URL.replace(/^https?:\/\//, '')}/sponsor</a></p>
+          <p style="font-size: 12px; color: #6b7280;">You're getting this because you sponsor ${title} on RankBid. Questions? Reply to ${SUPPORT_EMAIL}.</p>
+        </div>
+      `;
+  const subject = `${e.productTitle} moved ${e.newPosition ? `to #${e.newPosition}` : 'down'} in RankBid sponsored listings`;
+  return send(e.to, subject, html, `Premium outbid alert (#${e.position} → ${e.newPosition ?? '?'})`);
 }
 
 /** Confirms a coming-soon waitlist signup to the person who joined. */
@@ -291,7 +296,7 @@ export async function sendWaitlistWelcomeEmail(e: { to: string }): Promise<Email
             <h2 style="color: #0F3460; margin-top: 0;">You're on the RankBid waitlist 🎉</h2>
             <p>Thanks for joining! We've saved your spot with <strong>${escapeHtml(e.to)}</strong>.</p>
             <p>RankBid is where the community discovers and votes on the best products. We'll email you as soon as we launch so you can be among the first to submit your product and start collecting votes.</p>
-            <a href="${SITE_URL}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Visit RankBid</a>
+            <a href="${APP_URL}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Visit RankBid</a>
             <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
               You're getting this because this email joined the RankBid waitlist. Didn't sign up? Ignore this email or contact ${SUPPORT_EMAIL}.
             </p>
@@ -318,6 +323,18 @@ export async function sendVerifyEmail(e: { to: string; name?: string | null; ver
         </div>
       `;
   return send(e.to, 'Confirm your RankBid email', html, 'Verify email');
+}
+
+/** Second sign-in step for the admin dashboard: a 6-digit code (valid 10 minutes). */
+export async function sendAdminSignInCode(e: { to: string; code: string }): Promise<EmailResult> {
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1F2937; font-size: 15px; line-height: 1.5;">
+          <p>Your RankBid admin sign-in code is:</p>
+          <p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; margin: 12px 0;">${escapeHtml(e.code)}</p>
+          <p>It expires in 10 minutes. If you didn't just sign in to the admin dashboard, change your password now: someone else knows it.</p>
+        </div>
+      `;
+  return send(e.to, `RankBid admin sign-in code: ${e.code}`, html, 'Admin sign-in code');
 }
 
 /** Password reset link (valid for an hour, single use). */
@@ -354,7 +371,7 @@ export async function sendAccountUpdatedEmail(e: { to: string; name?: string | n
             <p>The RankBid team updated your account:</p>
             <ul>${changes}</ul>
             <p>You've been signed out on every device. Sign in again with the new details.</p>
-            <a href="${SITE_URL}/login" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Sign in</a>
+            <a href="${APP_URL}/login" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Sign in</a>
             <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
               Didn't ask for this? Email ${SUPPORT_EMAIL} right away.
             </p>

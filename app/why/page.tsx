@@ -57,7 +57,7 @@ export default function WhyRankBid() {
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-14">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3">How it works</h2>
-              <p className="text-sm sm:text-base text-[#1F2937]/60">Three steps from launch to leaderboard.</p>
+              <p className="text-sm sm:text-base text-[#1F2937]/70">Three steps from launch to leaderboard.</p>
             </div>
 
             <ol className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">

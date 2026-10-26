@@ -77,7 +77,7 @@ export default function SponsoredPage() {
               today.length === 0 ? (
                 <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl">
                   <p className="text-lg font-black text-[#1F2937]">No new sponsors yet today</p>
-                  <p className="text-sm text-[#1F2937]/60 mt-1">Be the first today: sponsor your product from ${MIN_BID_USD}.</p>
+                  <p className="text-sm text-[#1F2937]/70 mt-1">Be the first today: sponsor your product from ${MIN_BID_USD}.</p>
                 </div>
               ) : (
                 <div id={pagedToday.anchorId} className="scroll-mt-24">
@@ -93,7 +93,7 @@ export default function SponsoredPage() {
             ) : ranked.length === 0 ? (
               <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl">
                 <p className="text-lg font-black text-[#1F2937]">No sponsored products yet</p>
-                <p className="text-sm text-[#1F2937]/60 mt-1">Be the first: sponsor your product from ${MIN_BID_USD} and take #1.</p>
+                <p className="text-sm text-[#1F2937]/70 mt-1">Be the first: sponsor your product from ${MIN_BID_USD} and take #1.</p>
               </div>
             ) : (
               <>

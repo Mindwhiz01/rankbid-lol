@@ -28,7 +28,7 @@ function StorageTable({ items }: { items: StorageItem[] }) {
     <div className="overflow-x-auto -mx-1">
       <table className="w-full text-left text-xs sm:text-sm">
         <thead>
-          <tr className="text-[11px] uppercase tracking-[0.12em] text-[#1F2937]/45">
+          <tr className="text-[11px] uppercase tracking-[0.12em] text-[#1F2937]/70">
             <th className="font-bold px-1 pb-2">Name</th>
             <th className="font-bold px-1 pb-2">Type</th>
             <th className="font-bold px-1 pb-2">Purpose</th>
@@ -83,7 +83,7 @@ export default function CookiesPage() {
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-base sm:text-lg font-black text-[#1F2937]">Essential</h2>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mt-0.5">Required for sign-in, voting and security. These can&rsquo;t be turned off.</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 mt-0.5">Required for sign-in, voting and security. These can&rsquo;t be turned off.</p>
               </div>
               <span className="flex-shrink-0 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#059669]/10 text-[#059669]">Always on</span>
             </div>
@@ -94,7 +94,7 @@ export default function CookiesPage() {
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-base sm:text-lg font-black text-[#1F2937]">Preferences</h2>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mt-0.5">Saved only when you change a setting. Clearing them resets the site to defaults.</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 mt-0.5">Saved only when you change a setting. Clearing them resets the site to defaults.</p>
               </div>
               <button
                 type="button"

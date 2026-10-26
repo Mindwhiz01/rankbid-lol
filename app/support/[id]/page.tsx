@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -37,9 +38,9 @@ export default async function SupportPage({ params }: Props) {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-8 w-auto" />
+            <Image src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} preload sizes="140px" className="h-8 w-auto" />
           </Link>
-          <span className="text-xs font-semibold text-[#1F2937]/50">Community-voted rankings</span>
+          <span className="text-xs font-semibold text-[#1F2937]/70">Community-voted rankings</span>
         </div>
       </div>
 

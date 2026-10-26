@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Header from '@/components/Header';
 import FAQ from '@/components/FAQ';
 import Link from 'next/link';
@@ -217,6 +218,8 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
   }, []);
 
   const loadOwnListingIds = async () => {
+    // Signed-out visitors have no listings; skipping the request keeps a 401 out of their console.
+    if (!localStorage.getItem('user')) return;
     try {
       const res = await fetch('/api/user/submissions');
       if (!res.ok) return; // signed out
@@ -512,7 +515,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
               Ranked by people.{' '}
               <span className="block text-[#1F2937]/30">Not algorithms.</span>
             </h1>
-            <p style={slideDelay(140)} className="slide-up mt-5 sm:mt-6 text-sm sm:text-base md:text-lg text-[#1F2937]/60 max-w-xl mx-auto">
+            <p style={slideDelay(140)} className="slide-up mt-5 sm:mt-6 text-sm sm:text-base md:text-lg text-[#1F2937]/70 max-w-xl mx-auto">
               RankBid is a free product launch platform. Submit your product, collect community votes, and climb a live leaderboard ranked only by real people. Want the top of the page? Sponsored spots start at $1.
             </p>
 
@@ -520,6 +523,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
 
           {/* Live top 3 podium: refreshes on its own every few seconds */}
           <div style={slideDelay(200)} className="slide-up relative max-w-5xl mx-auto px-4 sm:px-6 mt-10 sm:mt-12 pb-14 sm:pb-20">
+            <h2 className="sr-only">Top sponsored products</h2>
             <LivePodium onClaim={openClaim} />
 
             {/* SPONSORED #4-#10, then #11-#20 … on later pages (the podium shows #1-#3), with today's sponsors beside them */}
@@ -529,7 +533,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
                   <div className="flex items-center gap-2 text-amber-500">
                     <Icons.Star />
-                    <h3 className="text-base sm:text-lg font-black text-[#1F2937]">More sponsored</h3>
+                    <h2 className="text-base sm:text-lg font-black text-[#1F2937]">More sponsored</h2>
                     <span className="text-xs font-bold text-[#1F2937]/40">
                       {sponsoredPages > 1 ? `#${firstSpot}–#${lastSpot}` : 'ranked by price'}
                     </span>
@@ -550,9 +554,9 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                         aria-label={`Sponsor your product at #${pos}`}
                         className="group w-full text-left flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl border-2 border-dashed border-amber-200 bg-white/60 hover:border-amber-400 hover:bg-amber-50/60 transition-all"
                       >
-                        <span className="w-7 sm:w-9 flex-shrink-0 text-sm sm:text-lg font-black text-amber-600/70 tabular-nums">#{pos}</span>
+                        <span className="w-7 sm:w-9 flex-shrink-0 text-sm sm:text-lg font-black text-amber-700 tabular-nums">#{pos}</span>
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 rounded-md px-2 py-0.5">Open</span>
-                        <span className="flex-1 min-w-0 text-xs sm:text-sm font-semibold text-[#1F2937]/50 truncate">Feature your product here for life</span>
+                        <span className="flex-1 min-w-0 text-xs sm:text-sm font-semibold text-[#1F2937]/70 truncate">Feature your product here for life</span>
                         <span className="flex-shrink-0 text-xs sm:text-sm font-black text-amber-700 group-hover:underline">Claim</span>
                       </button>
                     );
@@ -619,7 +623,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                   <IconTile><PremiumIcons.Rocket /></IconTile>
                   <div>
                     <h2 className="text-base sm:text-lg md:text-2xl font-black text-[#1F2937]">Submit Your Product</h2>
-                    <p className="text-xs sm:text-sm text-[#1F2937]/60">Free, instant, and ranked by real votes.</p>
+                    <p className="text-xs sm:text-sm text-[#1F2937]/70">Free, instant, and ranked by real votes.</p>
                   </div>
                 </div>
 
@@ -681,7 +685,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 </div>
                 <button
                   onClick={() => setLastSubmittedProduct(null)}
-                  className="text-xs sm:text-sm text-[#1F2937]/60 hover:text-[#1F2937] font-semibold"
+                  className="text-xs sm:text-sm text-[#1F2937]/70 hover:text-[#1F2937] font-semibold"
                 >
                   Dismiss
                 </button>
@@ -713,7 +717,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
             {loading && listings.length === 0 ? (
               <div className="text-center py-8 sm:py-10 md:py-12">
                 <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mt-2 sm:mt-3">Loading rankings...</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold mt-2 sm:mt-3">Loading rankings...</p>
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-8 sm:py-10 md:py-12 border border-gray-200 shadow-sm bg-white fade-in rounded-lg">
@@ -856,7 +860,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm sm:text-base font-black text-[#1F2937]">{platformLabel}</p>
-                        <p className="text-xs text-[#1F2937]/55">Top rated {activeTimeFilter === 'today' ? 'today' : 'all time'}</p>
+                        <p className="text-xs text-[#1F2937]/70">Top rated {activeTimeFilter === 'today' ? 'today' : 'all time'}</p>
                       </div>
                     </div>
 
@@ -887,7 +891,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs sm:text-xs md:text-sm font-bold text-[#1F2937] truncate group-hover/item:text-[#0F3460]">{item.title}</p>
                                   {item.category && (
-                                    <p className="text-xs text-[#1F2937]/50 mt-0.5 truncate">
+                                    <p className="text-xs text-[#1F2937]/70 mt-0.5 truncate">
                                       {getCategoryLabel(item.category)}
                                     </p>
                                   )}
@@ -911,8 +915,8 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                       <div className="text-center py-4 sm:py-6 md:py-8 flex-1 flex items-center justify-center">
                         <div>
                           <div className="mb-3 sm:mb-4"><EmptyStateIcon size="sm" /></div>
-                          <p className="text-xs sm:text-xs md:text-sm text-[#1F2937]/60 font-semibold mb-2 sm:mb-3">No submissions yet</p>
-                          <p className="text-xs text-[#1F2937]/50">Be the first to submit!</p>
+                          <p className="text-xs sm:text-xs md:text-sm text-[#1F2937]/70 font-semibold mb-2 sm:mb-3">No submissions yet</p>
+                          <p className="text-xs text-[#1F2937]/70">Be the first to submit!</p>
                         </div>
                       </div>
                     )}
@@ -946,9 +950,12 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                 top: 'calc((100cqh - max(100cqh, 100cqw * 1396 / 2198)) * 0.25)',
               }}
             >
-              <img
+              <Image
                 src="/why-makers-person.jpg"
                 alt=""
+                width={2198}
+                height={1396}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 className="h-full w-full"
                 style={{ maskImage: PHOTO_FADE, WebkitMaskImage: PHOTO_FADE }}
               />
@@ -964,7 +971,7 @@ export default function Home({ initialListings = [] }: { initialListings?: Listi
                   <div className="absolute inset-x-[4%] -bottom-[11px] top-2 rounded-2xl bg-white/50 backdrop-blur-sm" />
                   <div className="relative flex items-center gap-3 rounded-2xl bg-white/85 p-3 shadow-xl backdrop-blur-md">
                     <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#0F3460]/10">
-                      <img src="/brand/logo-mark.png" alt="" width={223} height={194} className="w-8 h-auto" />
+                      <Image src="/brand/logo-mark.png" alt="" width={223} height={194} sizes="32px" className="w-8 h-auto" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">

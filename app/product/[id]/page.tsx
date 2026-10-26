@@ -29,7 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const short = product.description.length > 110 ? product.description.slice(0, 110).replace(/\s+\S*$/, '') : product.description;
   const summary = short ? `${short.trim().replace(/[\s.,;:!?-]+$/, '')}. ` : '';
   return pageMetadata({
-    title: `${product.title}: ${category} ranking & votes`,
+    // The product name goes first and is never cut for the category: a long name just drops the suffix.
+    title: product.title.length + category.length + 10 <= 50 ? `${product.title}: ${category} ranking` : product.title,
     description: `${summary}${product.title} has ${product.totalVotes} community votes on RankBid. See its live rank in ${category} and vote for free.`,
     path: `/product/${product.id}`,
   });

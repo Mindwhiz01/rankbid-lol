@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -144,7 +145,7 @@ export default function PlatformsCta() {
                           <svg viewBox="0 0 16 12" className="h-2.5 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                             <path d="M1 1h14M1 6h14M1 11h14" />
                           </svg>
-                          <img src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} className="h-4 w-auto" />
+                          <Image src="/brand/logo-horizontal.png" alt="RankBid" width={823} height={194} sizes="70px" className="h-4 w-auto" />
                           <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                             <circle cx="7" cy="7" r="5" />
                             <path d="M11 11l4 4" />

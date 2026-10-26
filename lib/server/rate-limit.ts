@@ -101,6 +101,40 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
   }
 }
 
+/**
+ * For limits that count only actions that went through (pair with recordHit): when `key` already has
+ * `limit` hits within `windowSec`, the time the oldest of them leaves the window, else null.
+ * Records nothing, so refused or invalid attempts never extend a block. Fails open, like rateLimit.
+ */
+export async function rateLimitedUntil(key: string, limit: number, windowSec: number): Promise<Date | null> {
+  if (!supabaseConfigured() || key.includes(`:${EXEMPT}-`)) return null;
+  try {
+    const since = new Date(Date.now() - windowSec * 1000).toISOString();
+    // The limit-th newest hit: once it ages out, fewer than `limit` remain.
+    const res = await fetch(
+      sbUrl(`rate_limits?key=eq.${encodeURIComponent(key)}&created_at=gte.${encodeURIComponent(since)}&select=created_at&order=created_at.desc&offset=${limit - 1}&limit=1`),
+      { headers: sbHeaders(), cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const [row]: { created_at: string }[] = await res.json();
+    return row ? new Date(new Date(row.created_at).getTime() + windowSec * 1000) : null;
+  } catch (error) {
+    console.error('rateLimitedUntil error:', error);
+    return null;
+  }
+}
+
+/** Counts one hit for `key` towards rateLimitedUntil. */
+export async function recordHit(key: string): Promise<void> {
+  if (!supabaseConfigured() || key.includes(`:${EXEMPT}-`)) return;
+  await fetch(sbUrl('rate_limits'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+    body: JSON.stringify({ key }),
+    cache: 'no-store',
+  }).catch(error => console.error('recordHit error:', error));
+}
+
 /** Daily cron cleanup: rate-limit rows older than a day, expired sessions and spent or expired reset links. */
 export async function pruneRateLimits(): Promise<void> {
   if (!supabaseConfigured()) return;

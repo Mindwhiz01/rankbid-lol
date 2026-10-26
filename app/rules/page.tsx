@@ -52,7 +52,8 @@ export default function RulesPage() {
           <RuleCard icon={<PremiumIcons.Ballot />} tone="green" title="How Voting Works">
             <List items={[
               'Submitting and voting are 100% free',
-              'Log in to vote. Each person gets one vote per product',
+              'Vote with your account, or as a guest with your name and email from a maker’s support link',
+              'Each person gets one vote per product. Makers may vote for their own product once, like everyone else',
               'All-time rankings use total votes; Today uses votes from the last 24 hours',
               'Rankings update in real time as votes come in',
             ]} />

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryFromSlug, categoryPath } from '@/lib/categories';
-import { ADMIN_COOKIE, isAdminRequest, isValidAdminCookie } from '@/lib/server/admin';
+import { isAdminRequest } from '@/lib/server/admin';
 import { isComingSoonEnabled } from '@/lib/server/site-settings';
-import { SITE_HOST } from '@/lib/site';
+import { isLiveHost } from '@/lib/site';
 
 // Pages that need a signed-in account; a signed-out visitor is sent to /login and back.
 const MEMBERS_ONLY = ['/profile', '/sponsor', '/payment-success'];
@@ -25,8 +25,14 @@ const COMING_SOON_OPEN = [
 ];
 
 function isMainDomain(request: NextRequest): boolean {
-  const host = (request.headers.get('host') || '').split(':')[0].toLowerCase();
-  return host === SITE_HOST || host.endsWith(`.${SITE_HOST}`);
+  return isLiveHost(request.headers.get('host'));
+}
+
+function adminNetworkAllowed(request: NextRequest): boolean {
+  const allowed = (process.env.ADMIN_ALLOWED_IPS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!allowed.length) return true;
+  const ip = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || '';
+  return allowed.some(entry => (entry.endsWith('.') || entry.endsWith(':') ? ip.startsWith(entry) : ip === entry));
 }
 
 export async function proxy(request: NextRequest) {
@@ -55,6 +61,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(clean);
   }
 
+  // ADMIN_ALLOWED_IPS (comma-separated; a prefix ending in "." covers a range) hides /admin on the live
+  // domain from every other network. Unset, /admin is open to anyone who has an admin account.
+  if ((pathname === '/admin' || pathname.startsWith('/admin/')) && isMainDomain(request) && !adminNetworkAllowed(request)) {
+    return NextResponse.rewrite(new URL('/not-found-admin', request.url), { status: 404 });
+  }
+
   // Coming soon mode (switched from the admin dashboard): every visitor except admins sees /coming-soon.
   // It only applies on the live domain (SITE_HOST); the vercel.app domain always shows the full site.
   if (isMainDomain(request) && await isComingSoonEnabled()) {
@@ -78,10 +90,6 @@ export async function proxy(request: NextRequest) {
   // Only members-only pages need a sign-in. Everything else renders, so an unknown address
   // gets the 404 page instead of a login prompt.
   if (!MEMBERS_ONLY.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
-    return NextResponse.next();
-  }
-
-  if (isValidAdminCookie(request.cookies.get(ADMIN_COOKIE)?.value)) {
     return NextResponse.next();
   }
 

@@ -134,7 +134,7 @@ export default function StatusCardModal({ isOpen, onClose, product, productUrl }
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black text-[#1F2937]">Share your rank card</h2>
-              <p className="text-xs text-[#1F2937]/50">Post it anywhere to collect votes</p>
+              <p className="text-xs text-[#1F2937]/70">Post it anywhere to collect votes</p>
             </div>
           </div>
           <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-lg flex items-center justify-center text-[#1F2937]/40 hover:text-[#1F2937] hover:bg-gray-100 transition">
@@ -238,7 +238,7 @@ export default function StatusCardModal({ isOpen, onClose, product, productUrl }
           {/* Suggested text */}
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#1F2937]/45">Suggested post</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#1F2937]/70">Suggested post</p>
               <button onClick={handleCopyText} className="text-xs font-black text-[#0F3460] hover:underline">
                 {textCopied ? 'Copied!' : 'Copy text'}
               </button>

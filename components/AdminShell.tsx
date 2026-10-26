@@ -19,7 +19,7 @@ export const ADMIN_TABS = [
 export type AdminTab = (typeof ADMIN_TABS)[number][0];
 type Active = AdminTab | 'payments';
 
-const SIDE_ITEMS: readonly (readonly [Active, string, typeof LayoutGrid])[] = [...ADMIN_TABS, ['payments', 'Approve payments', CreditCard]];
+const SIDE_ITEMS: readonly (readonly [Active, string, typeof LayoutGrid])[] = [...ADMIN_TABS, ['payments', 'Sponsor orders', CreditCard]];
 
 /**
  * Admin frame shared by /admin and /admin/premium: dark icon rail, rounded light canvas,

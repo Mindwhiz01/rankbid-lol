@@ -41,7 +41,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     body: (
       <p>
         Listing content you submit (title, description, logo and link), vote and click counts, and on sponsored spots the bid
-        amount and founder social links, are shown publicly. Founder email addresses and phone numbers are never shown. We never publish voters&rsquo; email addresses.
+        amount, founder name and founder social links, are shown publicly (on the site and in its public listings data). Founder email addresses and phone numbers are never shown. We never publish voters&rsquo; email addresses.
       </p>
     ),
   },

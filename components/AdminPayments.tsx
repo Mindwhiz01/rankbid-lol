@@ -48,7 +48,7 @@ const STATUS_STYLES: Record<string, string> = {
  * Sponsored payments: approve or reject pending orders and review every order by status.
  * Used on /admin/premium and inline on the admin Overview. The caller must be signed in as admin.
  */
-export default function AdminPayments({ title = 'Approve payments' }: { title?: string | null }) {
+export default function AdminPayments({ title = 'Sponsor orders' }: { title?: string | null }) {
   // Every order is loaded once; the filter pills only narrow the list (and show counts).
   const [allListings, setAllListings] = useState<PremiumListing[]>([]);
   const [loading, setLoading] = useState(false);

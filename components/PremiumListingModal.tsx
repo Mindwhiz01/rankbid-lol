@@ -106,6 +106,23 @@ interface RankedListing {
 const MAX_LINKS = MAX_SOCIAL_LINKS;
 
 const NEW_PRODUCT = 'new';
+/** What the buyer typed, kept for the trip to Stripe so a cancelled checkout comes back filled in. */
+const DRAFT_KEY = 'rankbid-sponsor-draft';
+
+type SponsorDraft = { formData?: Record<string, string>; phoneCountry?: string; linkRows?: SocialField[]; bidInput?: string };
+
+/** The saved draft, read once (and cleared) when the form mounts. Only rendered in the browser. */
+function takeDraft(): SponsorDraft {
+  try {
+    if (typeof window === 'undefined') return {};
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return {};
+    sessionStorage.removeItem(DRAFT_KEY);
+    return JSON.parse(raw) ?? {};
+  } catch {
+    return {};
+  }
+}
 
 export default function PremiumListingModal({
   listingId: fixedListingId,
@@ -119,6 +136,8 @@ export default function PremiumListingModal({
   variant = 'modal',
 }: PremiumListingModalProps) {
   const asPage = variant === 'page';
+  // Back from a cancelled Stripe checkout: start with what the buyer typed (saved in handleSubmit).
+  const [draft] = useState(takeDraft);
   // Product picker (only without a fixed listingId): an own listing's id, or NEW_PRODUCT.
   const [productChoice, setProductChoice] = useState(NEW_PRODUCT);
   const [productUrl, setProductUrl] = useState('');
@@ -127,7 +146,7 @@ export default function PremiumListingModal({
   const [productCategory, setProductCategory] = useState<CategoryChoice>(() => categoryChoice(initialCategory));
   const [ranked, setRanked] = useState<RankedListing[]>([]);
   // What the buyer typed; empty means the suggested amount. The rank follows from it.
-  const [bidInput, setBidInput] = useState('');
+  const [bidInput, setBidInput] = useState(typeof draft.bidInput === 'string' ? draft.bidInput : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -149,8 +168,8 @@ export default function PremiumListingModal({
   const productLink = isNewProduct ? productUrl.trim() : ownListings.find(l => l.id === listingId)?.url;
 
   // Which link type each social row holds, in order. Values live in formData.
-  const [linkRows, setLinkRows] = useState<SocialField[]>(() => defaultRows(ownField));
-  const [phoneCountry, setPhoneCountry] = useState('US');
+  const [linkRows, setLinkRows] = useState<SocialField[]>(() => (Array.isArray(draft.linkRows) ? draft.linkRows : defaultRows(ownField)));
+  const [phoneCountry, setPhoneCountry] = useState(typeof draft.phoneCountry === 'string' ? draft.phoneCountry : 'US');
   const [formData, setFormData] = useState({
     founderName: '',
     founderEmail: '',
@@ -163,6 +182,7 @@ export default function PremiumListingModal({
     founderTiktok: '',
     founderYoutube: '',
     founderGithub: '',
+    ...draft.formData,
   });
 
   useEffect(() => {
@@ -230,6 +250,10 @@ export default function PremiumListingModal({
     for (const s of SOCIALS) {
       if (!shown.has(s.name)) payload[s.name] = '';
     }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, phoneCountry, linkRows, bidInput }));
+    } catch {}
 
     try {
       await onSubmit({
@@ -346,7 +370,7 @@ export default function PremiumListingModal({
           type="button"
           onClick={onClose}
           aria-label={asPage ? 'Back' : 'Close'}
-          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 rounded-full flex items-center justify-center text-[#1F2937]/50 hover:text-[#1F2937] hover:bg-gray-100 transition"
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 rounded-full flex items-center justify-center text-[#1F2937]/70 hover:text-[#1F2937] hover:bg-gray-100 transition"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
@@ -359,7 +383,7 @@ export default function PremiumListingModal({
               Sponsor your product
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-[-0.04em] text-[#0B2545] leading-[1.05]">Checkout details</h2>
-            <p className="mt-2 text-sm text-[#1F2937]/60">Please make sure the information below is correct before you pay.</p>
+            <p className="mt-2 text-sm text-[#1F2937]/70">Please make sure the information below is correct before you pay.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-8 lg:gap-12 items-start">
@@ -375,9 +399,9 @@ export default function PremiumListingModal({
                     <SocialMark field={PLATFORM_FIELD[productPlatform]} size="w-8 h-8" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/45">Sponsoring</p>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/70">Sponsoring</p>
                     <p className="text-lg font-black text-[#0B2545] truncate">{title}</p>
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]/60 min-w-0">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]/70 min-w-0">
                       <span className="flex-shrink-0">{PLATFORM_LABELS[productPlatform]}</span>
                       {productLink && <span className="truncate">· {productLink.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>}
                     </p>
@@ -438,7 +462,7 @@ export default function PremiumListingModal({
                         <span className={fieldLabel}>Category {req}</span>
                         <CategoryField value={productCategory} onChange={setProductCategory} />
                       </div>
-                      <p className="sm:col-span-2 text-xs text-[#1F2937]/55 -mt-1">
+                      <p className="sm:col-span-2 text-xs text-[#1F2937]/70 -mt-1">
                         It is listed on RankBid first (free, same checks as a normal submission), then you pay to sponsor it.
                       </p>
                     </div>
@@ -456,7 +480,7 @@ export default function PremiumListingModal({
                 )}
                 <label className="block">
                   <span className="relative block">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-[#1F2937]/50">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-[#1F2937]/70">$</span>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -472,7 +496,7 @@ export default function PremiumListingModal({
                   </span>
                 </label>
                 {validBid ? (
-                  <p className="mt-1.5 text-xs text-[#1F2937]/55">
+                  <p className="mt-1.5 text-xs text-[#1F2937]/70">
                     Whole dollars, from ${MIN_BID_USD}. {rank > 1 && (current ? `The top spot (#1) needs $${Math.max(MIN_BID_USD, topBid - raise)} more.` : `The top spot (#1) needs $${topBid}.`)}
                   </p>
                 ) : (
@@ -480,19 +504,19 @@ export default function PremiumListingModal({
                 )}
 
                 <div className="mt-4 flex items-center gap-4 sm:gap-5 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
-                  <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
+                  <span className="text-5xl sm:text-6xl font-black tracking-[-0.05em] leading-none text-amber-700 tabular-nums">#{rank}</span>
                   <div className="min-w-0">
                     <p className="text-lg sm:text-xl font-black text-[#0B2545]">
-                      ${total} <span className="text-sm font-semibold text-[#1F2937]/55">· {current ? `$${raise} + $${price} added, ` : ''}lifetime on the {where.toLowerCase()}</span>
+                      ${total} <span className="text-sm font-semibold text-[#1F2937]/70">· {current ? `$${raise} + $${price} added, ` : ''}{where === 'Homepage' ? 'lifetime on the Sponsored page, on the homepage while in the top 10' : 'lifetime on the Sponsored page'}</span>
                     </p>
-                    <p className="text-xs text-[#1F2937]/60 mt-0.5">
+                    <p className="text-xs text-[#1F2937]/70 mt-0.5">
                       {passes
                         ? `Above ${passes.title ?? 'another product'} ($${passes.bidUsd}), which moves down one place.`
                         : rank === 1 ? 'Nobody is sponsored yet: you take the top place.' : 'You take the next place after the current listings.'}
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-[#1F2937]/55 mt-2">
+                <p className="text-xs text-[#1F2937]/70 mt-2">
                   One payment, no end date. Listings are ranked by price: someone paying more later moves you down; equal amounts keep whoever paid first ahead.
                 </p>
               </section>
@@ -526,7 +550,7 @@ export default function PremiumListingModal({
               <section>
                 <div className="flex items-baseline justify-between gap-3 mb-4">
                   <h3 className={sectionTitle + ' mb-0'}>Social links</h3>
-                  <span className="text-xs font-semibold text-[#1F2937]/45">Shown on your listing · {visibleRows.length}/{MAX_LINKS}</span>
+                  <span className="text-xs font-semibold text-[#1F2937]/70">Shown on your listing · {visibleRows.length}/{MAX_LINKS}</span>
                 </div>
 
                 <div className="space-y-3">
@@ -541,7 +565,7 @@ export default function PremiumListingModal({
                         <label className="relative flex items-center gap-2 pl-4 pr-8 border-r border-gray-200 bg-[#F4F6FA] rounded-l-xl cursor-pointer flex-shrink-0">
                           <SocialMark field={field} />
                           <span className="text-xs font-bold text-[#1F2937] whitespace-nowrap">{social.label}</span>
-                          <svg className="absolute right-2.5 w-3.5 h-3.5 text-[#1F2937]/45 pointer-events-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <svg className="absolute right-2.5 w-3.5 h-3.5 text-[#1F2937]/70 pointer-events-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.06l3.71-3.83a.75.75 0 1 1 1.08 1.04l-4.25 4.39a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z" clipRule="evenodd" />
                           </svg>
                           <select
@@ -610,7 +634,7 @@ export default function PremiumListingModal({
                       <span className="h-6 px-1.5 rounded-md bg-[#2E77BC] flex items-center text-[9px] font-black text-white">AMEX</span>
                     </span>
                   </div>
-                  <p className="px-4 py-3 text-xs text-[#1F2937]/60 border-t border-[#0F3460]/10">
+                  <p className="px-4 py-3 text-xs text-[#1F2937]/70 border-t border-[#0F3460]/10">
                     You won&apos;t be charged yet. You&apos;ll be taken to Stripe to pay securely in USD; your listing goes live as soon as the payment is confirmed.
                   </p>
                 </div>
@@ -622,11 +646,11 @@ export default function PremiumListingModal({
               <h3 className={sectionTitle}>Order details</h3>
               <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl bg-white border border-amber-200 px-5 py-4">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/50">Sponsored rank</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#1F2937]/70">Sponsored rank</p>
                   <p className="text-sm font-bold text-[#1F2937]/70">{where}</p>
-                  <p className="mt-1 text-xl font-black text-[#0B2545] tabular-nums">${total}{current && <span className="ml-1.5 text-xs font-semibold text-[#1F2937]/50">total bid</span>}</p>
+                  <p className="mt-1 text-xl font-black text-[#0B2545] tabular-nums">${total}{current && <span className="ml-1.5 text-xs font-semibold text-[#1F2937]/70">total bid</span>}</p>
                 </div>
-                <span className="text-6xl font-black tracking-[-0.05em] leading-none text-amber-600 tabular-nums">#{rank}</span>
+                <span className="text-6xl font-black tracking-[-0.05em] leading-none text-amber-700 tabular-nums">#{rank}</span>
               </div>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
@@ -650,7 +674,7 @@ export default function PremiumListingModal({
               {current && (
                 <div className="flex justify-between text-sm mb-3">
                   <span className="text-[#1F2937]/70">Current bid (already paid)</span>
-                  <span className="font-semibold tabular-nums text-[#1F2937]/60">${raise}.00</span>
+                  <span className="font-semibold tabular-nums text-[#1F2937]/70">${raise}.00</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
@@ -674,10 +698,10 @@ export default function PremiumListingModal({
               >
                 {loading ? 'Processing…' : `Pay $${price} with Stripe`}
               </button>
-              <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-sm font-bold text-[#1F2937]/55 hover:text-[#1F2937] transition">
+              <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-sm font-bold text-[#1F2937]/70 hover:text-[#1F2937] transition">
                 Cancel
               </button>
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[#1F2937]/45">
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[#1F2937]/70">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
                 Secure payment by Stripe
               </p>

@@ -11,6 +11,7 @@ import AccountSettings from '@/components/AccountSettings';
 import { HOME_SPONSORED } from '@/lib/premiumSpots';
 import Pagination from '@/components/Pagination';
 import { usePaged } from '@/lib/usePaged';
+import { logoUrl } from '@/lib/logo';
 
 interface User {
   id: string;
@@ -72,7 +73,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (!savedUser) {
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
 
@@ -82,7 +83,7 @@ export default function ProfilePage() {
       fetchUserData();
     } catch {
       localStorage.removeItem('user');
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
   }, [router]);
 
@@ -254,7 +255,7 @@ export default function ProfilePage() {
               <div>
                 <div className="mb-6">
                   <h2 className="text-lg sm:text-2xl font-black text-[#1F2937] mb-1">My Submissions</h2>
-                  <p className="text-xs sm:text-sm text-[#1F2937]/60">Products and services you&apos;ve submitted to RankBid</p>
+                  <p className="text-xs sm:text-sm text-[#1F2937]/70">Products and services you&apos;ve submitted to RankBid</p>
                 </div>
 
                 {submissions.length === 0 ? (
@@ -326,7 +327,7 @@ export default function ProfilePage() {
                             </div>
                           ) : (
                             <div className="mx-2 sm:mx-3 -mt-1 pt-3 pb-2 px-3 sm:px-4 rounded-b-xl bg-gray-50 border border-t-0 border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <p className="text-xs text-[#1F2937]/60">Sponsor it for life from $1, one payment: the higher you pay, the higher it ranks.</p>
+                              <p className="text-xs text-[#1F2937]/70">Sponsor it for life from $1, one payment: the higher you pay, the higher it ranks.</p>
                               <div className="self-start sm:self-auto flex flex-wrap items-center gap-1.5">
                                 {manage}
                                 <button
@@ -353,7 +354,7 @@ export default function ProfilePage() {
               <div>
                 <div className="mb-6">
                   <h2 className="text-lg sm:text-2xl font-black text-[#1F2937] mb-1">My Votes</h2>
-                  <p className="text-xs sm:text-sm text-[#1F2937]/60">Products and services you&apos;ve voted for</p>
+                  <p className="text-xs sm:text-sm text-[#1F2937]/70">Products and services you&apos;ve voted for</p>
                 </div>
 
                 {votes.length === 0 ? (
@@ -375,7 +376,7 @@ export default function ProfilePage() {
                       if (vote.listing?.url) {
                         try {
                           const urlObj = new URL(vote.listing.url);
-                          faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(urlObj.hostname)}&sz=32`;
+                          faviconUrl = logoUrl(urlObj.hostname, 32);
                         } catch {
                           // If URL parsing fails, use default
                         }
@@ -413,7 +414,7 @@ export default function ProfilePage() {
                               <p className="text-lg font-black text-[#0F3460] leading-none">
                                 {vote.listing?.totalVotes || 0}
                               </p>
-                              <p className="text-[10px] sm:text-[11px] text-[#1F2937]/50 font-semibold mt-0.5">
+                              <p className="text-[10px] sm:text-[11px] text-[#1F2937]/70 font-semibold mt-0.5">
                                 {(vote.listing?.totalVotes || 0) === 1 ? 'vote' : 'votes'}
                               </p>
                             </div>
@@ -434,7 +435,7 @@ export default function ProfilePage() {
               <div>
                 <div className="mb-6">
                   <h2 className="text-lg sm:text-2xl font-black text-[#1F2937] mb-1">Settings</h2>
-                  <p className="text-xs sm:text-sm text-[#1F2937]/60">Your name, password and account</p>
+                  <p className="text-xs sm:text-sm text-[#1F2937]/70">Your name, password and account</p>
                 </div>
 
                 <AccountSettings

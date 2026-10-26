@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest, sbSelect, toAdminUser } from '@/lib/server/admin';
+import { logAdminActivity } from '@/lib/server/admin-activity';
+import { removeVote, sbHeaders, sbUrl } from '@/lib/server/votes';
 
 // voter_id is "user:<user id>" for signed-in votes and "email:<email>" for guest votes from a
 // /support link (their name and support type live in `supporters`). Anything else is a legacy id.
@@ -96,5 +98,39 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Error fetching votes:', error);
     return NextResponse.json({ error: 'Failed to fetch votes' }, { status: 500 });
+  }
+}
+
+// DELETE { voteIds, reason }: removes votes (e.g. fraud), refreshes each listing's counts and rank,
+// and logs every removed vote with the reason.
+export async function DELETE(req: NextRequest) {
+  if (!(await isAdminRequest(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const body = await req.json().catch(() => null);
+  const voteIds: string[] = Array.isArray(body?.voteIds) ? body.voteIds.filter((v: unknown): v is string => typeof v === 'string').slice(0, 100) : [];
+  const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
+  if (!voteIds.length) return NextResponse.json({ error: 'Choose at least one vote' }, { status: 400 });
+  if (!reason) return NextResponse.json({ error: 'Give a reason for removing these votes' }, { status: 400 });
+
+  try {
+    const { rows } = await sbSelect<VoteRow>(`votes?select=*&id=in.(${inList(voteIds)})`);
+    const removed: string[] = [];
+    // One at a time: each removal recounts its listing, and two votes may share one.
+    for (const v of rows) {
+      await removeVote(v.listing_id, v.voter_id);
+      if (v.voter_id.startsWith('email:')) {
+        await fetch(sbUrl(`supporters?listing_id=eq.${encodeURIComponent(v.listing_id)}&email=eq.${encodeURIComponent(v.voter_id.slice(6))}`), {
+          method: 'DELETE',
+          headers: sbHeaders(),
+        }).catch(() => null);
+      }
+      await logAdminActivity(req, 'vote.delete', v.listing_id, { reason, vote: v });
+      removed.push(v.id);
+    }
+    return NextResponse.json({ removed });
+  } catch (error) {
+    console.error('Error removing votes:', error);
+    return NextResponse.json({ error: 'Failed to remove votes' }, { status: 500 });
   }
 }

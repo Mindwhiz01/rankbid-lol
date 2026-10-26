@@ -10,6 +10,7 @@ import type { PublicListing } from '@/lib/server/votes';
 import { linkedInShareUrl, supportUrl } from '@/lib/site';
 import { PLATFORM_LABELS, normalizePlatform } from '@/lib/platform-url';
 import { safeExternalUrl } from '@/lib/utils';
+import { logoUrl } from '@/lib/logo';
 
 type SupportType = 'founder' | 'friend' | 'supporter';
 
@@ -40,7 +41,7 @@ const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
 
 function faviconFor(url: string): string | null {
   try {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(url).hostname)}&sz=128`;
+    return logoUrl(new URL(url).hostname, 128);
   } catch {
     return null;
   }
@@ -99,6 +100,9 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
         setJustVotedName(first);
       } else if (data.alreadyVoted) {
         setError('This email has already voted for this product. Thank you!');
+      } else if (res.status === 429 && data.retryAt) {
+        const at = new Date(data.retryAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        setError(`Too many votes from your network right now. Please try again after ${at}.`);
       } else {
         setError(data.error || 'Something went wrong. Please try again.');
       }
@@ -177,7 +181,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
             <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
               <div>
                 <p className="text-sm font-black text-[#1F2937]">Building something too?</p>
-                <p className="text-xs text-[#1F2937]/60">Launch it on RankBid for free and get your own support link.</p>
+                <p className="text-xs text-[#1F2937]/70">Launch it on RankBid for free and get your own support link.</p>
               </div>
               <Link href="/signup" className="px-4 py-2 rounded-lg bg-[#0F3460] text-white text-xs sm:text-sm font-black hover:bg-[#0D2A50] transition flex-shrink-0">Launch for free</Link>
             </div>
@@ -185,7 +189,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
         ) : (
           <form onSubmit={submit} noValidate>
             <h2 className="text-lg sm:text-xl font-black text-[#1F2937] mb-1">Cast your vote</h2>
-            <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4 sm:mb-5">No account needed. Takes about 10 seconds.</p>
+            <p className="text-xs sm:text-sm text-[#1F2937]/70 mb-4 sm:mb-5">No account needed. Takes about 10 seconds.</p>
 
             <p className="text-xs font-bold text-[#1F2937] mb-2">I’m supporting as a…</p>
             <div role="radiogroup" aria-label="Support type" className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-5">
@@ -205,7 +209,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
                     <IconTile tone={opt.tone} size="sm">{opt.icon}</IconTile>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-black text-[#1F2937]">{opt.label}</p>
-                      <p className="text-xs text-[#1F2937]/55">{opt.hint}</p>
+                      <p className="text-xs text-[#1F2937]/70">{opt.hint}</p>
                     </div>
                     <span className={`sm:hidden w-4 h-4 rounded-full border-2 flex-shrink-0 ${active ? 'border-[#0F3460] bg-[#0F3460]' : 'border-gray-300'}`} />
                   </button>
@@ -238,7 +242,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5s-8.5-4.8-8.5-11A4.5 4.5 0 0112 7a4.5 4.5 0 018.5 2.5c0 6.2-8.5 11-8.5 11z" /></svg>
               {submitting ? 'Recording your vote…' : `Vote for ${listing.title}`}
             </button>
-            <p className="text-[11px] text-[#1F2937]/45 text-center mt-3">
+            <p className="text-[11px] text-[#1F2937]/70 text-center mt-3">
               We only use your email to make sure each person votes once. It’s never shown publicly. See our <Link href="/tos" className="underline">terms</Link>.
             </p>
           </form>
@@ -253,7 +257,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
             {OPTIONS.map(opt => (
               <div key={opt.value} className="text-center p-3 rounded-xl bg-gray-50 border border-gray-100">
                 <p className="text-lg sm:text-2xl font-black text-[#0F3460]">{summary.counts[opt.value]}</p>
-                <p className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/60">{opt.label}{summary.counts[opt.value] === 1 ? '' : 's'}</p>
+                <p className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/70">{opt.label}{summary.counts[opt.value] === 1 ? '' : 's'}</p>
               </div>
             ))}
           </div>

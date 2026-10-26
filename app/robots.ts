@@ -15,7 +15,9 @@ const AI_BOTS = [
 ];
 
 export default function robots(): MetadataRoute.Robots {
-  if (!INDEXABLE) return { rules: [{ userAgent: '*', disallow: '/' }] };
+  // Previews (the sandbox) stay crawlable so search engines can see their noindex tag and drop them;
+  // a Disallow would hide the tag and leave the bare URLs indexable.
+  if (!INDEXABLE) return { rules: [{ userAgent: '*', allow: '/' }] };
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: DISALLOW },

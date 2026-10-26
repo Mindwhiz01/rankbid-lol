@@ -15,6 +15,11 @@ async function hasUserVote(userId: string, listingId: string): Promise<boolean> 
   return Array.isArray(rows) && rows.length > 0;
 }
 
+// Voting and unvoting one product over and over churns its rank. This applies to every account,
+// including RATE_LIMIT_EXEMPT_USERS testers.
+const TOGGLE_MESSAGE = 'You’re changing your vote on this product too quickly. Please wait a few minutes.';
+const toggleAllowed = (userId: string, listingId: string) => rateLimit(`vote-toggle:${userId}:${listingId}`, 6, 10 * 60);
+
 export async function POST(req: NextRequest) {
   try {
     if (!supabaseConfigured()) {
@@ -35,6 +40,9 @@ export async function POST(req: NextRequest) {
     // Slows down scripted voting from many accounts on one network.
     if (!(await rateLimit(`vote-ip:${ipHash(req)}`, 30, 60 * 60)) || !(await rateLimit(`vote-user:${user.id}`, 60, 60 * 60))) {
       return NextResponse.json({ error: 'Too many votes. Please try again later.' }, { status: 429 });
+    }
+    if (!(await toggleAllowed(user.id, listingId))) {
+      return NextResponse.json({ error: TOGGLE_MESSAGE }, { status: 429 });
     }
 
     const listing = await getListing(listingId);
@@ -100,6 +108,9 @@ export async function DELETE(req: NextRequest) {
     // Shares the vote limit, so voting and unvoting can't be looped to churn the rankings.
     if (!(await rateLimit(`vote-user:${user.id}`, 60, 60 * 60))) {
       return NextResponse.json({ error: 'Too many changes. Please try again later.' }, { status: 429 });
+    }
+    if (!(await toggleAllowed(user.id, listingId))) {
+      return NextResponse.json({ error: TOGGLE_MESSAGE }, { status: 429 });
     }
 
     const listing = await getListing(listingId);

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import SelectionHeading from '@/components/SelectionHeading';
 import { REVIEWS } from '@/lib/reviews';
@@ -32,7 +33,7 @@ const AUTO_MS = 5000;
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <div className="flex gap-0.5 text-amber-400" aria-label={`${rating} out of 5 stars`}>
+    <div role="img" className="flex gap-0.5 text-amber-400" aria-label={`${rating} out of 5 stars`}>
       {Array.from({ length: 5 }, (_, i) => (
         <svg key={i} className={`w-4 h-4 ${i < rating ? '' : 'opacity-25'}`} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9L12 2.5z" />
@@ -108,7 +109,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
   const stats = [
     { value: products, label: 'products listed' },
     { value: votes, label: 'community votes' },
-    { value: categories, label: 'categories ranked' },
+    { value: categories, label: 'categories with products' },
   ];
 
   const navBtn =
@@ -136,7 +137,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
                 <dd className="text-3xl sm:text-4xl font-bold tracking-[-0.03em] text-[#0B2545] tabular-nums">
                   {s.value ? s.value.toLocaleString('en-US') : '—'}
                 </dd>
-                <dt className="text-xs sm:text-sm text-[#1F2937]/55 mt-1">{s.label}</dt>
+                <dt className="text-xs sm:text-sm text-[#1F2937]/70 mt-1">{s.label}</dt>
               </div>
             ))}
           </dl>
@@ -161,7 +162,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
                 </blockquote>
                 <figcaption className="mt-4 text-sm">
                   <span className="font-bold text-[#0B2545]">{review.name}</span>
-                  <span className="text-[#1F2937]/55">
+                  <span className="text-[#1F2937]/70">
                     {' · '}
                     {review.href ? <a href={review.href} className="hover:text-[#0F3460] hover:underline underline-offset-2">{review.role}</a> : review.role}
                   </span>
@@ -191,7 +192,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
               <button type="button" aria-label="Next review" onClick={() => setTurn(n => n + 1)} className={navBtn}>
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
               </button>
-              <span className="ml-2 text-xs font-bold text-[#1F2937]/45 tabular-nums">
+              <span className="ml-2 text-xs font-bold text-[#1F2937]/70 tabular-nums">
                 {String(index + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}
               </span>
             </div>
@@ -204,7 +205,7 @@ export default function TrustedBy({ products, votes, categories }: TrustedByProp
           <Ring which="inner" turn={turn} active={activeAvatar} />
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[17%] h-[17%] rounded-full bg-[#059669]/15 flex items-center justify-center">
             <span className="w-[62%] h-[62%] rounded-[30%] bg-white flex items-center justify-center shadow-lg shadow-[#0F3460]/30">
-              <img src="/brand/logo-mark.png" alt="" width={223} height={194} className="w-[70%] h-auto" />
+              <Image src="/brand/logo-mark.png" alt="" width={223} height={194} sizes="96px" className="w-[70%] h-auto" />
             </span>
           </div>
         </div>

@@ -122,9 +122,9 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 text-center hover:shadow-md transition-shadow">
                           <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🥈</div>
                           <h3 className="text-sm sm:text-base font-bold text-[#1F2937] mb-1 truncate">{topThree[1].title}</h3>
-                          <p className="text-xs text-[#1F2937]/60 mb-3 sm:mb-4">{topThree[1].category}</p>
+                          <p className="text-xs text-[#1F2937]/70 mb-3 sm:mb-4">{topThree[1].category}</p>
                           <p className="text-2xl sm:text-3xl font-black text-[#0F3460]">{votesFor(topThree[1])}</p>
-                          <p className="text-xs text-[#1F2937]/60 font-semibold">votes</p>
+                          <p className="text-xs text-[#1F2937]/70 font-semibold">votes</p>
                         </div>
                       </div>
                     )}
@@ -148,9 +148,9 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 text-center hover:shadow-md transition-shadow">
                           <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🥉</div>
                           <h3 className="text-sm sm:text-base font-bold text-[#1F2937] mb-1 truncate">{topThree[2].title}</h3>
-                          <p className="text-xs text-[#1F2937]/60 mb-3 sm:mb-4">{topThree[2].category}</p>
+                          <p className="text-xs text-[#1F2937]/70 mb-3 sm:mb-4">{topThree[2].category}</p>
                           <p className="text-2xl sm:text-3xl font-black text-[#0F3460]">{votesFor(topThree[2])}</p>
-                          <p className="text-xs text-[#1F2937]/60 font-semibold">votes</p>
+                          <p className="text-xs text-[#1F2937]/70 font-semibold">votes</p>
                         </div>
                       </div>
                     )}
@@ -165,7 +165,7 @@ export default function LeaderboardView({ initialListings }: { initialListings: 
                 </h2>
                 {sortedListings.length === 0 ? (
                   <div className="text-center py-8 sm:py-12 bg-white border border-gray-200 shadow-sm rounded-lg">
-                    <p className="text-sm text-[#1F2937]/60 font-semibold">{activeTab === 'today' ? 'No votes yet today' : 'No products ranked yet'}</p>
+                    <p className="text-sm text-[#1F2937]/70 font-semibold">{activeTab === 'today' ? 'No votes yet today' : 'No products ranked yet'}</p>
                   </div>
                 ) : (
                   <>

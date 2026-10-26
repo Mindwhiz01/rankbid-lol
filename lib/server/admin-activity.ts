@@ -1,13 +1,10 @@
 // Server-only: the admin activity log (supabase/migrations/admin_activity.sql). Every admin write
 // records who did it, what changed and, for deletions, a full copy of what was removed.
 import type { NextRequest } from 'next/server';
-import { ADMIN_COOKIE, isAdminEmail, isValidAdminCookie, isValidAdminKey } from '@/lib/server/admin';
+import { isAdminEmail } from '@/lib/server/admin';
 import { getSessionUser } from '@/lib/server/session';
 import { ipHash } from '@/lib/server/rate-limit';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-
-/** Shown as the actor when the owner used the admin key instead of signing in with an account. */
-export const ADMIN_KEY_ACTOR = 'Owner (admin key)';
 
 /** Human labels for each action, shared with the dashboard's Activity tab. */
 export const ACTIVITY_ACTIONS = {
@@ -15,6 +12,7 @@ export const ACTIVITY_ACTIONS = {
   'listing.delete': 'Deleted submission',
   'user.update': 'Edited user',
   'user.delete': 'Deleted user',
+  'vote.delete': 'Removed vote',
   'user.block': 'Blocked user',
   'user.unblock': 'Unblocked user',
   'premium.approve': 'Approved payment',
@@ -26,22 +24,20 @@ export const ACTIVITY_ACTIONS = {
   'team.invite_accepted': 'Accepted admin invite',
   'email.verify_domain': 'Re-checked email domain',
   'email.test': 'Sent test email',
+  // Kept so older log entries still read correctly; the shared admin key sign-in was removed (QA RB-41).
   'session.key_sign_in': 'Signed in with admin key',
   'session.sign_in': 'Admin signed in',
+  'session.code_verified': 'Admin entered sign-in code',
   'session.sign_out': 'Admin signed out',
   'team.password_set': 'Admin set their password',
 } as const;
 
 export type ActivityAction = keyof typeof ACTIVITY_ACTIONS;
 
-/** The email of whoever is making this admin request, or ADMIN_KEY_ACTOR. */
+/** The email of whoever is making this admin request. */
 export async function activityActor(req: NextRequest): Promise<string> {
   const user = await getSessionUser(req);
-  if (user) return user.email;
-  if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
-    return ADMIN_KEY_ACTOR;
-  }
-  return 'unknown';
+  return user?.email ?? 'unknown';
 }
 
 /**

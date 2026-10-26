@@ -1,8 +1,9 @@
 // Server-only admin helpers: who counts as an admin, and the data the admin dashboard reads.
-import { createHmac, timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { sbHeaders, sbUrl } from '@/lib/server/votes';
-import { getSessionUser, isCrossSiteWrite } from '@/lib/server/session';
+import { getSessionUser, isCrossSiteWrite, type SessionUser } from '@/lib/server/session';
+import { hasAdminSecondFactor } from '@/lib/server/admin-2fa';
 
 // Only list addresses that already have an account: signups aren't email-verified, so an unregistered
 // address here would let anyone register it and become admin.
@@ -10,36 +11,8 @@ export const ADMIN_EMAILS = [
   'assadullahnouman@gmail.com',
 ];
 
-export const ADMIN_COOKIE = 'adminKey';
-
 // Listings submitted without a signed-in user get this placeholder user_id (see /api/listings/submit).
 export const ANONYMOUS_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
-
-function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ab.length === bb.length && timingSafeEqual(ab, bb);
-}
-
-/** True when `key` matches ADMIN_KEY. There is no fallback key: an unset ADMIN_KEY disables key access. */
-export function isValidAdminKey(key: string | null | undefined): boolean {
-  const expected = process.env.ADMIN_KEY;
-  return Boolean(expected && key && safeEqual(key, expected));
-}
-
-/**
- * Value stored in the adminKey cookie: derived from ADMIN_KEY so the cookie never holds the key itself.
- * Changing ADMIN_KEY signs every admin browser out.
- */
-export function adminCookieValue(): string | null {
-  const key = process.env.ADMIN_KEY;
-  return key ? createHmac('sha256', key).update('rankbid-admin-session').digest('hex') : null;
-}
-
-export function isValidAdminCookie(value: string | null | undefined): boolean {
-  const expected = adminCookieValue();
-  return Boolean(expected && value && safeEqual(value, expected));
-}
 
 // ---- Team admins ----
 // Up to MAX_TEAM_ADMINS extra people the owner shares the dashboard with, stored as an email list
@@ -78,30 +51,32 @@ export async function setTeamAdminEmails(emails: string[]): Promise<void> {
 }
 
 /**
- * The owner: holds the admin key (header or cookie) or is signed in with an ADMIN_EMAILS address.
- * Only the owner can add or remove team admins.
+ * The signed-in user when their account is the owner's or a team admin's, whether or not they have
+ * entered this sign-in's emailed code yet. Use isAdminRequest to authorize admin actions.
+ */
+export async function adminAccount(req: NextRequest): Promise<SessionUser | null> {
+  if (isCrossSiteWrite(req)) return null;
+  const user = await getSessionUser(req);
+  return user && (await isAdminEmail(user.email)) ? user : null;
+}
+
+/**
+ * The owner: signed in with an ADMIN_EMAILS account and past the emailed-code step.
+ * Only the owner can add or remove team admins and switch the coming soon page.
  */
 export async function isOwnerRequest(req: NextRequest): Promise<boolean> {
-  if (isCrossSiteWrite(req)) return false;
-  if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
-    return true;
-  }
+  if (isCrossSiteWrite(req) || !hasAdminSecondFactor(req)) return false;
   const user = await getSessionUser(req);
   return Boolean(user && ADMIN_EMAILS.includes(user.email));
 }
 
 /**
- * An admin request comes from the owner (see isOwnerRequest) or from a signed-in user whose
- * email is on the admin team.
+ * An admin request comes from the owner or a team admin, signed in with their own account and past
+ * the emailed-code step. There is no shared admin password.
  */
 export async function isAdminRequest(req: NextRequest): Promise<boolean> {
-  if (isCrossSiteWrite(req)) return false;
-  if (isValidAdminKey(req.headers.get('x-admin-key')) || isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value)) {
-    return true;
-  }
-  const user = await getSessionUser(req);
-  if (!user) return false;
-  return ADMIN_EMAILS.includes(user.email) || (await getTeamAdminEmails()).includes(user.email);
+  if (!hasAdminSecondFactor(req)) return false;
+  return Boolean(await adminAccount(req));
 }
 
 // ---- Data ----
@@ -291,5 +266,10 @@ export async function removeListing(listingId: string): Promise<Record<string, u
   const res = await del(`listings?id=eq.${id}`);
   if (!res.ok) throw new Error(`Failed to delete listing: ${await res.text()}`);
   const deleted = await res.json();
+  // Drop the cached pages that showed it, so its URL 404s and it leaves the sitemap right away.
+  revalidatePath(`/product/${listingId}`);
+  revalidatePath('/categories/[slug]', 'page');
+  revalidatePath('/');
+  revalidatePath('/sitemap.xml');
   return Array.isArray(deleted) && deleted.length > 0 ? deleted[0] : null;
 }

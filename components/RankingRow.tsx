@@ -10,6 +10,7 @@ import { useVote } from '@/lib/useVote';
 import { supportUrl } from '@/lib/site';
 import { safeExternalUrl } from '@/lib/utils';
 import { claimClick } from '@/lib/clickCount';
+import { logoUrl } from '@/lib/logo';
 
 export interface RankingListing {
   id: string;
@@ -27,7 +28,7 @@ const FALLBACK_ICON =
 
 function faviconFor(url: string): string {
   try {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(url).hostname)}&sz=64`;
+    return logoUrl(new URL(url).hostname, 64);
   } catch {
     return FALLBACK_ICON;
   }
@@ -111,7 +112,7 @@ export default function RankingRow({
               {getCategoryLabel(listing.category)}
             </span>
             {clicks !== undefined && (
-              <span className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/50 whitespace-nowrap">
+              <span className="text-[11px] sm:text-xs font-semibold text-[#1F2937]/70 whitespace-nowrap">
                 {clicks.toLocaleString('en-US')} {clicks === 1 ? 'click' : 'clicks'}
               </span>
             )}
@@ -122,7 +123,7 @@ export default function RankingRow({
         {/* Votes */}
         <div className="text-center flex-shrink-0 sm:px-1">
           <p className="text-base sm:text-xl font-black text-[#0F3460] leading-none">{votes + extraVotes}</p>
-          <p className="text-[10px] sm:text-[11px] text-[#1F2937]/50 font-semibold mt-0.5">{votesLabel === 'votes' && votes + extraVotes === 1 ? 'vote' : votesLabel}</p>
+          <p className="text-[10px] sm:text-[11px] text-[#1F2937]/70 font-semibold mt-0.5">{votesLabel === 'votes' && votes + extraVotes === 1 ? 'vote' : votesLabel}</p>
         </div>
 
         {/* Actions (above the stretched title link) */}
@@ -156,7 +157,7 @@ export default function RankingRow({
               onClick={onPremium}
               title="Get a sponsored spot"
               aria-label={`Get a sponsored spot for ${listing.title}`}
-              className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all active:scale-95"
+              className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all active:scale-95"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9L12 2.5z" />

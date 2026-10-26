@@ -100,7 +100,7 @@ export default function WhyHero() {
               style={slideDelay(60)}
               className="slide-up"
             />
-            <p style={slideDelay(120)} className="slide-up mt-5 sm:mt-6 max-w-lg text-sm sm:text-base md:text-lg text-[#1F2937]/60">
+            <p style={slideDelay(120)} className="slide-up mt-5 sm:mt-6 max-w-lg text-sm sm:text-base md:text-lg text-[#1F2937]/70">
               RankBid is a free, community-driven launchpad. Real people vote, and the best products climb. No algorithms, no gatekeepers. Want extra visibility? Sponsored spots start at $1 and are always clearly labeled.
             </p>
           </div>
@@ -118,12 +118,12 @@ export default function WhyHero() {
               {votesToday > 0 ? (
                 <>
                   <span className="block text-lg font-black text-[#0B2545] tabular-nums leading-tight">{formatCount(votesToday)}</span>
-                  <span className="block text-xs text-[#1F2937]/60">Vote{votesToday !== 1 ? 's' : ''} cast today</span>
+                  <span className="block text-xs text-[#1F2937]/70">Vote{votesToday !== 1 ? 's' : ''} cast today</span>
                 </>
               ) : (
                 <>
                   <span className="block text-sm font-black text-[#0B2545] leading-tight">Voting is open</span>
-                  <span className="block text-xs text-[#1F2937]/60">Be the first to vote today</span>
+                  <span className="block text-xs text-[#1F2937]/70">Be the first to vote today</span>
                 </>
               )}
             </span>
@@ -149,7 +149,7 @@ export default function WhyHero() {
               <div key={stat.label.join(' ')} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5">
                 <dt className="sr-only">{stat.label.join(' ')}</dt>
                 <dd className="text-3xl sm:text-4xl font-black tracking-tight text-[#0B2545] tabular-nums">{formatCount(stat.value)}</dd>
-                <dd aria-hidden="true" className="text-xs sm:text-sm leading-tight text-[#1F2937]/55">
+                <dd aria-hidden="true" className="text-xs sm:text-sm leading-tight text-[#1F2937]/70">
                   {stat.label[0]}<br />{stat.label[1]}
                 </dd>
               </div>

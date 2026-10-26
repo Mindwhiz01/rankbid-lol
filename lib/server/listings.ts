@@ -2,6 +2,7 @@
 // sitemap), so search engines and AI crawlers that don't run JavaScript still see the data.
 import { cache } from 'react';
 import { sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { selfHostedImage } from '@/lib/logo';
 
 export interface Listing {
   id: string;
@@ -37,7 +38,7 @@ function toListing(row: Row): Listing {
     totalVotes: row.total_votes || 0,
     dayVotes: row.day_votes || 0,
     clickCount: row.click_count || 0,
-    ...(row.image_url && { imageUrl: row.image_url }),
+    ...(row.image_url && { imageUrl: selfHostedImage(row.image_url) ?? undefined }),
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
     rankReachedAt: row.rank_reached_at || row.created_at,

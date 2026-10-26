@@ -88,7 +88,7 @@ export default function TodayView({ initialListings }: { initialListings: Listin
           {loading ? (
             <div className="text-center py-8 sm:py-12">
               <div className="inline-block animate-spin text-3xl sm:text-4xl">⏳</div>
-              <p className="text-xs sm:text-sm text-[#1F2937]/60 font-semibold mt-2 sm:mt-3">Loading today&apos;s rankings...</p>
+              <p className="text-xs sm:text-sm text-[#1F2937]/70 font-semibold mt-2 sm:mt-3">Loading today&apos;s rankings...</p>
             </div>
           ) : topListingsToday.length === 0 ? (
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl text-center py-8 sm:py-12 px-4 sm:px-8">

@@ -5,24 +5,41 @@ import { SITE_URL, SUPPORT_EMAIL, X_HANDLE, X_URL } from '@/lib/site';
 
 export const SITE_NAME = 'RankBid';
 export const SITE_TAGLINE = 'Free community-voted product rankings';
+// About 155 characters, so search results show it whole.
 export const SITE_DESCRIPTION =
-  'RankBid is a free product launch platform where real people vote and the most-voted products, websites and creator profiles rise to the top of a live leaderboard. Rankings come from public vote counts, not algorithms. Makers can also bid for one of ten clearly labeled sponsored spots, starting at $1.';
+  'Free product launch platform: real people vote and the most-voted products rise to the top of a live leaderboard. Clearly labeled sponsored spots from $1.';
 
 export const absoluteUrl = (path = '/') => new URL(path, SITE_URL).toString();
 
-/** Per-page metadata with a canonical URL and matching Open Graph / X card tags. */
-export function pageMetadata({ title, description, path, noindex = false }: {
+/** Branded share card (app/opengraph-image.tsx) for every page that has no image of its own. */
+export const DEFAULT_SHARE_IMAGE = { url: '/opengraph-image', width: 1200, height: 630, alt: `${SITE_NAME}: ${SITE_TAGLINE}` };
+
+/** Shortens `text` to at most `max` characters at a word boundary, ending in "…" when cut. */
+export function clip(text: string, max: number): string {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1).replace(/\s+\S*$/, '').replace(/[\s.,;:!?–-]+$/, '');
+  return `${cut || t.slice(0, max - 1)}…`;
+}
+
+/**
+ * Per-page metadata with a canonical URL and matching Open Graph / X card tags. Titles are kept to about
+ * 60 characters with the " | RankBid" suffix and descriptions to 155, so search results show them whole.
+ */
+export function pageMetadata({ title: fullTitle, description: fullDescription, path, noindex = false }: {
   title: string;
   description: string;
   path: string;
   noindex?: boolean;
 }): Metadata {
+  const title = clip(fullTitle, 50);
+  const description = clip(fullDescription, 155);
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: path, siteName: SITE_NAME, type: 'website' },
-    twitter: { card: 'summary_large_image', site: `@${X_HANDLE}`, title, description },
+    openGraph: { title, description, url: path, siteName: SITE_NAME, type: 'website', images: [DEFAULT_SHARE_IMAGE] },
+    twitter: { card: 'summary_large_image', site: `@${X_HANDLE}`, title, description, images: [DEFAULT_SHARE_IMAGE] },
     ...(noindex && { robots: { index: false, follow: true } }),
   };
 }

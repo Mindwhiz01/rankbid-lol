@@ -86,17 +86,17 @@ export default function DailyView({ initialListings }: { initialListings: Listin
             <div className="flex gap-1.5 sm:gap-2 items-center">
               <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
                 <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.hours).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Hours</span>
+                <span className="text-[10px] font-bold text-[#1F2937]/70 mt-0.5">Hours</span>
               </div>
               <span className="text-lg sm:text-2xl font-black text-white/60">:</span>
               <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
                 <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.minutes).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Mins</span>
+                <span className="text-[10px] font-bold text-[#1F2937]/70 mt-0.5">Mins</span>
               </div>
               <span className="text-lg sm:text-2xl font-black text-white/60">:</span>
               <div className="flex flex-col items-center bg-white text-[#0F3460] min-w-[3rem] sm:min-w-[3.5rem] px-2 py-1.5 rounded-lg shadow-sm">
                 <span className="text-lg sm:text-2xl font-black tabular-nums leading-none">{String(countdown.seconds).padStart(2, '0')}</span>
-                <span className="text-[10px] font-bold text-[#1F2937]/60 mt-0.5">Secs</span>
+                <span className="text-[10px] font-bold text-[#1F2937]/70 mt-0.5">Secs</span>
               </div>
             </div>
           </div>
@@ -108,12 +108,12 @@ export default function DailyView({ initialListings }: { initialListings: Listin
             {loading ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin text-4xl">⏳</div>
-                <p className="text-[#1F2937]/60 font-semibold mt-2">Loading rankings...</p>
+                <p className="text-[#1F2937]/70 font-semibold mt-2">Loading rankings...</p>
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-8 sm:py-12 px-4 border border-gray-200 shadow-sm bg-white rounded-lg">
                 <p className="text-sm sm:text-base font-bold text-[#1F2937] mb-1">Nothing launched yet today</p>
-                <p className="text-xs sm:text-sm text-[#1F2937]/60 mb-4">Launch yours now and get a head start on today’s board.</p>
+                <p className="text-xs sm:text-sm text-[#1F2937]/70 mb-4">Launch yours now and get a head start on today’s board.</p>
                 <Link
                   href="/#submit"
                   className="inline-flex px-4 sm:px-6 py-2 sm:py-2.5 bg-[#0F3460] text-white font-black text-xs sm:text-sm rounded-lg hover:bg-[#0D2A50] active:scale-95 transition-all"
