@@ -1,22 +1,17 @@
-import { after, NextRequest, NextResponse } from 'next/server';
-import { getListing, recordVote, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
-import { notifyVote, snapshotListing } from '@/lib/server/vote-notify';
-import { clientIp, ipHash, rateLimitedUntil, recordHit } from '@/lib/server/rate-limit';
+import { NextRequest, NextResponse } from 'next/server';
+import { getListing, sbHeaders, sbUrl, supabaseConfigured } from '@/lib/server/votes';
+import { clientIp, ipHash, rateLimit, rateLimitedUntil, recordHit } from '@/lib/server/rate-limit';
 import { canonicalEmail, domainAcceptsMail, isDisposableEmail } from '@/lib/server/guest-email';
 import { verifyTurnstile } from '@/lib/server/turnstile';
+import { createPendingSupportVote, hasCountedVote, type SupportType } from '@/lib/server/support-confirm';
+import { sendSupportVoteConfirm } from '@/lib/email';
 
 // Guest voting from a shared /support/<id> link: name + email + how they support the maker.
-// One vote per email per listing (voter_id = "email:<email>").
+// One vote per email per listing (voter_id = "email:<email>"), counted once the voter confirms by email.
 
-const SUPPORT_TYPES = ['founder', 'friend', 'supporter'] as const;
-type SupportType = (typeof SUPPORT_TYPES)[number];
+const SUPPORT_TYPES: readonly SupportType[] = ['founder', 'friend', 'supporter'];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-// PostgREST answers 404 / PGRST205 when the supporters table hasn't been created yet.
-function isMissingTable(status: number, body: string) {
-  return status === 404 || body.includes('PGRST205') || body.includes('does not exist');
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Honeypot: real visitors never see or fill this field.
     if (body.company) {
-      return NextResponse.json({ success: true }, { status: 201 });
+      return NextResponse.json({ success: true, pending: true, email }, { status: 202 });
     }
 
     if (!listingId || listingId.length > 100) return NextResponse.json({ error: 'Missing product' }, { status: 400 });
@@ -70,30 +65,27 @@ export async function POST(req: NextRequest) {
 
     // One vote per inbox: "jo.doe+2@gmail.com" and "jodoe@gmail.com" are the same voter.
     const voter = `email:${canonicalEmail(email)}`;
-    const before = await snapshotListing(listing.id);
-    const result = await recordVote(listing.id, voter);
-    if (result.status === 'duplicate') {
+    if (await hasCountedVote(listing.id, voter)) {
       return NextResponse.json({ error: 'This email has already voted for this product', alreadyVoted: true }, { status: 409 });
     }
-    await Promise.all(limits.map(l => recordHit(l.key)));
-    if (before) after(() => notifyVote(before, result.totalVotes, voter));
-
-    // Supporter details are best-effort: the vote above already counts even if this table is missing.
-    const supporterRes = await fetch(sbUrl('supporters'), {
-      method: 'POST',
-      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify({ listing_id: listing.id, name, email, support_type: supportType }),
-    });
-    if (!supporterRes.ok) {
-      const text = await supporterRes.text();
-      if (isMissingTable(supporterRes.status, text)) {
-        console.warn('[support-vote] supporters table missing; run supabase/migrations/add_supporters.sql');
-      } else {
-        console.error('[support-vote] failed to save supporter:', supporterRes.status, text);
-      }
+    // Caps confirmation emails to one inbox, so the form can't be used to flood someone's mail.
+    if (!(await rateLimit(`support-confirm-mail:${voter}`, 3, 60 * 60))) {
+      return NextResponse.json({ error: 'We already sent a confirmation link to this email. Please check your inbox.' }, { status: 429 });
     }
 
-    return NextResponse.json({ success: true, totalVotes: result.totalVotes }, { status: 201 });
+    // The vote counts once the voter clicks the emailed link (/api/support-vote/confirm).
+    const confirmUrl = await createPendingSupportVote(
+      { listing_id: listing.id, voter_id: voter, name, email, support_type: supportType },
+      process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
+    );
+    const sent = await sendSupportVoteConfirm({ to: email, name, productTitle: listing.title, confirmUrl });
+    if (!sent.sent) {
+      console.error('[support-vote] confirmation email failed:', sent.error);
+      return NextResponse.json({ error: 'We couldn’t send the confirmation email. Please try again.' }, { status: 502 });
+    }
+    await Promise.all(limits.map(l => recordHit(l.key)));
+
+    return NextResponse.json({ success: true, pending: true, email }, { status: 202 });
   } catch (error) {
     console.error('[support-vote] error:', error);
     return NextResponse.json({ error: 'Could not record your vote. Please try again.' }, { status: 500 });

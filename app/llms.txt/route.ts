@@ -21,7 +21,7 @@ export async function GET() {
     '- Submitting a product and voting are free.',
     '- Each person gets one vote per product; rankings are ordered by total votes, ties go to the product that reached that count first, so a product that just reached a count joins the end of that group.',
     '- Rankings update in real time: an all-time board, a "today" board (last 24 hours) and one board per category.',
-    '- Anyone can vote through a product\'s shareable support link with just a name and email, no account needed.',
+    '- Anyone can vote through a product\'s shareable support link with just a name and email, no account needed; the vote counts once they confirm it from the emailed link.',
     '- Optional sponsored listings: from $1 with no end date (one payment, live for the lifetime of the listing), ranked by amount paid (ties go to whoever paid first). The top 10 show above the leaderboard on the homepage; all are on /sponsored. Sponsored listings never change vote rankings.',
     '- Every listing shows a click count: RankBid page opens and website visits, one per visitor per product every 30 minutes.',
     '- Listings can be websites or creator profiles on X (Twitter), LinkedIn, Instagram, TikTok or Facebook.',

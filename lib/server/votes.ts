@@ -51,16 +51,37 @@ export async function recordVote(listingId: string, voterId: string): Promise<Re
   }
 
   // The listing joins the end of the queue at its new count.
-  const now = new Date().toISOString();
-  const { totalVotes, dayVotes } = await refreshCounts(listingId, { updated_at: now, rank_reached_at: now });
+  const { totalVotes, dayVotes } = await refreshCounts(listingId, true);
   return { status: 'ok', totalVotes, dayVotes };
 }
 
-/** Recounts a listing's votes from the `votes` table and saves the totals on the listing. */
-async function refreshCounts(listingId: string, extra: Record<string, string> = {}) {
-  const id = encodeURIComponent(listingId);
+/**
+ * Recounts a listing's votes from the `votes` table and saves the totals on the listing, which rejoins the
+ * queue at its new count. refresh_listing_counts (supabase/migrations/vote_counts_and_guest_confirm.sql)
+ * does it in one locked step, so simultaneous votes can't save or report a stale total.
+ */
+async function refreshCounts(listingId: string, added: boolean) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  const rpc = await fetch(sbUrl('rpc/refresh_listing_counts'), {
+    method: 'POST',
+    headers: sbHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_listing_id: listingId, p_day_start: today.toISOString(), p_added: added }),
+    cache: 'no-store',
+  });
+  if (rpc.ok) {
+    const row = await rpc.json().catch(() => null);
+    if (typeof row?.total_votes === 'number' && typeof row?.day_votes === 'number') {
+      return { totalVotes: row.total_votes as number, dayVotes: row.day_votes as number };
+    }
+  } else if (rpc.status !== 404) {
+    console.error('refresh_listing_counts failed:', rpc.status, await rpc.text());
+  }
+
+  // The function isn't installed: count, then save.
+  const id = encodeURIComponent(listingId);
+  const now = new Date().toISOString();
+  const extra: Record<string, string> = added ? { updated_at: now, rank_reached_at: now } : { rank_reached_at: now };
   const [totalVotes, dayVotes] = await Promise.all([
     countRows(`votes?listing_id=eq.${id}&select=id`),
     countRows(`votes?listing_id=eq.${id}&voted_at=gte.${today.toISOString()}&select=id`),
@@ -88,7 +109,7 @@ export async function removeVote(listingId: string, voterId: string): Promise<{ 
     { method: 'DELETE', headers: sbHeaders({ Prefer: 'return=minimal' }) }
   );
   if (!res.ok) throw new Error(`Failed to delete vote: ${await res.text()}`);
-  const counts = await refreshCounts(listingId, { rank_reached_at: new Date().toISOString() });
+  const counts = await refreshCounts(listingId, false);
   if (counts.totalVotes === 0) {
     const row = await fetch(sbUrl(`listings?id=eq.${id}&select=created_at`), { headers: sbHeaders() }).then(r => (r.ok ? r.json() : []));
     if (row[0]?.created_at) {

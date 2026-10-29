@@ -14,7 +14,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How does voting work on RankBid?',
-    a: 'Each person gets one vote per product on RankBid. Logged-in members vote from any listing, and anyone else can vote through a product’s shareable support link with just a name and email, no account needed. Vote counts are public and update in real time.',
+    a: 'Each person gets one vote per product on RankBid. Logged-in members vote from any listing, and anyone else can vote through a product’s shareable support link with just a name and email, no account needed (they confirm it from a link we email). Vote counts are public and update in real time.',
   },
   {
     q: 'How are rankings determined?',

@@ -22,7 +22,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     title: 'Accounts & Voting',
     body: (
       <ul>
-        <li>You need an account to submit products and to vote on the leaderboard. Through a product&apos;s support link, anyone can vote once with their name and email, no account needed.</li>
+        <li>You need an account to submit products and to vote on the leaderboard. Through a product&apos;s support link, anyone can vote once with their name and email, no account needed; a guest vote counts once it is confirmed from the link we email.</li>
         <li>Each person may vote once per product. Using multiple accounts, bots or paid votes is not allowed.</li>
         <li>Inflating click counts with bots, scripts or click farms is not allowed.</li>
         <li>You are responsible for activity on your account and for keeping your login secure.</li>

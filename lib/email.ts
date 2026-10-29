@@ -325,6 +325,24 @@ export async function sendVerifyEmail(e: { to: string; name?: string | null; ver
   return send(e.to, 'Confirm your RankBid email', html, 'Verify email');
 }
 
+/** "Confirm your vote" link for a guest vote from a /support link (valid 24 hours, single use). */
+export async function sendSupportVoteConfirm(e: { to: string; name: string; productTitle: string; confirmUrl: string }): Promise<EmailResult> {
+  const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); color: #1F2937; font-size: 15px; line-height: 1.5;">
+            <h2 style="color: #0F3460; margin-top: 0;">Confirm your vote</h2>
+            <p>Hi ${escapeHtml(e.name)},</p>
+            <p>Click the button to confirm your vote for <strong>${escapeHtml(e.productTitle)}</strong>. Your vote counts once you confirm. The link works once and expires in 24 hours.</p>
+            <a href="${safeHref(e.confirmUrl)}" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background-color: #0F3460; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">Confirm my vote</a>
+            <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">
+              Didn't vote? Ignore this email and nothing will be counted. Questions? Email ${SUPPORT_EMAIL}.
+            </p>
+          </div>
+        </div>
+      `;
+  return send(e.to, `Confirm your vote for ${e.productTitle}`, html, 'Support vote confirm');
+}
+
 /** Second sign-in step for the admin dashboard: a 6-digit code (valid 10 minutes). */
 export async function sendAdminSignInCode(e: { to: string; code: string }): Promise<EmailResult> {
   const html = `

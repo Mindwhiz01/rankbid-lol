@@ -22,6 +22,7 @@ describe('POST /api/votes', () => {
     if (c.table === 'listings' && c.method === 'GET') return json([LISTING]);
     if (c.table === 'votes' && c.method === 'POST') return votesInsert(c);
     if (c.table === 'votes' && c.method === 'GET') return json([], 200, { 'content-range': '0-0/4' });
+    if (c.url.includes('rpc/refresh_listing_counts')) return json({ total_votes: 4, day_votes: 1 });
     return undefined;
   });
 
@@ -39,13 +40,28 @@ describe('POST /api/votes', () => {
   });
 
   // Before the 2026-10-26 tuning a vote took 17 calls in 16 sequential steps.
-  it('takes at most 12 database calls, in 7 sequential steps', async () => {
+  it('takes at most 10 database calls, in 6 sequential steps', async () => {
     const { POST } = await import('@/app/api/votes/route');
     const fake = db();
     await POST(makeRequest('/api/votes', { method: 'POST', body: { listingId: 'l1' }, cookies: asMember }));
-    // session · 3 rate limits ∥ · listing, user vote, snapshot ∥ · insert · 2 recounts ∥ · listing update · user_votes
-    expect(fake.calls.length).toBeLessThanOrEqual(12);
+    // session · 3 rate limits ∥ · listing, user vote, snapshot ∥ · insert · locked recount (RPC) · user_votes
+    expect(fake.calls.length).toBeLessThanOrEqual(10);
     expect(fake.calls.filter(c => c.table === 'rate_limits')).toEqual([]); // one RPC each, not insert+count
+    expect(fake.calls.some(c => c.table === 'listings' && c.method === 'PATCH')).toBe(false); // RB-34: saved by the RPC
+  });
+
+  it('falls back to count-then-save when refresh_listing_counts is not installed', async () => {
+    const { POST } = await import('@/app/api/votes/route');
+    const fake = fakeSupabase(c => {
+      if (c.table === 'listings' && c.method === 'GET') return json([LISTING]);
+      if (c.table === 'votes' && c.method === 'POST') return new Response(null, { status: 201 });
+      if (c.table === 'votes' && c.method === 'GET') return json([], 200, { 'content-range': '0-0/4' });
+      if (c.url.includes('rpc/refresh_listing_counts')) return json({ code: 'PGRST202' }, 404);
+      return undefined;
+    });
+    const res = await POST(makeRequest('/api/votes', { method: 'POST', body: { listingId: 'l1' }, cookies: asMember }));
+    expect(await res.json()).toMatchObject({ totalVotes: 4 });
+    expect(fake.calls.some(c => c.table === 'listings' && c.method === 'PATCH')).toBe(true);
   });
 
   it('a second vote from the same account is refused by the unique index (409 → "Already voted")', async () => {

@@ -59,6 +59,7 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
   // Name saved from an earlier visit (this browser already voted), or set after voting now.
   const savedName = useSyncExternalStore(noopSubscribe, () => readSaved(listing.id), () => null);
   const [justVotedName, setJustVotedName] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const doneName = justVotedName ?? savedName;
   const done = doneName ? { name: doneName } : null;
   const [votes, setVotes] = useState(listing.totalVotes);
@@ -89,7 +90,10 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
         body: JSON.stringify({ listingId: listing.id, name, email, supportType, company, turnstileToken: captchaToken }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
+      if (res.ok && data.pending) {
+        // Counts once they click the emailed link (/support/confirm).
+        setPendingEmail(typeof data.email === 'string' ? data.email : email.trim());
+      } else if (res.ok) {
         const first = name.trim().split(' ')[0];
         if (typeof data.totalVotes === 'number') setVotes(data.totalVotes);
         setSummary(prev => prev && {
@@ -185,6 +189,23 @@ export default function SupportVoteForm({ listing }: { listing: PublicListing })
               </div>
               <Link href="/signup" className="px-4 py-2 rounded-lg bg-[#0F3460] text-white text-xs sm:text-sm font-black hover:bg-[#0D2A50] transition flex-shrink-0">Launch for free</Link>
             </div>
+          </div>
+        ) : pendingEmail ? (
+          <div className="text-center" role="status">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#0F3460]/10 text-[#0F3460] flex items-center justify-center">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16v12H4z" /><path d="M4 7l8 6 8-6" /></svg>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-[#1F2937] mb-1">Check your inbox</h2>
+            <p className="text-sm text-[#1F2937]/70 mb-4">
+              We sent a link to <strong className="break-all">{pendingEmail}</strong>. Click it to confirm, and your vote for {listing.title} will count. The link expires in 24 hours.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setPendingEmail(null); setCaptchaToken(null); }}
+              className="text-xs sm:text-sm font-bold text-[#0F3460] underline underline-offset-2"
+            >
+              Wrong email? Try again
+            </button>
           </div>
         ) : (
           <form onSubmit={submit} noValidate>
